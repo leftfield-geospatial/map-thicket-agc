@@ -3,7 +3,7 @@ from __future__ import division
 from builtins import zip
 from past.utils import old_div
 import sys
-sys.path.append("C:\Data\Development\Projects\PhD GeoInformatics\Code\Misc Tools")
+# sys.path.append("C:\Data\Development\Projects\PhD GeoInformatics\Code\Misc Tools")
 import AllometryUtils as au
 import SpatialUtils as su
 import pylab
@@ -13,9 +13,9 @@ import os
 
 ## updated allometric calcs with new AllometryUtils and latest field data
 
-allometryFileName = "C:\Data\Development\Projects\PhD GeoInformatics\Data\GEF Sampling\Final Sampling March 2019\AllometricModels.xlsx"
-litterFileName = "C:\Data\Development\Projects\PhD GeoInformatics\Data\GEF Sampling\Final Sampling March 2019\GEF_Litter_Consolidated ALL plots_Sent to Dugal_2019.05.29_Cos.xlsx"
-woodyFileName = "C:\Data\Development\Projects\PhD GeoInformatics\Data\GEF Sampling\Final Sampling March 2019\GEF_Spp list_Consolidated_ALL plots_Sent to Dugal_2019.05.31_Cos_ProblemsSolved.xlsx"
+allometryFileName = "C:\Data\Development\Projects\GEF-5 SLM\Data\Sampling Inputs\Allometry\Allometric Models.xlsx"
+litterFileName = "C:\Data\Development\Projects\GEF-5 SLM\Data\Sampling Inputs\Allometry\Litter Allometric Data.xlsx"
+woodyFileName = "C:\Data\Development\Projects\GEF-5 SLM\Data\Sampling Inputs\Allometry\Woody Allometric Data.xlsx"
 
 # reload(su)
 # reload(au)
@@ -36,16 +36,16 @@ for species in cos_species:
         print('{0} mismatch: \tCos allom: {1}\t Master allom: {2}'.format(species, cos, master))
 
 allom.EvalAllRecordCs(make_marked_file=False)
-allom.WriteAllCsFile()
+allom.WriteAllCsFile(out_file_name=r"C:\Data\Development\Projects\GEF-5 SLM\Data\Outputs\Allometry\Plant ABC.csv")
 # WoodyAllometryCalculator.EvalAllPlotCs(allom.plots)
 allom.ReadLitter(litter_file_name=litterFileName)
 allom.EvalPlotSummaryCs()
-allom.WriteSummaryFile()
+allom.WriteSummaryFile(out_file_name=r"C:\Data\Development\Projects\GEF-5 SLM\Data\Outputs\Allometry\Plot AGC.csv")
 
 # write out surrogate map for Cos
-outFileName = str.format('{0}\\Master Surrogate Map py3.csv', os.path.dirname(woodyFileName))
+outFileName = r"C:\Data\Development\Projects\GEF-5 SLM\Data\Outputs\Allometry\Master Surrogate Map.csv"
 
-with open(outFileName, 'w') as outfile:
+with open(outFileName, 'w', newline='') as outfile:
     writer = DictWriter(outfile, list(allom.master_species_map.values())[100].keys())
     writer.writeheader()
     writer.writerows(list(allom.master_species_map.values()))

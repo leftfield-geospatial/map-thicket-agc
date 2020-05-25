@@ -519,31 +519,31 @@ class WoodyAllometryCalculator(object):
 
             self.summary_plots[id] = summary_plot
 
-    def WriteAllCsFile(self):
+    def WriteAllCsFile(self, out_file_name=None):
         if len(self.plots) == 0:
             print('EvalAllRecordCs has not been called')
             return
 
-        out_file_name = str.format(str('{0}/{1} - All WoodyC.csv'), os.path.dirname(self.woody_file_name),
-                                 os.path.splitext(os.path.basename(self.woody_file_name))[0])
+        if out_file_name is None:
+            out_file_name = str.format(str('{0}/{1} - All WoodyC.csv'), os.path.dirname(self.woody_file_name),
+                                     os.path.splitext(os.path.basename(self.woody_file_name))[0])
         print('Writing plot data to: {0}'.format(out_file_name))
-        with open(out_file_name,'w') as outfile:
+        with open(out_file_name,'w', newline='') as outfile:
             writer = DictWriter(outfile, list(list(self.plots.values())[0][0].keys()))
             writer.writeheader()
             for plot in list(self.plots.values()):
                 writer.writerows(plot)
 
-    def WriteSummaryFile(self):
+    def WriteSummaryFile(self, out_file_name=None):
         if len(self.summary_plots) == 0:
             print('EvalPlotSummaryCs has not been called')
             return
 
-        out_file_name = str.format(str('{0}/{1} - Summary WoodyC & LitterC.csv'), os.path.dirname(self.woody_file_name),
-                                 os.path.splitext(os.path.basename(self.woody_file_name))[0])
+        if out_file_name is None:
+            out_file_name = str.format(str('{0}/{1} - Summary WoodyC & LitterC.csv'), os.path.dirname(self.woody_file_name),
+                                     os.path.splitext(os.path.basename(self.woody_file_name))[0])
         print('Writing plot summary to: {0}'.format(out_file_name))
-        with open(out_file_name, 'w') as outfile:
+        with open(out_file_name, 'w', newline='') as outfile:
             writer = DictWriter(outfile, list(self.summary_plots.values())[0].keys())
             writer.writeheader()
             writer.writerows(list(self.summary_plots.values()))
-
-

@@ -18,20 +18,20 @@ from collections import OrderedDict
 # from PIL import Image
 # from PIL import ImageDraw
 import sys
-sys.path.append("C:\Data\Development\Projects\PhD GeoInformatics\Code\Misc Tools")
+# sys.path.append("C:\Data\Development\Projects\PhD GeoInformatics\Code\Misc Tools")
 import SpatialUtils as su
 
 
 # |layerid=0|subset="Comment" LIKE 'H%'
 correctedShapeFileNames = [
-    r'C:\Data\Development\Projects\PhD GeoInformatics\Data\GEF Field Trial\DGPS Sept 2017\Corrected\Point_ge.shp',
-    r'C:\Data\Development\Projects\PhD GeoInformatics\Data\GEF Sampling\Sampling Dec 2017\DGPS Dec 2017\Corrected\Point_ge.shp',
-    r'C:\Data\Development\Projects\PhD GeoInformatics\Data\GEF Sampling\Sampling March 2018\DGPS\Corrected\Point_ge.shp',
-    r'C:\Data\Development\Projects\PhD GeoInformatics\Data\GEF Sampling\Sampling June 2018\DGPS\Corrected\Point_ge.shp',
-    r'C:\Data\Development\Projects\PhD GeoInformatics\Data\GEF Sampling\Sampling Sept 2018\DGPS\Corrected\Point_ge_wgs84.shp']
+    r"C:\Data\Development\Projects\GEF-5 SLM\Data\Sampling Inputs\Plot locations\Sept 2017\Point_ge.shp",
+    r"C:\Data\Development\Projects\GEF-5 SLM\Data\Sampling Inputs\Plot locations\Dec 2017\Point_ge.shp",
+    r"C:\Data\Development\Projects\GEF-5 SLM\Data\Sampling Inputs\Plot locations\March 2018\Point_ge.shp",
+    r"C:\Data\Development\Projects\GEF-5 SLM\Data\Sampling Inputs\Plot locations\June 2018\Point_ge.shp",
+    r"C:\Data\Development\Projects\GEF-5 SLM\Data\Sampling Inputs\Plot locations\Sept 2018\Point_ge.shp",
+    ]
 
-
-outShapeFileName = 'C:\Data\Development\Projects\PhD GeoInformatics\Data\GEF Sampling\GEF Plot Polygons with Agc v6.shp'
+outShapeFileName = r"C:\Data\Development\Projects\GEF-5 SLM\Data\Outputs\Geospatial\GEF Plot Polygons with AGC.shp"
 
 def world2Pixel(geoMatrix, x, y):
     """
@@ -102,14 +102,14 @@ for correctedShapeFileName in correctedShapeFileNames:
 
 ## Read the Geomax March 2019 files, correct them (and write out).  Add corrected info to the dgpsDict
 geomax_shapefile_names = [
-    "C:\Data\Development\Projects\PhD GeoInformatics\Data\GEF Sampling\Samping March 2019\DGPS\GEF_FIELD1.shp",
-    "C:\Data\Development\Projects\PhD GeoInformatics\Data\GEF Sampling\Samping March 2019\DGPS\GEF_FIELD2.shp",
-    "C:\Data\Development\Projects\PhD GeoInformatics\Data\GEF Sampling\Samping March 2019\DGPS\GEF_FIELD3.shp",
-    "C:\Data\Development\Projects\PhD GeoInformatics\Data\GEF Sampling\Samping March 2019\DGPS\GEF_FIELD4.shp"
+    r"C:\Data\Development\Projects\GEF-5 SLM\Data\Sampling Inputs\Plot locations\March 2019\GEF_FIELD1.shp",
+    r"C:\Data\Development\Projects\GEF-5 SLM\Data\Sampling Inputs\Plot locations\March 2019\GEF_FIELD2.shp",
+    r"C:\Data\Development\Projects\GEF-5 SLM\Data\Sampling Inputs\Plot locations\March 2019\GEF_FIELD3.shp",
+    r"C:\Data\Development\Projects\GEF-5 SLM\Data\Sampling Inputs\Plot locations\March 2019\GEF_FIELD4.shp",
     ]
 
 # the ref file for adjusting the above
-gcp_shapefile_name = "C:\Data\Development\Projects\PhD GeoInformatics\Data\GEF Sampling\Samping March 2019\DGPS\GeomaxFieldReferencePts.shp"
+gcp_shapefile_name = r"C:\Data\Development\Projects\GEF-5 SLM\Data\Sampling Inputs\Plot locations\March 2019\GeomaxFieldReferencePts.shp"
 
 gcp_reader = su.GdalVectorReader(gcp_shapefile_name)
 gcp_reader.read()
@@ -199,15 +199,7 @@ print(field_reader.layer_dict['GEF_FIELD4']['spatial_ref'])
 from csv import DictReader
 
 plotCsGt = {}
-# csGtFilenames = ['C:\Data\Development\Projects\PhD GeoInformatics\Code\Results\Baviaans2017FieldTrialAnalysis\Summary - Woody & Litter.csv',
-#                  'C:\Data\Development\Projects\PhD GeoInformatics\Data\GEF Sampling\Sampling Dec 2017\GEF_Woody spp_2018.03.10_MdodaQC - Summary Woody & Litter.csv',
-#                  'C:\Data\Development\Projects\PhD GeoInformatics\Data\GEF Sampling\Sampling March 2018\GEF_Woody spp_INTACT_2018.04.24_Mdoda - Summary Woody & Litter.csv',
-#                  'C:\Data\Development\Projects\PhD GeoInformatics\Data\GEF Sampling\Sampling June 2018\GEF_SS_Woody spp_2018.07.13.Mdoda - Summary Woody & Litter.csv',
-#                  'C:\Data\Development\Projects\PhD GeoInformatics\Data\GEF Sampling\Sampling June 2018\GEF_MV_Woody spp_2018.07.06.Mdoda - Summary Woody & Litter.csv']
-# csGtFilenames = ['C:\Data\Development\Projects\PhD GeoInformatics\Data\GEF Sampling\GEF_Woody spp_Consolidated_ALL plots_2018.07.31_Mdoda - Summary Woody & Litter.csv']
-# csGtFilenames = ["C:\Data\Development\Projects\PhD GeoInformatics\Data\GEF Sampling\GEF_Woody spp_Consolidated_ALL plots_2018.12.16_MdodaDC - Summary Woody & Litter.csv"]
-# csGtFilenames = ["C:\Data\Development\Projects\PhD GeoInformatics\Data\GEF Sampling\Final Sampling March 2019\GEF_Spp list_Consolidated_ALL plots_Sent to Dugal_2019.05.31_Cos_ProblemsSolved - Summary Woody & Litter.csv"]
-csGtFilenames = ["C:\Data\Development\Projects\PhD GeoInformatics\Data\GEF Sampling\Final Sampling March 2019\GEF_Spp list_Consolidated_ALL plots_Sent to Dugal_2019.05.31_Cos_ProblemsSolved - Summary WoodyC & LitterC.csv"]
+csGtFilenames = [r"C:\Data\Development\Projects\GEF-5 SLM\Data\Outputs\Allometry\Plot AGC.csv"]
 
 for csGtFilename in csGtFilenames:
     with open(csGtFilename, 'r') as csGtFile:
@@ -304,7 +296,7 @@ for plotName in np.unique(plotNames):
 ds.FlushCache()
 
 #make csv file of points for Cos
-if True:
+if False:
     import os
     from csv import DictWriter
     # write out surrogate map for Cos

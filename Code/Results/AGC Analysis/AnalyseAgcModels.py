@@ -41,16 +41,17 @@ def scatter_y_pred(y, pred, scores):
 #--------------------------------------------------------------------------------------------------------------
 # WV3 im analysis
 
-samplingPlotGtFile = "C:/Data/Development/Projects/PhD GeoInformatics/Data/GEF Sampling/GEF Plot Polygons with Agc v5.shp"
+samplingPlotGtFile = r"C:\Data\Development\Projects\GEF-5 SLM\Data\Outputs\Geospatial\GEF Plot Polygons with AGC.shp"
 # imageFile = r"D:/Data/Development/Projects/PhD GeoInformatics/Data/Digital Globe/058217622010_01/PCI Output/ATCOR/SRTM+AdjCorr Aligned Photoscan DEM/ATCORCorrected_o17OCT01084657-P2AS_R1C12-058217622010_01_P001_PhotoscanDEM_14128022_PanSharp.pix"
 # imageFile = r"D:\Data\Development\Projects\PhD GeoInformatics\Data\Digital Globe\058217622010_01\PCI Output\ATCOR\SRTM+AdjCorr Aligned Photoscan DEM\o17OCT01084657-M2AS_R1C12-058217622010_01_P001_PanAndPansharpMS.vrt" %gdal 3 issues
 # imageFile = r"D:\Data\Development\Projects\PhD GeoInformatics\Data\Digital Globe\058217622010_01\PCI Output\ATCOR\SRTM+AdjCorr Aligned Photoscan DEM\o17OCT01084657-M2AS_R1C12-058217622010_01_P001_PanAndPansharpMS.tif"
-imageFile = r"D:\Data\Development\Projects\PhD GeoInformatics\Data\Digital Globe\058217622010_01\PCI Output\ATCOR\SRTM+AdjCorr Aligned Photoscan DEM\WorldView3_Oct2017_OrthoNgiDem_AtcorSrtmAdjCorr_PanAndPandSharpMs.tif"
+# imageFile = r"D:\OneDrive\GEF Essentials\Source Images\WorldView3 Aug 2017\WorldView3_Aug2018_OrthoThinSpline_NoAtcor_PanSharpMs.tif"
+imageFile = r"D:\OneDrive\GEF Essentials\Source Images\WorldView3 Oct 2017\WorldView3_Oct2017_OrthoNgiDem_AtcorSrtmAdjCorr_PanAndPandSharpMs.tif"
 
 vr = su.GdalVectorReader(samplingPlotGtFile)
 ld = vr.read()
 imr = su.GdalImageReader(imageFile)
-fex = su.ImPlotFeatureExtractor(image_reader=imr, plot_feat_dict=ld['GEF Plot Polygons with Agc v5'])
+fex = su.ImPlotFeatureExtractor(image_reader=imr, plot_feat_dict=ld['GEF Plot Polygons with AGC'])
 # reload(su)
 implot_feat_dict = fex.extract_all_features(patch_fn=su.ImPlotFeatureExtractor.extract_patch_ms_features_ex)
 # implot_feat_dict.pop('ST49')
