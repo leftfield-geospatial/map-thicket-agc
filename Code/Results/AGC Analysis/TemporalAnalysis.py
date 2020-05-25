@@ -13,22 +13,19 @@ from sklearn import linear_model, metrics
 from scipy import stats as stats
 # reload(su)
 
-samplingPlotGtFile = "C:/Data/Development/Projects/PhD GeoInformatics/Data/GEF Sampling/GEF Plot Polygons with Agc v5.shp"
-# imageFiles = [r"D:/Data/Development/Projects/PhD GeoInformatics/Data/Digital Globe/058217622010_01/PCI Output/ATCOR/SRTM+AdjCorr Aligned Photoscan DEM/ATCORCorrected_o17OCT01084657-P2AS_R1C12-058217622010_01_P001_PhotoscanDEM_14128022_PanSharp.pix",
-#                 r"D:\Data\Development\Projects\PhD GeoInformatics\Data\Digital Globe\104001004319E100\PCI Output\Ortho\o104001004319E100_PansharpMS_thinspline_2000PanGCPs.pix",
-#                 r"D:\Data\Development\Projects\PhD GeoInformatics\Data\GEF Essentials\Source Images\NGI April 2015\Ngi_May2015_OrthoNgiDem_Xcalib_Rgbn_Mosaic.vrt"]
-                # r"D:\Data\Development\Projects\PhD GeoInformatics\Data\NGI\Rectified\3322D_2015_1001\RGBN\XCALIB\AutoGcpWv3\o3323D_2015_1001_GEF_RGBN_XCALIb_v2.vrt"]
+samplingPlotGtFile = r"C:\Data\Development\Projects\GEF-5 SLM\Data\Outputs\Geospatial\GEF Plot Polygons with AGC.shp"
+
 # new py 3 May 2020 files
-imageFiles = [r"D:\Data\Development\Projects\PhD GeoInformatics\Data\Digital Globe\058217622010_01\PCI Output\ATCOR\SRTM+AdjCorr Aligned Photoscan DEM\WorldView3_Oct2017_OrthoNgiDem_AtcorSrtmAdjCorr_PanAndPandSharpMs.tif",
-              r"D:\Data\Development\Projects\PhD GeoInformatics\Data\Digital Globe\104001004319E100\PCI Output\Ortho\WorldView3_Nov2018_OrthoThinSpline_NoAtcor_PanSharpMs.tif",
-              r"D:\Data\Development\Projects\PhD GeoInformatics\Data\Digital Globe\1040010031309600\PCI Output\Ortho\WorldView3_Aug2018_OrthoThinSpline_NoAtcor_PanSharpMs.tif",
-              r"D:\Data\Development\Projects\PhD GeoInformatics\Data\NGI\Rectified\3322D_2015_1001\RGBN\XCALIB\AutoGcpWv3\Ngi_May2015_OrthoNgiDem_Xcalib_Rgbn_Mosaic.vrt"]
+imageFiles = [r"D:\OneDrive\GEF Essentials\Source Images\WorldView3 Oct 2017\WorldView3_Oct2017_OrthoNgiDem_AtcorSrtmAdjCorr_PanAndPandSharpMs.tif",
+              r"D:\OneDrive\GEF Essentials\Source Images\WorldView3 Nov 2018\WorldView3_Nov2018_OrthoThinSpline_NoAtcor_PanSharpMs.tif",
+              r"D:\OneDrive\GEF Essentials\Source Images\WorldView3 Aug 2017\WorldView3_Aug2017_OrthoThinSpline_NoAtcor_PanSharpMs.tif",
+              r"D:\OneDrive\GEF Essentials\Source Images\NGI April 2015\Ngi_May2015_OrthoNgiDem_Xcalib_Rgbn_Mosaic.vrt"]
 
 vr = su.GdalVectorReader(samplingPlotGtFile)
 ld = vr.read()
 
 image_readers = [su.GdalImageReader(imageFile) for imageFile in imageFiles]
-feature_extractors = [su.ImPlotFeatureExtractor(image_reader=imr, plot_feat_dict=ld['GEF Plot Polygons with Agc v5']) for imr in image_readers]
+feature_extractors = [su.ImPlotFeatureExtractor(image_reader=imr, plot_feat_dict=ld['GEF Plot Polygons with AGC']) for imr in image_readers]
 implot_feat_dicts = [fex.extract_all_features(patch_fn=su.ImPlotFeatureExtractor.extract_patch_ms_features_ex) for fex in feature_extractors]
 vr.cleanup()
 for imr in image_readers:
