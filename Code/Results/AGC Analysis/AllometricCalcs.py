@@ -2,14 +2,11 @@ from __future__ import print_function
 from __future__ import division
 from builtins import zip
 from past.utils import old_div
-import sys
-# sys.path.append("C:\Data\Development\Projects\PhD GeoInformatics\Code\Misc Tools")
 import AllometryUtils as au
 import SpatialUtils as su
 import pylab
 import numpy as np
 from csv import DictWriter
-import os
 
 ## updated allometric calcs with new AllometryUtils and latest field data
 
@@ -20,24 +17,24 @@ woodyFileName = "C:\Data\Development\Projects\GEF-5 SLM\Data\Sampling Inputs\All
 # reload(su)
 # reload(au)
 
-allom = au.WoodyAllometryCalculator(allometry_file_name=allometryFileName, woody_file_name=woodyFileName,
-                                    correction_method=au.CorrectionMethod.NicklessZou)
+allom = au.AgcAllometry(model_file_name=allometryFileName, data_file_name=woodyFileName,
+                        correction_method=au.CorrectionMethod.NicklessZou)
 
 allom.ReadAllometryFile()
 allom.ReadMasterSpeciesMap()
 
 # compare master map and cos' map
 cos_species = np.array(list(allom.cos_surrogate_map.keys()))
-master_species = np.array(list(allom.master_species_map.keys()))
+master_species = np.array(list(allom.master_surrogate_map.keys()))
 for species in cos_species:
     cos = allom.cos_surrogate_map[species]['allom_species']
-    master = allom.master_species_map[species]['allom_species']
+    master = allom.master_surrogate_map[species]['allom_species']
     if cos != master:
         print('{0} mismatch: \tCos allom: {1}\t Master allom: {2}'.format(species, cos, master))
 
 allom.EvalAllRecordCs(make_marked_file=False)
 allom.WriteAllCsFile(out_file_name=r"C:\Data\Development\Projects\GEF-5 SLM\Data\Outputs\Allometry\Plant ABC.csv")
-# WoodyAllometryCalculator.EvalAllPlotCs(allom.plots)
+# AgcAllometry.EvalAllPlotCs(allom.plots)
 allom.ReadLitter(litter_file_name=litterFileName)
 allom.EvalPlotSummaryCs()
 allom.WriteSummaryFile(out_file_name=r"C:\Data\Development\Projects\GEF-5 SLM\Data\Outputs\Allometry\Plot AGC.csv")
@@ -46,9 +43,9 @@ allom.WriteSummaryFile(out_file_name=r"C:\Data\Development\Projects\GEF-5 SLM\Da
 outFileName = r"C:\Data\Development\Projects\GEF-5 SLM\Data\Outputs\Allometry\Master Surrogate Map.csv"
 
 with open(outFileName, 'w', newline='') as outfile:
-    writer = DictWriter(outfile, list(allom.master_species_map.values())[100].keys())
+    writer = DictWriter(outfile, list(allom.master_surrogate_map.values())[100].keys())
     writer.writeheader()
-    writer.writerows(list(allom.master_species_map.values()))
+    writer.writerows(list(allom.master_surrogate_map.values()))
 
 
 # look at rel betw vol and yc

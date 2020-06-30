@@ -1,3 +1,6 @@
+'''
+
+'''
 from __future__ import print_function
 from __future__ import division
 from builtins import str
@@ -13,23 +16,156 @@ from collections import OrderedDict
 import os.path
 from scipy import stats as stats
 from enum import Enum
+import warnings
 
 fontSize = 16
 
+
+def FormatSpecies(species):
+    ''' Formats the species name into abbreviated dot notation
+
+    Parameters
+    ----------
+    species
+        the species name e.g. 'Portulacaria afra'
+
+    Returns
+    -------
+        the abbreviated species name e.g. 'P.afra'        
+    '''
+    species = str(species).strip()
+    comps = species.split(' ', 1)
+    if len(comps) > 1:
+        abbrev_species = str.format(str("{0}.{1}"), comps[0][0], comps[1].strip())
+    else:
+        abbrev_species = species
+    return abbrev_species
+
 class CorrectionMethod(Enum):
+    ''' Aboveground biomass correction method
+    '''
     Duan = 1
     MinimumBias = 2
     NicklessZou = 3
 
+class AbcModel(object):
+    def __init__(self, model_dict={}, surrogate_dict=None, correction_method=CorrectionMethod.NicklessZou):
+        ''' Estimate woody / above ground carbon (ABC) from allometric measurements
+
+        Parameters
+        ----------
+        model_dict
+            dictionary of woody allometric models
+            (see table 3 in https://www.researchgate.net/publication/335531470_Aboveground_biomass_and_carbon_pool_estimates_of_Portulacaria_afra_spekboom-rich_subtropical_thicket_with_species-specific_allometric_models)
+        surrogate_dict
+            dictionary of known surrogate species for which models exist
+            surrogate species are species contained in the keys of model_dict i.e. for which models exist
+            (see supplementary data in https://doi.org/10.1016/j.foreco.2019.05.048)
+        correction_method
+            ABC correction method to use (default CorrectionMethod.NicklessZou)
+        '''
+        self.model_dict = model_dict
+        self.surrogate_dict = surrogate_dict
+        self.correction_method = correction_method
+
+    def EstimateAbc(self, meas_dict={'canopy_length': 0., 'canopy_width': 0., 'height': 0.}):
+        ''' Apply allometric model to measurements
+
+        Parameters
+        ----------
+        meas_dict
+            dictionary of plant measurements
+
+        Returns
+        -------
+            ABC results in a dict (see fields in supplementary data in https://doi.org/10.1016/j.foreco.2019.05.048)
+        '''
+        res = {'yc':0.,     # Above ground carbon (ABC) in kg
+               'yc_lc':0.,  #
+               'yc_uc':0.,
+               'height':0.,
+               'area':0.,
+               'vol':0.}
+        species =str(meas_dict['species']).strip()
+
+        x = 0.
+        CD = np.mean([meas_dict['canopy_length'], meas_dict['canopy_width']])
+        CA = np.pi * (CD/2)**2
+        # NB leave height in cm as other code assumes cm, but convert vol and area to m to avoid large num + overflow
+        res['height'] = meas_dict['height']                 # pass through plant height (cm)
+        res['area'] = CA/1.e4                               # canopy area (m**2)
+        res['vol'] = CA*meas_dict['height']/1.e6            # cylindrical plant volume in (m**3)
+
+        # check in surrogate_dict , then return area / vol only (yc = 0)
+        if species not in self.surrogate_dict:
+            warnings.warn('{0} has no key in species map, setting yc = 0'.format(species))
+            return res
+        allom_species = self.surrogate_dict[species]['allom_species']
+        if allom_species == 'none':
+            warnings.warn('{0} has no model, setting yc = 0'.format(species))
+            return res
+        elif allom_species not in self.model_dict:  # should never happen
+            raise Exception('{0} has no key in model_dict'.format(allom_species))
+
+        model = self.model_dict[allom_species]
+
+        if model['vars'] == 'CA.H':
+            x = CA*meas_dict['height']
+        elif model['vars'] == 'CA.SL':
+            x = CA*meas_dict['height']
+        elif model['vars'] == 'CD':
+            x = CD
+        elif model['vars'] == 'CD.H':
+            x = CD*meas_dict['height']
+        elif model['vars'] == 'Hgt':
+            x = meas_dict['height']
+        else:
+            raise Exception('{0}: unknown variable', model['vars'])
+
+        yn = np.exp(model['ay'])*x**model['by']   # "naive"
+
+        # correct to yc
+        if self.correction_method == CorrectionMethod.Duan:
+            yc = yn * model['Duan']
+        elif self.correction_method == CorrectionMethod.MinimumBias:
+            yc = yn * model['MB']
+        else:                     # CorrectionMethod.NicklessZou
+            if yn == 0.:
+                yc = 0.
+            else:
+                yc = np.exp(np.log(yn) + (model['sigma']**2)/2.)
+
+        if model['use_wd_ratio']:
+            wd_species = self.master_species_map[species]['wd_species']
+            if wd_species not in self.wd_ratios:
+                print('WARNING: Evalmeas_dictCs - {0} has no key in wd_ratios, using 1'.format(wd_species))
+            else:
+                yc = yc * self.wd_ratios[wd_species]['wd_ratio']
+
+        res['yc'] = yc * 0.48
+        res['yc_lc'] = yc * model['LC']
+        res['yc_uc'] = yc * model['UC']
+        return res
+
 ## Class to read in allom and wd ratio tables, and calc yc for a record
-class WoodyAllometryCalculator(object):
-    def __init__(self, allometry_file_name="", woody_file_name="", correction_method = CorrectionMethod.NicklessZou):
-        self.allometry_file_name = allometry_file_name
-        self.woody_file_name = woody_file_name
-        if not os.path.exists(allometry_file_name):
-            raise Exception("Allometry file does not exist: {0}".format(allometry_file_name))
-        if not os.path.exists(woody_file_name):
-            raise Exception("WoodyC file does not exist: {0}".format(woody_file_name))
+class AgcAllometry(object):
+    '''
+    '''
+    def __init__(self, model_file_name="", data_file_name="", correction_method = CorrectionMethod.NicklessZou):
+        '''
+
+        Parameters
+        ----------
+        model_file_name
+        data_file_name
+        correction_method
+        '''
+        self.allometry_file_name = model_file_name
+        self.woody_file_name = data_file_name
+        if not os.path.exists(model_file_name):
+            raise Exception("Allometry file does not exist: {0}".format(model_file_name))
+        if not os.path.exists(data_file_name):
+            raise Exception("WoodyC file does not exist: {0}".format(data_file_name))
         self.allom_models = {}
         self.wd_ratios = {}
         self.mvdv_surrogate_map = {}
@@ -40,15 +176,6 @@ class WoodyAllometryCalculator(object):
         # self.ReadAllometryFile()
         # self.ReadMasterSpeciesMap()
 
-    @staticmethod
-    def AbbrevSpeciesName(species):
-        species = str(species).strip()
-        comps = species.split(' ', 1)
-        if len(comps) > 1:
-            abbrev_species = str.format(str("{0}.{1}"), comps[0][0], comps[1].strip())
-        else:
-            abbrev_species = species
-        return abbrev_species
 
     def ReadAllometryFile(self):
         wb = load_workbook(self.allometry_file_name)
@@ -65,7 +192,7 @@ class WoodyAllometryCalculator(object):
                 break
             # species = str.strip(str(r[0].value[0]) + '.' + str(r[1].value))
             species = str.strip(str(r[0].value)) + ' ' + str.strip(str(r[1].value))
-            species = self.AbbrevSpeciesName(species)
+            species = FormatSpecies(species)
             model = {}
             # model['allom_species'] = species
             model['vars'] = r[3].value
@@ -96,7 +223,7 @@ class WoodyAllometryCalculator(object):
                 break
             # species = str.strip(str(r[0].value[0]) + '.' + str(r[1].value))
             species = str.strip(str(r[0].value)) + ' ' + str.strip(str(r[1].value))
-            species = self.AbbrevSpeciesName(species)
+            species = FormatSpecies(species)
             model = {}
             model['wd_species'] = species
             model['wd_ratio'] = r[4].value
@@ -116,12 +243,12 @@ class WoodyAllometryCalculator(object):
                 break
 
             species = str.strip(str(r[0].value))
-            species = self.AbbrevSpeciesName(species)
+            species = FormatSpecies(species)
             model = {}
             model['species'] = species
-            model['allom_species'] = self.AbbrevSpeciesName(str.strip(str(r[1].value)))
+            model['allom_species'] = FormatSpecies(str.strip(str(r[1].value)))
             if r[2].value is not None:
-                model['wd_species'] = self.AbbrevSpeciesName(str.strip(str(r[2].value)))
+                model['wd_species'] = FormatSpecies(str.strip(str(r[2].value)))
             else:
                 model['wd_species'] = None
             self.mvdv_surrogate_map[species] = model
@@ -151,7 +278,7 @@ class WoodyAllometryCalculator(object):
             # map_species = str(r[3].value).strip().replace('. ', '.')
             model = {}
             model['species'] = species
-            model['allom_species'] = self.AbbrevSpeciesName(map_species)
+            model['allom_species'] = FormatSpecies(map_species)
             if species in self.wd_ratios:
                 model['wd_species'] = species
             elif model['allom_species'] in self.wd_ratios:
