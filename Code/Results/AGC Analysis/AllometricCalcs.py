@@ -10,42 +10,42 @@ from csv import DictWriter
 
 ## updated allometric calcs with new AllometryUtils and latest field data
 
-allometryFileName = "C:\Data\Development\Projects\GEF-5 SLM\Data\Sampling Inputs\Allometry\Allometric Models.xlsx"
-litterFileName = "C:\Data\Development\Projects\GEF-5 SLM\Data\Sampling Inputs\Allometry\Litter Allometric Data.xlsx"
-woodyFileName = "C:\Data\Development\Projects\GEF-5 SLM\Data\Sampling Inputs\Allometry\Woody Allometric Data.xlsx"
+model_file_name = "C:\Data\Development\Projects\GEF-5 SLM\Data\Sampling Inputs\Allometry\Allometric Models.xlsx"
+litter_file_name = "C:\Data\Development\Projects\GEF-5 SLM\Data\Sampling Inputs\Allometry\Litter Allometric Data.xlsx"
+woody_file_name = "C:\Data\Development\Projects\GEF-5 SLM\Data\Sampling Inputs\Allometry\Woody Allometric Data.xlsx"
 
 # reload(su)
 # reload(au)
 
-allom = au.AgcAllometry(model_file_name=allometryFileName, data_file_name=woodyFileName,
-                        correction_method=au.CorrectionMethod.NicklessZou)
+allom = au.AgcAllometry(model_file_name=model_file_name,
+                        correction_method=au.WoodyBiomassCorrectionMethod.NicklessZou)
 
 allom.ReadAllometryFile()
 allom.ReadMasterSpeciesMap()
 
 # compare master map and cos' map
-cos_species = np.array(list(allom.cos_surrogate_map.keys()))
-master_species = np.array(list(allom.master_surrogate_map.keys()))
+cos_species = np.array(list(allom.cb_surrogate_dict.keys()))
+master_species = np.array(list(allom.master_surrogate_dict.keys()))
 for species in cos_species:
-    cos = allom.cos_surrogate_map[species]['allom_species']
-    master = allom.master_surrogate_map[species]['allom_species']
+    cos = allom.cb_surrogate_dict[species]['allom_species']
+    master = allom.master_surrogate_dict[species]['allom_species']
     if cos != master:
         print('{0} mismatch: \tCos allom: {1}\t Master allom: {2}'.format(species, cos, master))
 
-allom.EvalAllRecordCs(make_marked_file=False)
+allom.EstimatePlantAbc(data_file_name=woody_file_name, make_marked_file=False)
 allom.WriteAllCsFile(out_file_name=r"C:\Data\Development\Projects\GEF-5 SLM\Data\Outputs\Allometry\Plant ABC.csv")
 # AgcAllometry.EvalAllPlotCs(allom.plots)
-allom.ReadLitter(litter_file_name=litterFileName)
-allom.EvalPlotSummaryCs()
+allom.__ReadLitter(litter_file_name=litter_file_name)
+allom.EvalPlotSummaryCs(litter_file_name=litter_file_name)
 allom.WriteSummaryFile(out_file_name=r"C:\Data\Development\Projects\GEF-5 SLM\Data\Outputs\Allometry\Plot AGC.csv")
 
 # write out surrogate map for Cos
 outFileName = r"C:\Data\Development\Projects\GEF-5 SLM\Data\Outputs\Allometry\Master Surrogate Map.csv"
 
 with open(outFileName, 'w', newline='') as outfile:
-    writer = DictWriter(outfile, list(allom.master_surrogate_map.values())[100].keys())
+    writer = DictWriter(outfile, list(allom.master_surrogate_dict.values())[100].keys())
     writer.writeheader()
-    writer.writerows(list(allom.master_surrogate_map.values()))
+    writer.writerows(list(allom.master_surrogate_dict.values()))
 
 
 # look at rel betw vol and yc

@@ -17,11 +17,14 @@ import os.path
 from scipy import stats as stats
 from enum import Enum
 import warnings
+from openpyxl.styles import PatternFill
+from openpyxl.styles.colors import Color
+from openpyxl.styles import colors
 
 fontSize = 16
 
 
-def FormatSpecies(species):
+def FormatSpeciesName(species):
     ''' Formats the species name into abbreviated dot notation
 
     Parameters
@@ -41,16 +44,16 @@ def FormatSpecies(species):
         abbrev_species = species
     return abbrev_species
 
-class CorrectionMethod(Enum):
+class WoodyBiomassCorrectionMethod(Enum):
     ''' Aboveground biomass correction method
     '''
     Duan = 1
     MinimumBias = 2
     NicklessZou = 3
 
-class AbcModel(object):
-    def __init__(self, model_dict={}, surrogate_dict=None, correction_method=CorrectionMethod.NicklessZou):
-        ''' Estimate woody / above ground carbon (ABC) from allometric measurements
+class WoodyAbcModel(object):
+    def __init__(self, model_dict={}, surrogate_dict={}, correction_method=WoodyBiomassCorrectionMethod.NicklessZou):
+        ''' Object for estimating woody / above ground carbon (ABC) from allometric measurements
 
         Parameters
         ----------
@@ -58,57 +61,58 @@ class AbcModel(object):
             dictionary of woody allometric models
             (see table 3 in https://www.researchgate.net/publication/335531470_Aboveground_biomass_and_carbon_pool_estimates_of_Portulacaria_afra_spekboom-rich_subtropical_thicket_with_species-specific_allometric_models)
         surrogate_dict
-            dictionary of known surrogate species for which models exist
-            surrogate species are species contained in the keys of model_dict i.e. for which models exist
+            map from actual species to surrogate species for which models and wet/dry ratios exist
             (see supplementary data in https://doi.org/10.1016/j.foreco.2019.05.048)
         correction_method
-            ABC correction method to use (default CorrectionMethod.NicklessZou)
+            Biomass correction method to use (default WoodyBiomassCorrectionMethod.NicklessZou)
         '''
         self.model_dict = model_dict
         self.surrogate_dict = surrogate_dict
         self.correction_method = correction_method
 
-    def EstimateAbc(self, meas_dict={'canopy_length': 0., 'canopy_width': 0., 'height': 0.}):
+    def Estimate(self, meas_dict={'species': '', 'canopy_length': 0., 'canopy_width': 0., 'height': 0.}):
         ''' Apply allometric model to measurements
 
         Parameters
         ----------
         meas_dict
-            dictionary of plant measurements
+            dictionary of plant species and measurements
 
         Returns
         -------
             ABC results in a dict (see fields in supplementary data in https://doi.org/10.1016/j.foreco.2019.05.048)
+                abc_dict = {'yc':0.,    # Estimated biomass (kg)
+                       'yc_lc':0.,      # yc lower confidence interval (kg)
+                       'yc_uc':0.,      # yc upper confidence interval (kg)
+                       'height':0.,     # plant height (cm)
+                       'area':0.,       # canopy area (m**2)
+                       'vol':0.}        # cylindrical plant volume (m**3)
         '''
-        res = {'yc':0.,     # Above ground carbon (ABC) in kg
-               'yc_lc':0.,  #
-               'yc_uc':0.,
-               'height':0.,
-               'area':0.,
-               'vol':0.}
+        abc_dict = {'yc':0., 'yc_lc':0., 'yc_uc':0., 'height':0., 'area':0., 'vol':0.}  # default return valued
         species =str(meas_dict['species']).strip()
 
         x = 0.
-        CD = np.mean([meas_dict['canopy_length'], meas_dict['canopy_width']])
-        CA = np.pi * (CD/2)**2
-        # NB leave height in cm as other code assumes cm, but convert vol and area to m to avoid large num + overflow
-        res['height'] = meas_dict['height']                 # pass through plant height (cm)
-        res['area'] = CA/1.e4                               # canopy area (m**2)
-        res['vol'] = CA*meas_dict['height']/1.e6            # cylindrical plant volume in (m**3)
+        CD = np.mean([meas_dict['canopy_length'], meas_dict['canopy_width']])   # canopy diameter
+        CA = np.pi * (CD/2)**2                                                  # canopy area
+        # Leave height in cm as other code assumes cm, but convert vol and area to m
+        abc_dict['height'] = meas_dict['height']                 # pass through plant height (cm)
+        abc_dict['area'] = CA/1.e4                               # canopy area (m**2)
+        abc_dict['vol'] = CA*meas_dict['height']/1.e6            # cylindrical plant volume in (m**3)
 
         # check in surrogate_dict , then return area / vol only (yc = 0)
         if species not in self.surrogate_dict:
             warnings.warn('{0} has no key in species map, setting yc = 0'.format(species))
-            return res
+            return abc_dict
         allom_species = self.surrogate_dict[species]['allom_species']
         if allom_species == 'none':
             warnings.warn('{0} has no model, setting yc = 0'.format(species))
-            return res
+            return abc_dict
         elif allom_species not in self.model_dict:  # should never happen
             raise Exception('{0} has no key in model_dict'.format(allom_species))
 
         model = self.model_dict[allom_species]
 
+        # apply allometric model
         if model['vars'] == 'CA.H':
             x = CA*meas_dict['height']
         elif model['vars'] == 'CA.SL':
@@ -125,435 +129,295 @@ class AbcModel(object):
         yn = np.exp(model['ay'])*x**model['by']   # "naive"
 
         # correct to yc
-        if self.correction_method == CorrectionMethod.Duan:
+        if self.correction_method == WoodyBiomassCorrectionMethod.Duan:
             yc = yn * model['Duan']
-        elif self.correction_method == CorrectionMethod.MinimumBias:
+        elif self.correction_method == WoodyBiomassCorrectionMethod.MinimumBias:
             yc = yn * model['MB']
-        else:                     # CorrectionMethod.NicklessZou
+        else:
             if yn == 0.:
                 yc = 0.
             else:
                 yc = np.exp(np.log(yn) + (model['sigma']**2)/2.)
 
         if model['use_wd_ratio']:
-            wd_species = self.master_species_map[species]['wd_species']
+            wd_species = self.surrogate_dict[species]['wd_species']
             if wd_species not in self.wd_ratios:
-                print('WARNING: Evalmeas_dictCs - {0} has no key in wd_ratios, using 1'.format(wd_species))
+                print('WARNING: Evalmeas_dictCs - {0} has no key in wd_ratio_dict, using 1'.format(wd_species))
             else:
                 yc = yc * self.wd_ratios[wd_species]['wd_ratio']
 
-        res['yc'] = yc * 0.48
-        res['yc_lc'] = yc * model['LC']
-        res['yc_uc'] = yc * model['UC']
-        return res
+        abc_dict['yc'] = yc * 0.48              # conversion factor from dry weight to carbon
+        abc_dict['yc_lc'] = yc * model['LC']
+        abc_dict['yc_uc'] = yc * model['UC']
+        return abc_dict
 
-## Class to read in allom and wd ratio tables, and calc yc for a record
 class AgcAllometry(object):
-    '''
-    '''
-    def __init__(self, model_file_name="", data_file_name="", correction_method = CorrectionMethod.NicklessZou):
-        '''
+    def __init__(self, model_file_name='', correction_method = WoodyBiomassCorrectionMethod.NicklessZou):
+        ''' Class to construct allometric models and estimate AGC from woody and litter measurements
 
         Parameters
         ----------
         model_file_name
-        data_file_name
+            excel spreadsheet specifying allometric models, surrogate tables and wet/dry ratios
+            (constructed from supplementary data in https://doi.org/10.1016/j.foreco.2019.05.048)
         correction_method
+            Biomass correction method to use (default WoodyBiomassCorrectionMethod.NicklessZou)
         '''
-        self.allometry_file_name = model_file_name
-        self.woody_file_name = data_file_name
-        if not os.path.exists(model_file_name):
-            raise Exception("Allometry file does not exist: {0}".format(model_file_name))
-        if not os.path.exists(data_file_name):
-            raise Exception("WoodyC file does not exist: {0}".format(data_file_name))
-        self.allom_models = {}
-        self.wd_ratios = {}
-        self.mvdv_surrogate_map = {}
-        self.master_species_map = {}
+        self.correction_method = correction_method
+        self.__ConstructModels(model_file_name)
+        self.__ConstructSurrogateMap(model_file_name)
         self.plots = {}
         self.litter_dict = {}
-        self.correction_method = correction_method
-        # self.ReadAllometryFile()
-        # self.ReadMasterSpeciesMap()
 
+    def __ConstructModels(self, model_file_name):
+        ''' Read in allometric models, surrogate tables and wet/dry ratios from excel file
 
-    def ReadAllometryFile(self):
-        wb = load_workbook(self.allometry_file_name)
-        # read in a dictionary of allometric models
-        ws = wb["Allometric Models"]
-        first_row = ws[1]
-        header = []
-        for c in first_row:
-            header.append(c.value)
+        Parameters
+        ----------
+        model_file_name
+            excel spreadsheet specifying allometric models, surrogate tables and wet/dry ratios
+            (constructed from supplementary data in https://doi.org/10.1016/j.foreco.2019.05.048)
+        '''
+        self.model_dict = {}
+        self.master_surrogate_dict = {}
 
-        self.allom_models = {}
-        for r in ws[2:ws.max_row]:  # how to find num rows?
-            if r[0].value is None:
-                break
-            # species = str.strip(str(r[0].value[0]) + '.' + str(r[1].value))
-            species = str.strip(str(r[0].value)) + ' ' + str.strip(str(r[1].value))
-            species = FormatSpecies(species)
-            model = {}
-            # model['allom_species'] = species
-            model['vars'] = r[3].value
-            model['ay'] = r[6].value
-            model['by'] = r[7].value
-            model['sigma'] = r[8].value
-            model['LC'] = r[9].value
-            model['UC'] = r[10].value
-            model['Duan'] = r[12].value
-            model['MB'] = r[13].value
-            if str(r[14].value) == 'x':
-                model['use_wd_ratio'] = False
-            else:
-                model['use_wd_ratio'] = True
-            self.allom_models[species] = model
-        ws = None
+        self.model_file_name = model_file_name
+        if not os.path.exists(model_file_name):
+            raise Exception("Model file {0} does not exist".format(model_file_name))
+        with load_workbook(self.model_file_name) as wb:
 
-        # read in a dictionary of wet/dry ratios
-        ws = wb["Wet Dry Ratios"]
-        first_row = ws[0 + 1]
-        header = []
-        for c in first_row:
-            header.append(c.value)
-
-        self.wd_ratios = {}
-        for r in ws[2:ws.max_row]:  # how to find num rows?
-            if r[0].value is None:
-                break
-            # species = str.strip(str(r[0].value[0]) + '.' + str(r[1].value))
-            species = str.strip(str(r[0].value)) + ' ' + str.strip(str(r[1].value))
-            species = FormatSpecies(species)
-            model = {}
-            model['wd_species'] = species
-            model['wd_ratio'] = r[4].value
-            self.wd_ratios[species] = model
-        ws = None
-
-        # read in a Marius' surrogate table
-        ws = wb["Surrogates"]
-        first_row = ws[0 + 1]
-        header = []
-        for c in first_row:
-            header.append(c.value)
-
-        self.mvdv_surrogate_map = {}
-        for r in ws[2:ws.max_row]:
-            if r[0].value is None:
-                break
-
-            species = str.strip(str(r[0].value))
-            species = FormatSpecies(species)
-            model = {}
-            model['species'] = species
-            model['allom_species'] = FormatSpecies(str.strip(str(r[1].value)))
-            if r[2].value is not None:
-                model['wd_species'] = FormatSpecies(str.strip(str(r[2].value)))
-            else:
-                model['wd_species'] = None
-            self.mvdv_surrogate_map[species] = model
-        wb.close()
-        wb = None
-
-
-    def ReadMasterSpeciesMap(self):
-        import copy
-        wb = load_workbook(self.woody_file_name)
-
-        self.cos_surrogate_map = {}
-        ws = wb.get_sheet_by_name("Master spp list")
-        first_row = ws[1]
-        header = []
-        for c in first_row:
-            header.append(c.value)
-        for r in ws[2:ws.max_row]:
-            # if r[2].value is None:  # no mapping yet
-            #     continue
-            species = str(r[1].value).strip()
-
-            for c in r[6:]:     # check this - Cos changed the spreadsheet format
-                if c.value is not None and c.value != "":
-                    map_species = str(c.value).strip()  # .replace('. ', '.')
+            # read in a dictionary of allometric models
+            ws = wb["Allometric Models"]
+            # header = [c.value for c in ws[1]]
+            for r in ws[2:ws.max_row]:
+                if r[0].value is None:
                     break
-            # map_species = str(r[3].value).strip().replace('. ', '.')
-            model = {}
-            model['species'] = species
-            model['allom_species'] = FormatSpecies(map_species)
-            if species in self.wd_ratios:
-                model['wd_species'] = species
-            elif model['allom_species'] in self.wd_ratios:
-                model['wd_species'] = model['allom_species']
-            else:
-                model['wd_species'] = None
+                species = FormatSpeciesName('{0} {1}'.format(str(r[0].value).strip(), str(r[1].value).strip()))
+                model = {'vars': r[3].value, 'ay': r[6].value, 'by': r[7].value, 'sigma': r[8].value, 'LC': r[9].value,
+                         'UC': r[10].value, 'Duan': r[12].value, 'MB': r[13].value,
+                         'use_wd_ratio': False if (str(r[14].value) == 'x') else True}
+                self.model_dict[species] = model
+            ws = None
 
-            model['species_full'] = str(r[0].value).strip()  # hack for translating between name formats
-            self.cos_surrogate_map[species] = model
-        #     if not self.allom_models.has_key(map_species):
-        #         print self.cos_surrogate_map[species], " not found in allometric models"
-        #         c.fill = PatternFill(fgColor='FFEE08', fill_type='solid')
-        #     else:
-        #         c.fill = PatternFill(fgColor='FFFFFF', fill_type='solid')
-        # wb.save(filename=woodyErrorFileName)
-        wb.close()
-        wb = None
-        if False:   # try use only Cos' map
-            self.master_species_map = self.cos_surrogate_map
-            return
+            # read in a dictionary of wet/dry ratios
+            ws = wb["Wet Dry Ratios"]
+            self.wd_ratio_dict = {}
+            for r in ws[2:ws.max_row]:
+                if r[0].value is None:
+                    break
+                species = FormatSpeciesName('{0} {1}'.format(str(r[0].value).strip(), str(r[1].value).strip()))
+                model = {'wd_species': species, 'wd_ratio': r[4].value}
+                self.wd_ratio_dict[species] = model
+
+
+    def __ConstructSurrogateMap(self, model_file_name):
+        ''' Construct master surrogate species map from combination of Cos Bolus and Marius van der Vyver contributions
+
+        Parameters
+        ----------
+        model_file_name
+            excel spreadsheet specifying allometric models, surrogate tables and wet/dry ratios
+        '''
+        import copy
+        self.model_file_name = model_file_name
+        if not os.path.exists(model_file_name):
+            raise Exception("Model file {0} does not exist".format(model_file_name))
+
+        with load_workbook(self.model_file_name) as wb:
+            # read in a Marius van der Vyver's surrogate map
+            ws = wb["Surrogates"]
+            # header = [c.value for c in ws[1]]
+            self.mvdv_surrogate_dict = {}
+            for r in ws[2:ws.max_row]:
+                if r[0].value is None:
+                    break
+
+                species = FormatSpeciesName(str(r[0].value).strip())
+                model = {'species': species, 'allom_species': FormatSpeciesName(str(r[1].value).strip()),
+                         FormatSpeciesName(str(r[2].value).strip()) if r[2].value is not None else None}
+                self.mvdv_surrogate_dict[species] = model
+
+            self.cb_surrogate_dict = {}
+
+            # read in a Cos Bolus' surrogate map
+            ws = wb.get_sheet_by_name("CB Surrogates")
+            for r in ws[2:ws.max_row]:
+                species = str(r[1].value).strip()
+
+                for c in r[6:]:     # check spreadsheet format
+                    if (c.value is not None) and (c.value != ''):
+                        map_species = str(c.value).strip()
+                        break
+
+                # add wet/dry surrogate
+                wd_species = None
+                if species in self.wd_ratio_dict:
+                    wd_species = species
+                elif model['allom_species'] in self.wd_ratio_dict:
+                    wd_species = model['allom_species']
+
+                model = {'species': species, 'allom_species': FormatSpeciesName(map_species), 'wd_species': wd_species,
+                        'species_full': str(r[0].value).strip()}  # hack for translating between name formats
+                self.cb_surrogate_dict[species] = model
 
         # combine the two species maps into one
-        self.master_species_map = {}
-        # first copy across Marius map as is
-        print('Parse MVDV surrogate map---------------------------------------------------------------------------------')
-        for species, map in self.mvdv_surrogate_map.items():
+        self.master_surrogate_dict = {}
+        # copy across Marius' map
+        for species, surrogate_species_dict in self.mvdv_surrogate_dict.items():
             # use abbrev name as the key always
-            self.master_species_map[species] = copy.deepcopy(map)
-            # self.master_species_map[species]['species'] = species
-            # error check this map
-            if map['allom_species'] not in self.allom_models:
-                print('WARNING: species: {0}, allom surrogate: {1} - No allometric model'.format(species, map['allom_species']))
+            self.master_surrogate_dict[species] = copy.deepcopy(surrogate_species_dict)
+            # do some error checking
+            if surrogate_species_dict['allom_species'] not in self.model_dict:
+                warnings.warn('Species: {0}, allom surrogate: {1} - No allometric model'.format(species, surrogate_species_dict['allom_species']))
             else:
-                if self.allom_models[map['allom_species']]['use_wd_ratio']:
-                    if map['wd_species'] is not None:
-                        if map['wd_species'] not in self.wd_ratios:
-                            print('WARNING: species: {0}, wd surrogate: {1} - No wet:dry ratio'.format(species, map['wd_species']))
-                            self.master_species_map[species]['wd_species'] = None
+                if self.model_dict[surrogate_species_dict['allom_species']]['use_wd_ratio']:
+                    if surrogate_species_dict['wd_species'] is not None:
+                        if surrogate_species_dict['wd_species'] not in self.wd_ratio_dict:
+                            warnings.warn('Species: {0}, wd surrogate: {1} - No wet:dry ratio'.format(species,
+                                                                                                      surrogate_species_dict['wd_species']))
+                            self.master_surrogate_dict[species]['wd_species'] = None
                     else:
-                        print('WARNING: species: {0}, no wd surrogate'.format(species))
-                else:
-                    print('NOTE: species: {0}, allom surrogate {1}, needs no wet:dry surrogate'.format(species, map['allom_species']))
-                    # self.master_species_map[species]['wd_species'] = None
+                        warnings.warn('Species: {0}, no wd surrogate'.format(species))
 
-        # now add Cos' map, adding wd_ratios
-        print('Parse CB master map-------------------------------------------------------------------------------------')
-        for species, map in self.cos_surrogate_map.items():
-            if species not in self.master_species_map:
-                self.master_species_map[species] = copy.deepcopy(map)
-                # self.master_species_map[species]['species'] = species
+        # now add Cos' map, with wet/dry ratios
+        for species, surrogate_species_dict in self.cb_surrogate_dict.items():
+            if species not in self.master_surrogate_dict:
+                self.master_surrogate_dict[species] = copy.deepcopy(surrogate_species_dict)
 
-                if map['allom_species'] == 'none':  # this has no surrogate at all and is excluded
-                    self.master_species_map[species]['wd_species'] = None
-                    print('NOTE: species: {0}, has no surrogates '.format(species))
-                # if the source species has wd_ratio then refer to this directly
-                elif species in self.wd_ratios:
-                    self.master_species_map[species]['wd_species'] = species
-                # else if the allom species has wd_ratio then refer to this
-                elif map['allom_species'] in self.wd_ratios:
-                    self.master_species_map[species]['wd_species'] = map['allom_species']
-                # else check we actually need a wd ratio
-                elif self.allom_models[map['allom_species']]['use_wd_ratio']:
-                    # look ip wd species from in surrogate map for allom surrogate if possible
-                    if map['allom_species'] in self.mvdv_surrogate_map and self.mvdv_surrogate_map[map['allom_species']]['wd_species'] is not None:
-                        self.master_species_map[species]['wd_species'] = self.mvdv_surrogate_map[map['allom_species']]['wd_species']
+                if surrogate_species_dict['allom_species'] == 'none':  # this has no surrogate at all and is excluded
+                    self.master_surrogate_dict[species]['wd_species'] = None
+                elif species in self.wd_ratio_dict: # if the source species has wd_ratio then refer to this directly
+                    self.master_surrogate_dict[species]['wd_species'] = species
+                elif surrogate_species_dict['allom_species'] in self.wd_ratio_dict: # else if the allom species has wd_ratio then refer to this
+                    self.master_surrogate_dict[species]['wd_species'] = surrogate_species_dict['allom_species']
+
+                elif self.model_dict[surrogate_species_dict['allom_species']]['use_wd_ratio']: # else check we actually need a wd ratio
+                    # look up wd_species in surrogate map for allom surrogate if possible
+                    if surrogate_species_dict['allom_species'] in self.mvdv_surrogate_dict and self.mvdv_surrogate_dict[surrogate_species_dict['allom_species']]['wd_species'] is not None:
+                        self.master_surrogate_dict[species]['wd_species'] = self.mvdv_surrogate_dict[surrogate_species_dict['allom_species']]['wd_species']
                     else:
-                        print('WARNING: species: {0}, allom surrogate: {1} - No wd surrogate'.format(species, map['allom_species']))
-                        # self.master_species_map[species]['wd_species'] = ''
-                else:
-                    print('NOTE: species: {0}, allom surrogate {1}, needs no wet:dry surrogate'.format(species, map['allom_species']))
-            else:
-                print('NOTE: CB species: {0}, already exists in the MvdV map'.format(species, species))
+                        warnings.warn('Species: {0}, allom surrogate: {1} - No wd surrogate'.format(species, surrogate_species_dict['allom_species']))
 
-    def EvalRecordCs(self, record, correction_method = CorrectionMethod.Duan):
-        # vars = [model['vars'] for model in allometricModels.values()]
-        res = {'yc':0.,'yc_lc':0.,'yc_uc':0., 'height':0., 'area':0., 'vol':0.}
-        species =str(record['species']).strip()
+    def __ReadLitter(self, litter_file_name=None):
+        ''' Read excel file into dict of dry litter weight for each plot
 
-        x = 0.
-        CD = np.mean([record['canopy_length'], record['canopy_width']])
-        CA = np.pi * (old_div(CD,2))**2
-        # NB leave height in cm as other code assumes cm, but convert vol and area to m to avoid large num + overflow
-        res['height'] = record['height']           # cm
-        res['area'] = old_div(CA, 1.e4)                     # m**2
-        res['vol'] = old_div(CA*record['height'], 1.e6)     # volume of a cylinder (m**3)
-        # res['vol'] = (np.pi*4./3) * record['canopyLength'] * record['canopyWidth'] * record['height']/2.   # volume of an ellipse
+        Parameters
+        ----------
+        litter_file_name
+            name of excel file containing plot ID's and litter weights
+        '''
 
-        # error check and if there is no allom model, then return area / vol only (yc = 0)
-        if species not in self.master_species_map:
-            print('WARNING: EvalRecordCs - {0} has no key in species map, setting yc = 0'.format(species))
-            return res
-        allom_species = self.master_species_map[species]['allom_species']
-        if allom_species == 'none':
-            print('NOTE: EvalRecordCs - {0} has no model, setting yc = 0'.format(species))
-            return res
-        elif allom_species not in self.allom_models:  # should never happen
-            raise Exception('WARNING: EvalRecordCs - {0} has no key in alommetry models, setting yc = 0'.format(allom_species))
-            # return res
-        model = self.allom_models[allom_species]
-
-        if model['vars'] == 'CA.H':
-            x = CA*record['height']
-        elif model['vars'] == 'CA.SL':
-            x = CA*record['height']
-        elif model['vars'] == 'CD':
-            x = CD
-        elif model['vars'] == 'CD.H':
-            x = CD*record['height']
-        elif model['vars'] == 'Hgt':
-            x = record['height']
-        else:
-            raise Exception('{0}: unknown variable', model['vars'])
-
-        yn = np.exp(model['ay'])*x**model['by']   # "naive"
-
-        # correct to yc
-        if correction_method == CorrectionMethod.Duan:
-            yc = yn * model['Duan']
-        elif correction_method == CorrectionMethod.MinimumBias:
-            yc = yn * model['MB']
-        else:                     # CorrectionMethod.NicklessZou
-            if yn == 0.:
-                yc = 0.
-            else:
-                yc = np.exp(np.log(yn) + (model['sigma']**2)/2.)
-
-        if model['use_wd_ratio']:
-            wd_species = self.master_species_map[species]['wd_species']
-            if wd_species not in self.wd_ratios:
-                print('WARNING: EvalRecordCs - {0} has no key in wd_ratios, using 1'.format(wd_species))
-            else:
-                yc = yc * self.wd_ratios[wd_species]['wd_ratio']
-
-        res['yc'] = yc * 0.48
-        res['yc_lc'] = yc * model['LC']
-        res['yc_uc'] = yc * model['UC']
-        return res
-
-    def ReadLitter(self, litter_file_name=None):
-        self.litter_dict = {}
         if litter_file_name is None:
             litter_file_name = self.woody_file_name
-        wb = load_workbook(litter_file_name, data_only=True)
+        self.litter_dict = {}
+        if not os.path.exists(litter_file_name):
+            raise Exception("Litter file {0} does not exist".format(litter_file_name))
 
-        ws = wb['Final Litter_copied']
-        for r in ws[2:ws.max_row]:
-            id = str(r[0].value).strip().upper()
-            id = id.replace('-0', '')
-            id = id.replace('-', '')
-            if id == '' or id is None or id == 'NONE' or r[1].value == 0:
-                print('WARNING: ReadLitter - No ID, continue')
-                continue
-            # else:
-            #     print 'ReadLitter - ID: {0}'.format(id)
-            if not np.isreal(r[1].value) or r[1].value is None:
-                dry_weight = 0.
-                print('WARNING: ReadLitter - no data for {0}'.format(id))        # these are typically excluded / not sampled plots
-            else:
-                dry_weight = r[1].value
-
-            if id in self.litter_dict:
-                self.litter_dict[id]['dry_weight'] += dry_weight
-                print('WARNING: ReadLitter - multiple values for {0}'.format(id))
-            else:
-                self.litter_dict[id] = {'dry_weight': dry_weight}
-        wb.close()
-        wb = None
-
-    def EvalAllRecordCs(self, woody_file_name='', make_marked_file=False):
-        from openpyxl.styles import PatternFill
-        from openpyxl.styles.colors import Color
-        from openpyxl.styles import colors
-        ok_colour = Color(auto=True)
-
-        if woody_file_name == '':
-            woody_file_name = self.woody_file_name
-        wb = load_workbook(self.woody_file_name)
-        ws = wb.get_sheet_by_name("Consolidated data")
-
-        print(ws.title, ' rows: ', ws.max_row)
-        first_row = ws[1]
-        header = []
-        for c in first_row:
-            header.append(c.value)
-
-        self.unmodelled_species = {'unknown': {}, 'none': {}}
-
-        self.plots = {}
-        plots = collections.OrderedDict()
-        for r in ws[2:ws.max_row]:
-            if r is None or r[2].value is None:
-                continue
-            # print  r[2].value
-            record = OrderedDict()
-            species = str(r[3].value).strip()
-
-            id = str(r[0].value).strip()
-            dashLoc = str(id).find('-')
-            if dashLoc < 0:
-                dashLoc = 2
-            id = id.replace('-', '').upper()
-            idNum = np.int32(id[dashLoc:])  # get rid of leading zeros
-            id = '%s%d' % (id[:dashLoc], idNum)
-            plot_size = np.int32(str(r[1].value).lower().split('x')[0])
-
-            record['ID'] = id
-            record['degr_class'] = str(r[2].value)
-            record['orig_species'] = species
-            record['canopy_width'] = r[4].value
-            record['canopy_length'] = r[5].value
-            record['height'] = r[6].value
-            record['species'] = species
-            record['plot_size'] = plot_size
-
-            # zero empty records
-            fields = ['canopy_width', 'canopy_length', 'height']
-            fields_ok = True
-            for f in fields:
-                if record[f] is None:
-                    print('WARNING: EvalAllCs = ID: {0}, species: {1}, has incomplete data'.format(id, species))
-                    record[f] = 0
-                    fields_ok = False
-
-            if r.__len__() > 7:
-                record['bsd'] = str(r[7].value)
-            else:
-                record['bsd'] = ""
-
-            res = self.EvalRecordCs(record, correction_method=self.correction_method)
-            for key in list(res.keys()):
-                record[key] = res[key]
-            # record['yc'] = res['yc']
-            # record['area'] = res['area']
-            # record['vol'] = res['vol']
-
-            if make_marked_file:    #mark problem cells
-                if species not in self.master_species_map or not fields_ok:
-                    r[3].fill = PatternFill(fgColor=colors.YELLOW, fill_type='solid')
-                    print('Marking row {0}'.format(r[3].row))
+        with load_workbook(litter_file_name, data_only=True) as wb:
+            ws = wb['Final Litter_copied']
+            for r in ws[2:ws.max_row]:      # loop through plots/rows
+                plot_id = str(r[0].value).strip().upper()   # parse plot ID
+                plot_id = plot_id.replace('-0', '')
+                plot_id = plot_id.replace('-', '')
+                if plot_id == '' or plot_id is None or plot_id == 'NONE' or r[1].value == 0:
+                    warnings.warn('Empty record, continuing...')
+                    continue
+                if not np.isreal(r[1].value) or r[1].value is None:
+                    dry_weight = 0.
+                    warnings.warn('No data for plot {0}'.format(plot_id))        # these are typically excluded / not sampled plots
                 else:
-                    r[3].fill = PatternFill(fgColor=ok_colour, fill_type='solid',)
+                    dry_weight = r[1].value
 
-            # we don't need to error check here - it is handled in EvalRecordCs, this is just to remember unknown species
-            if species not in self.master_species_map or self.master_species_map[species]['allom_species'] == 'none':
-                if species not in self.master_species_map:
-                    key = 'unknown'
-                elif self.master_species_map[species]['allom_species'] == 'none':
-                    key = 'none'
-                # print 'WARNING: EvalRecordCs - {0} has no key in species map, setting yc = 0'.format(species)
-                # return res
-                if species in self.unmodelled_species:
-                    self.unmodelled_species[key][species]['count'] += 1
-                    self.unmodelled_species[key][species]['vol'] += old_div(res['vol'],1.e6)
+                if plot_id in self.litter_dict:
+                    self.litter_dict[plot_id]['dry_weight'] += dry_weight
+                    warnings.warn('Multiple values for plot {0}'.format(plot_id))
                 else:
-                    self.unmodelled_species[key][species] = {}
-                    self.unmodelled_species[key][species]['count'] = 1
-                    self.unmodelled_species[key][species]['vol'] = old_div(res['vol'], 1.e6)
-            # if not self.master_species_map.has_key(species):
-            #     print 'WARNING: EvalAllCs = {0} not found in species map, ommitting'.format(species)
-            #     continue
-            # print record
+                    self.litter_dict[plot_id] = {'dry_weight': dry_weight}
 
-            if id in plots:
-                plots[id].append(record)
-            else:
-                plots[id] = [record]
+    def EstimatePlantAbc(self, woody_file_name='', make_marked_file=False):
+        ''' Estimate aboveground biomass carbon (ABC) for each plant in each plot
 
+        Parameters
+        ----------
+        woody_file_name
+            excel file containing plant measurements for each plot
+        make_marked_file
+            create an output excel file that highlighs problematic rows in woody_file_name
+        '''
+
+        woody_abc_model = WoodyAbcModel(model_dict=self.model_dict, surrogate_dict=self.master_surrogate_dict,
+                                        correction_method=self.correction_method)
         if make_marked_file:
-            out_file_name = str.format('{0}/{1}_Marked.xlsx', os.path.dirname(self.woody_file_name),
-                                       os.path.splitext(os.path.basename(self.woody_file_name))[0])
-            wb.save(filename=out_file_name)
+            ok_colour = Color(auto=True)
 
-        wb.close()
-        wb = None
-        self.plots = plots
+        with load_workbook(woody_file_name) as wb:
+            ws = wb.get_sheet_by_name("Consolidated data")
+
+            self.unmodelled_species = {'unknown': {}, 'none': {}}       # keep a record of species without models
+            self.plots = collections.OrderedDict()
+            for r in ws[2:ws.max_row]:
+                if r is None or r[2].value is None:
+                    continue
+                species = str(r[3].value).strip()
+
+                plot_id = str(r[0].value).strip()
+                dashLoc = str(plot_id).find('-')
+                if dashLoc < 0:
+                    dashLoc = 2
+                plot_id = plot_id.replace('-', '').upper()
+                id_num = np.int32(plot_id[dashLoc:])  # get rid of leading zeros
+                plot_id = '%s%d' % (plot_id[:dashLoc], id_num)
+                plot_size = np.int32(str(r[1].value).lower().split('x')[0])
+                meas_dict = OrderedDict({'ID': plot_id, 'degr_class': str(r[2].value), 'orig_species': species,
+                                      'canopy_width': r[4].value, 'canopy_length': r[5].value, 'height': r[6].value,
+                                      'species': species, 'plot_size': plot_size})
+
+                # error checking
+                fields = ['canopy_width', 'canopy_length', 'height']
+                fields_ok = True
+                for f in fields:
+                    if meas_dict[f] is None:
+                        warnings.warn('ID: {0}, species: {1}, has incomplete data'.format(plot_id, species))
+                        meas_dict[f] = 0
+                        fields_ok = False
+
+                meas_dict['bsd'] = str(r[7].value) if (r.__len__() > 7) else ''
+                abc_dict = woody_abc_model.Estimate(meas_dict)
+
+                for key in list(abc_dict.keys()):   # copy to meas_dict
+                    meas_dict[key] = abc_dict[key]
+
+                if make_marked_file:    # mark problem cells
+                    if species not in self.master_surrogate_dict or not fields_ok:
+                        r[3].fill = PatternFill(fgColor=colors.YELLOW, fill_type='solid')
+                        print('Marking row {0}'.format(r[3].row))
+                    else:
+                        r[3].fill = PatternFill(fgColor=ok_colour, fill_type='solid',)
+
+                # error checking done in woody_abc_model.Estimate, but this remembers species without models
+                if species not in self.master_surrogate_dict or self.master_surrogate_dict[species]['allom_species'] == 'none':
+                    if species not in self.master_surrogate_dict:
+                        key = 'unknown'
+                    elif self.master_surrogate_dict[species]['allom_species'] == 'none':
+                        key = 'none'
+                    if species in self.unmodelled_species:
+                        self.unmodelled_species[key][species]['count'] += 1
+                        self.unmodelled_species[key][species]['vol'] += old_div(abc_dict['vol'],1.e6)
+                    else:
+                        self.unmodelled_species[key][species] = {}
+                        self.unmodelled_species[key][species]['count'] = 1
+                        self.unmodelled_species[key][species]['vol'] = old_div(abc_dict['vol'], 1.e6)
+
+                if plot_id in self.plots:
+                    self.plots[plot_id].append(meas_dict)
+                else:
+                    self.plots[plot_id] = [meas_dict]
+
+            if make_marked_file:
+                out_file_name = str.format('{0}/{1}_Marked.xlsx', os.path.dirname(woody_file_name),
+                                           os.path.splitext(os.path.basename(woody_file_name))[0])
+                wb.save(filename=out_file_name)
+
         print('Unknown species:')
         for k, v in self.unmodelled_species['unknown'].items():
             print(k, v)
@@ -564,7 +428,7 @@ class AgcAllometry(object):
     # @staticmethod
     def EvalPlotSummaryCs(self):
         if len(self.plots) == 0:
-            print('EvalAllRecordCs has not been called')
+            print('EstimatePlantAbc has not been called')
             return
         self.summary_plots = {}
         # summing yc_lc and yc_uc is probably not valid - summing would average out errors and reduce lc and uc
@@ -648,7 +512,7 @@ class AgcAllometry(object):
 
     def WriteAllCsFile(self, out_file_name=None):
         if len(self.plots) == 0:
-            print('EvalAllRecordCs has not been called')
+            print('EstimatePlantAbc has not been called')
             return
 
         if out_file_name is None:
