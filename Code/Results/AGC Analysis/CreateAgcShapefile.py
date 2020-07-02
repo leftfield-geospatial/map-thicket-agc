@@ -79,7 +79,6 @@ for correctedShapeFileName in correctedShapeFileNames:
             field_defn = feat_defn.GetFieldDefn(i)
             f[field_defn.GetName()] = feat.GetField(i)
 
-
         key = "%s-%s" % (f['Datafile'][:-4], f['Comment'])
 
         geom = feat.GetGeometryRef()

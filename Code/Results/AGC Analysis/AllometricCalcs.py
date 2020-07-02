@@ -14,11 +14,24 @@ model_file_name = "C:\Data\Development\Projects\GEF-5 SLM\Data\Sampling Inputs\A
 litter_file_name = "C:\Data\Development\Projects\GEF-5 SLM\Data\Sampling Inputs\Allometry\Litter Allometric Data.xlsx"
 woody_file_name = "C:\Data\Development\Projects\GEF-5 SLM\Data\Sampling Inputs\Allometry\Woody Allometric Data.xlsx"
 
+agc_plot_est = au.AgcPlotEstimator(model_file_name=model_file_name, correction_method=au.BiomassCorrectionMethod.NicklessZou)
+
+agc_plot_est.Estimate(woody_file_name=woody_file_name, litter_file_name=litter_file_name)
+agc_plot_est.WriteAbcPlantFile(out_file_name=r"C:\Data\Development\Projects\GEF-5 SLM\Data\Outputs\Allometry\Plant ABC 2.csv")
+agc_plot_est.WriteAgcPlotFile(out_file_name=r"C:\Data\Development\Projects\GEF-5 SLM\Data\Outputs\Allometry\Plot AGC 2.csv")
+
+surrogate_file_name = r"C:\Data\Development\Projects\GEF-5 SLM\Data\Outputs\Allometry\Master Surrogate Map 2.csv"
+with open(surrogate_file_name, 'w', newline='') as outfile:
+    writer = DictWriter(outfile, list(agc_plot_est.abc_aggregator.master_surrogate_dict.values())[100].keys())
+    writer.writeheader()
+    writer.writerows(list(agc_plot_est.abc_aggregator.master_surrogate_dict.values()))
+
+
 # reload(su)
 # reload(au)
 
-allom = au.AgcAllometry(model_file_name=model_file_name,
-                        correction_method=au.WoodyBiomassCorrectionMethod.NicklessZou)
+allom = au.AbcAggregator(model_file_name=model_file_name,
+                         correction_method=au.BiomassCorrectionMethod.NicklessZou)
 
 allom.ReadAllometryFile()
 allom.ReadMasterSpeciesMap()
@@ -32,17 +45,17 @@ for species in cos_species:
     if cos != master:
         print('{0} mismatch: \tCos allom: {1}\t Master allom: {2}'.format(species, cos, master))
 
-allom.EstimatePlantAbc(data_file_name=woody_file_name, make_marked_file=False)
-allom.WriteAllCsFile(out_file_name=r"C:\Data\Development\Projects\GEF-5 SLM\Data\Outputs\Allometry\Plant ABC.csv")
-# AgcAllometry.EvalAllPlotCs(allom.plots)
+allom.Aggregate(data_file_name=woody_file_name, make_marked_file=False)
+allom.WriteFile(out_file_name=r"C:\Data\Development\Projects\GEF-5 SLM\Data\Outputs\Allometry\Plant ABC.csv")
+# PlantAbcEstimator.EvalAllPlotCs(allom.plots)
 allom.__ReadLitter(litter_file_name=litter_file_name)
 allom.EvalPlotSummaryCs(litter_file_name=litter_file_name)
 allom.WriteSummaryFile(out_file_name=r"C:\Data\Development\Projects\GEF-5 SLM\Data\Outputs\Allometry\Plot AGC.csv")
 
 # write out surrogate map for Cos
-outFileName = r"C:\Data\Development\Projects\GEF-5 SLM\Data\Outputs\Allometry\Master Surrogate Map.csv"
+surrogate_file_name = r"C:\Data\Development\Projects\GEF-5 SLM\Data\Outputs\Allometry\Master Surrogate Map.csv"
 
-with open(outFileName, 'w', newline='') as outfile:
+with open(surrogate_file_name, 'w', newline='') as outfile:
     writer = DictWriter(outfile, list(allom.master_surrogate_dict.values())[100].keys())
     writer.writeheader()
     writer.writerows(list(allom.master_surrogate_dict.values()))
@@ -102,7 +115,7 @@ import pandas as pd
 from scipy.stats import gaussian_kde
 
 plotAbcFileName = "C:\Data\Development\Projects\PhD GeoInformatics\Data\GEF Sampling\Final Sampling March 2019\GEF_Spp list_Consolidated_ALL plots_Sent to Dugal_2019.05.31_Cos_ProblemsSolved - All WoodyC.csv"
-outFileName = "C:\Data\Development\Projects\PhD GeoInformatics\Data\GEF Sampling\Final Sampling March 2019\GEF_Spp list_Consolidated_ALL plots_Sent to Dugal_2019.05.31_Cos_ProblemsSolved - Per-Stratum Per-Species WoodyC.xlsx"
+surrogate_file_name = "C:\Data\Development\Projects\PhD GeoInformatics\Data\GEF Sampling\Final Sampling March 2019\GEF_Spp list_Consolidated_ALL plots_Sent to Dugal_2019.05.31_Cos_ProblemsSolved - Per-Stratum Per-Species WoodyC.xlsx"
 
 abcDf = pd.read_csv(plotAbcFileName)
 
@@ -179,7 +192,7 @@ for (degrClass, degrGroup), plotIdx in zip(plotSpeciesYcDf.groupby('degr_class',
     pylab.tight_layout()
 
 f1.savefig(r'C:\Data\Development\Projects\PhD GeoInformatics\Docs\Funding\GEF5\Invoices, Timesheets and Reports\Final Report\SpeciesAbcPerStratum.png', dpi=300)
-degrSpeciesYcDf.to_excel(outFileName)
+degrSpeciesYcDf.to_excel(surrogate_file_name)
 
 #-------------------- make plot of ABC contribution by height
 abcDf.loc[abcDf['degr_class']=='Degraded ', 'degr_class'] = 'Degraded'
