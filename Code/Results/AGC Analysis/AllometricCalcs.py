@@ -2,79 +2,49 @@ from __future__ import print_function
 from __future__ import division
 from builtins import zip
 from past.utils import old_div
-import AllometryUtils as au
+import allometry as allom
 import SpatialUtils as su
 import pylab
 import numpy as np
+import pathlib
 from csv import DictWriter
 
-## updated allometric calcs with new AllometryUtils and latest field data
+root_path = pathlib.Path(allom.__file__).parent.parent.absolute()
 
-model_file_name = "C:\Data\Development\Projects\GEF-5 SLM\Data\Sampling Inputs\Allometry\Allometric Models.xlsx"
-litter_file_name = "C:\Data\Development\Projects\GEF-5 SLM\Data\Sampling Inputs\Allometry\Litter Allometric Data.xlsx"
-woody_file_name = "C:\Data\Development\Projects\GEF-5 SLM\Data\Sampling Inputs\Allometry\Woody Allometric Data.xlsx"
+model_file_name = root_path.joinpath('Data/Sampling Inputs/Allometry/Allometric Models.xlsx')
+litter_file_name = root_path.joinpath('Data/Sampling Inputs/Allometry/Litter Allometric Data.xlsx')
+woody_file_name = root_path.joinpath('Data/Sampling Inputs/Allometry/Woody Allometric Data.xlsx')
 
-agc_plot_est = au.AgcPlotEstimator(model_file_name=model_file_name, correction_method=au.BiomassCorrectionMethod.NicklessZou)
-
+agc_plot_est = allom.AgcPlotEstimator(model_file_name=model_file_name, correction_method=allom.BiomassCorrectionMethod.NicklessZou)
 agc_plot_est.Estimate(woody_file_name=woody_file_name, litter_file_name=litter_file_name)
-agc_plot_est.WriteAbcPlantFile(out_file_name=r"C:\Data\Development\Projects\GEF-5 SLM\Data\Outputs\Allometry\Plant ABC 2.csv")
-agc_plot_est.WriteAgcPlotFile(out_file_name=r"C:\Data\Development\Projects\GEF-5 SLM\Data\Outputs\Allometry\Plot AGC 2.csv")
 
-surrogate_file_name = r"C:\Data\Development\Projects\GEF-5 SLM\Data\Outputs\Allometry\Master Surrogate Map 2.csv"
-with open(surrogate_file_name, 'w', newline='') as outfile:
-    writer = DictWriter(outfile, list(agc_plot_est.abc_aggregator.master_surrogate_dict.values())[100].keys())
-    writer.writeheader()
-    writer.writerows(list(agc_plot_est.abc_aggregator.master_surrogate_dict.values()))
+if True:
+    agc_plot_est.WriteAbcPlantFile(out_file_name=root_path.joinpath('Data/Outputs/Allometry/Plant ABC 3.csv'))
+    agc_plot_est.WriteAgcPlotFile(out_file_name=root_path.joinpath('Data/Outputs/Allometry/Plot AGC 3.csv'))
 
-
-# reload(su)
-# reload(au)
-
-allom = au.AbcAggregator(model_file_name=model_file_name,
-                         correction_method=au.BiomassCorrectionMethod.NicklessZou)
-
-allom.ReadAllometryFile()
-allom.ReadMasterSpeciesMap()
-
-# compare master map and cos' map
-cos_species = np.array(list(allom.cb_surrogate_dict.keys()))
-master_species = np.array(list(allom.master_surrogate_dict.keys()))
-for species in cos_species:
-    cos = allom.cb_surrogate_dict[species]['allom_species']
-    master = allom.master_surrogate_dict[species]['allom_species']
-    if cos != master:
-        print('{0} mismatch: \tCos allom: {1}\t Master allom: {2}'.format(species, cos, master))
-
-allom.Aggregate(data_file_name=woody_file_name, make_marked_file=False)
-allom.WriteFile(out_file_name=r"C:\Data\Development\Projects\GEF-5 SLM\Data\Outputs\Allometry\Plant ABC.csv")
-# PlantAbcEstimator.EvalAllPlotCs(allom.plots)
-allom.__ReadLitter(litter_file_name=litter_file_name)
-allom.EvalPlotSummaryCs(litter_file_name=litter_file_name)
-allom.WriteSummaryFile(out_file_name=r"C:\Data\Development\Projects\GEF-5 SLM\Data\Outputs\Allometry\Plot AGC.csv")
-
-# write out surrogate map for Cos
-surrogate_file_name = r"C:\Data\Development\Projects\GEF-5 SLM\Data\Outputs\Allometry\Master Surrogate Map.csv"
-
-with open(surrogate_file_name, 'w', newline='') as outfile:
-    writer = DictWriter(outfile, list(allom.master_surrogate_dict.values())[100].keys())
-    writer.writeheader()
-    writer.writerows(list(allom.master_surrogate_dict.values()))
-
+    surrogate_file_name = root_path.joinpath('Data/Outputs/Allometry/Master Surrogate Map 3.csv')
+    with open(surrogate_file_name, 'w', newline='') as outfile:
+        writer = DictWriter(outfile, list(agc_plot_est.abc_aggregator.master_surrogate_dict.values())[100].keys())
+        writer.writeheader()
+        writer.writerows(list(agc_plot_est.abc_aggregator.master_surrogate_dict.values()))
 
 # look at rel betw vol and yc
-ycs = np.array([plot['AbcHa'] for plot in list(allom.summary_plots.values())])
-agcs = np.array([plot['AgcHa'] for plot in list(allom.summary_plots.values())])
-vols = np.array([plot['VolHa'] for plot in list(allom.summary_plots.values())])
-ids = np.array([plot['ID'] for plot in list(allom.summary_plots.values())])
-classes = np.array([plot['Stratum'] for plot in list(allom.summary_plots.values())])
-litters = np.array([plot['LitterCHa'] for plot in list(allom.summary_plots.values())])
+plot_summary_dict = agc_plot_est.plot_summary_agc_dict
+fields_to_extract = ['AbcHa', 'AgcHa', 'VolHa', 'LitterCHa', 'ID', 'Stratum']
+vector_dict = {}
+for field in fields_to_extract:
+    vector_dict[field] = np.array([plot[field] for plot in list(plot_summary_dict.values())])
 
-pylab.figure()
-su.scatter_plot(ycs, vols,labels=ids, class_labels=classes, xlabel='YcHa', ylabel='Volume')
-pylab.figure()
-su.scatter_plot(agcs, vols,labels=ids, class_labels=classes, xlabel='AgcHa', ylabel='Volume')
-pylab.figure()
-su.scatter_plot(litters, ycs,labels=ids, class_labels=classes, xlabel='LitterCHa', ylabel='YcHa')
+pylab.figure('Allometric Relations')
+pylab.subplot(2, 2, 1)
+su.scatter_plot(vector_dict['AgcHa']/1000, vector_dict['VolHa'], labels=vector_dict['ID'], class_labels=vector_dict['Stratum'],
+                xlabel='ABC $(tC/ha)$', ylabel='Volume $(m^3)$')
+pylab.subplot(2, 2, 2)
+su.scatter_plot(vector_dict['AbcHa']/1000, vector_dict['VolHa'], labels=vector_dict['ID'], class_labels=vector_dict['Stratum'],
+                xlabel='ABC $(tC/ha)$', ylabel='Volume $(m^3)$')
+pylab.subplot(2, 2, 3)
+su.scatter_plot(vector_dict['LitterCHa']/1000, vector_dict['AbcHa']/1000, labels=vector_dict['ID'], class_labels=vector_dict['Stratum'],
+                xlabel='Litter C $(tC/ha)$', ylabel='ABC $(kgC/ha)$')
 
 # ---------------------------------------------------------------------------------------------------
 # plots for report

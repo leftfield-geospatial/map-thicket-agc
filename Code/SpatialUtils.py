@@ -114,8 +114,9 @@ def scatter_plot(x, y, class_labels=None, labels=None, thumbnails=None, do_regre
     if class_labels is None:
         class_labels = np.zeros(x.__len__())
     classes = np.unique(class_labels)
-    if 'Pristine' in classes and 'Moderate' in classes and 'Severe' in classes and classes.size==3:
-        classes = np.array(['Severe', 'Moderate', 'Pristine'])
+    if 'Intact' in classes and 'Moderate' in classes and 'Degraded' in classes and classes.size==3:
+        classes = np.array(['Degraded', 'Moderate', 'Intact'])
+
     if classes.__len__() == 1:
         # colours = [u'#1f77b4']
         colours = [(0., 0., 0.)]
