@@ -23,6 +23,7 @@ from sklearn.preprocessing import PolynomialFeatures
 # from pandas import DataFrame as pd
 from skimage.feature import greycomatrix, greycoprops
 from skimage import data
+import matplotlib.pyplot as pyplot
 
 # Python Imaging Library imports
 from PIL import Image
@@ -81,6 +82,129 @@ def entropy(x, along_axis=None):
     p = np.array([old_div(np.size(x[x == i]), (1.0 * x.size)) for i in np.unique(x)])
     # compute Shannon entropy in bits
     return -np.sum(p * np.log2(p))
+
+def scatter_ds(data, x_col=None, y_col=None, class_col=None, label_col=None, thumbnail_col=None, do_regress=True,
+               x_label=None, y_label=None, xfn=lambda x: x, yfn=lambda y: y):
+    """
+
+    Parameters
+    ----------
+    data
+    x_col
+    y_col
+    class_col
+    label_col
+    thumbnail_col
+    do_regress
+    x_label
+    y_label
+    xfn
+    yfn
+
+    Returns
+    -------
+
+    """
+    ims = 20.       # scale factor for thumbnails
+    if x_col is None:
+        x_col = data.columns[0]
+    if y_col is None:
+        y_col = data.columns[1]
+
+    x = xfn(data[x_col])
+    y = yfn(data[y_col])
+
+    if class_col is None:
+        data['class_col'] = np.zeros((data.shape[0],1))
+        class_col = 'class_col'
+
+    # TO DO: either remove thumbnail option or refactor
+    # TO DO: sort classes
+    # if 'Intact' in classes and 'Moderate' in classes and 'Degraded' in classes and classes.size==3:
+    #     classes = np.array(['Degraded', 'Moderate', 'Intact'])
+    classes = np.array([class_name for class_name, class_group in data.groupby(by=class_col)])
+    n_classes =  len(classes)
+    if n_classes == 1:
+        colours = [(0., 0., 0.)]
+    else:
+        colours = ['g', 'tab:orange', 'r', 'b', 'y', 'k', 'm']
+
+    xlim = [x.min(), x.max()]
+    ylim = [y.min(), y.max()]
+    xd = np.diff(xlim)[0]
+    yd = np.diff(ylim)[0]
+
+    pyplot.axis('tight')
+    pyplot.axis(xlim + ylim)
+    ax = pyplot.gca()
+    handles = [0] * n_classes
+
+    for class_i, (class_label, class_data) in enumerate(data.groupby(by=class_col)):
+        colour = colours[class_i]
+        if thumbnail_col is None:
+            pylab.plot(xfn(class_data[x_col]), yfn(class_data[y_col]), markerfacecolor=colour, marker='.', label=class_label, linestyle='None',
+                       markeredgecolor=colour)
+        for rowi, row in class_data.iterrows():
+            xx = xfn(row[x_col])
+            yy = yfn(row[y_col])
+            if label_col is not None:   # add a text label for each point
+                pylab.text(xx - .0015, yy - .0015, row[label_col],
+                           fontdict={'size': 9, 'color': colour, 'weight': 'bold'})
+
+            if thumbnail_col is not None:   # add a thumbnail for each point
+                imbuf = np.array(row[thumbnail_col])
+                band_idx = [0, 1, 2]
+                if imbuf.shape[2] == 8:  # wv3
+                    band_idx = [4, 2, 1]
+                elif imbuf.shape[2] >= 8:  # wv3 + pan
+                    band_idx = [5, 3, 2]
+
+                extent = [xx - xd/(2 * ims), xx + xd/(2 * ims), yy - yd/(2 * ims), yy + yd/(2 * ims)]
+                pyplot.imshow(imbuf[:, :, band_idx], extent=extent, aspect='auto')
+                handles[class_i] = ax.add_patch(patches.Rectangle(extent[0], extent[2], xd/ims, yd/ims,
+                                                fill=False, edgecolor=colour, linewidth=2.))
+
+    if do_regress:  # find and display regression error stats
+        (slope, intercept, r, p, stde) = stats.linregress(x, y)
+        scores, predicted = FeatureSelector.score_model(x[:,None], y[:,None], model=linear_model.LinearRegression(),
+                                                        find_predicted=True, cv=len(x), print_scores=True)
+
+        pylab.text((xlim[0] + xd * 0.7), (ylim[0] + yd * 0.05), '$R^2$ = {0:.2f}'.format(np.round(scores['R2_stacked'], 2)),
+                   fontdict={'size': 12})
+        yr = np.array(xlim)*slope + intercept
+        pyplot.plot(xlim, yr, 'k--', lw=2, zorder=-1)
+
+        yhat = x * slope + intercept
+        rmse = np.sqrt(np.mean((y - yhat) ** 2))
+
+        print('RMSE1 = {0:.4f}'.format(rmse))
+        print('RMSE2 = {0:.4f}'.format(np.sqrt(scores['test_user'].mean())))
+        print('R^2  = {0:.4f}'.format(r ** 2))
+        print('Stacked R^2  = {0:.4f}'.format(scores['R2_stacked']))
+        print('P (slope=0) = {0:f}'.format(p))
+        print('Slope = {0:.4f}'.format(slope))
+        print('Std error of slope = {0:.4f}'.format(stde))
+    else:
+        r = np.nan
+        rmse = np.nan
+
+    if x_label is not None:
+        pyplot.xlabel(x_label, fontdict={'size': 12})
+    else:
+        pylab.xlabel(x_col, fontdict={'size': 12})
+
+    if y_label is not None:
+        pyplot.ylabel(y_label, fontdict={'size': 12})
+    else:
+        pylab.xlabel(y_col, fontdict={'size': 12})
+
+    if n_classes > 1:
+        if not thumbnail_col is None:
+            pylab.legend(handles, classes, fontsize=12)
+        else:
+            pylab.legend(classes, fontsize=12)
+    return r ** 2, rmse
+
 
 def scatter_plot(x, y, class_labels=None, labels=None, thumbnails=None, do_regress=True, xlabel=None, ylabel=None,
                  xfn=lambda x: x, yfn=lambda y: y):

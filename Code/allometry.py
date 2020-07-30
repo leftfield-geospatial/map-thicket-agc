@@ -522,7 +522,6 @@ class AgcPlotEstimator:
             #     vector_dict[field] = {'v': vectors_to_summarise[field]}
 
             # heights = np.array([record['height'] for record in plot])
-            val = {}
             if plot_sizes_un.size > 1:      # it is a nested plot, so we need to extrapolate
                 nest_record_idx = plot['plot_size'] == plot_sizes_un.min(initial=5)
                 small_record_idx = plot['height'] < nested_height_thresh
@@ -536,19 +535,12 @@ class AgcPlotEstimator:
                     out_v = v[~nest_record_idx]
                     sum_v = out_v.sum() + nest_v.sum() + (small_v.sum() * ((plot_sizes_un.max(initial=5.) / plot_sizes_un.min(initial=5.)) ** 2))
                     mean_v = out_v.tolist() + nest_v.tolist() + (small_v.tolist() * int((plot_sizes_un.max(initial=5.) / plot_sizes_un.min(initial=5.)) ** 2))
-                    val['sum_v'] = sum_v
-                    val['mean_v'] = np.array(mean_v).mean()
-                    val['n'] = len(mean_v) # out_v.size + nest_v.size + (small_v.size * (plot_sizes_un.max()/ plot_sizes_un.min()) ** 2)
-                    vector_dict[field] = val
+                    vector_dict[field] = {'sum_v': sum_v, 'mean_v': np.array(mean_v).mean(), 'n': len(mean_v)} # out_v.size + nest_v.size + (small_v.size * (plot_sizes_un.max()/ plot_sizes_un.min()) ** 2)
             else:
                 # for key, val in vector_dict.items():
                 for field in fields_to_summarise:
-                    # v = val['v']
                     v = np.array(plot[field])
-                    val['sum_v'] = v.sum()
-                    val['mean_v'] = v.mean()
-                    val['n'] = v.size
-                    vector_dict[field] = val
+                    vector_dict[field] = {'sum_v': v.sum(), 'mean_v':  v.mean(), 'n': v.size}
 
             summary_plot = OrderedDict()
             summary_plot['ID'] = plot_id

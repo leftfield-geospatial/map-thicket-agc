@@ -1,10 +1,8 @@
-from __future__ import print_function
-from __future__ import division
 from builtins import zip
 from past.utils import old_div
 import allometry as allom
 import SpatialUtils as su
-import pylab
+import matplotlib.pyplot as pyplot
 import numpy as np
 import pathlib
 from csv import DictWriter
@@ -29,6 +27,17 @@ if True:
         writer.writerows(list(agc_plot_est.abc_aggregator.master_surrogate_dict.values()))
 
 # look at rel betw vol and yc
+pyplot.figure('Allometric Relations')
+pyplot.subplot(2, 2, 1)
+su.scatter_ds(agc_plot_est.plot_summary_agc_ds, x_col='AgcHa', y_col='VolHa', class_col='Stratum', label_col='ID',
+              xfn=lambda x:x/1000., x_label='AGC $(tC/ha)$', y_label='Volume $(m^3)$')
+pyplot.subplot(2, 2, 2)
+su.scatter_ds(agc_plot_est.plot_summary_agc_ds, x_col='AbcHa', y_col='VolHa', class_col='Stratum', label_col='ID',
+              xfn=lambda x:x/1000., x_label='ABC $(tC/ha)$', y_label='Volume $(m^3)$')
+pyplot.subplot(2, 2, 3)
+su.scatter_ds(agc_plot_est.plot_summary_agc_ds, x_col='LitterCHa', y_col='AbcHa', class_col='Stratum', label_col='ID',
+              xfn=lambda x:x/1000., yfn=lambda x:x/1000., x_label='Litter C $(tC/ha)$', y_label='ABC $(tC/ha)$')
+
 plot_summary_dict = agc_plot_est.plot_summary_agc_dict
 fields_to_extract = ['AbcHa', 'AgcHa', 'VolHa', 'LitterCHa', 'ID', 'Stratum']
 vector_dict = {}
