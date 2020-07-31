@@ -2,7 +2,7 @@
 
 """
 from builtins import zip
-import allometry as allom
+from Modules import allometry as allom
 import SpatialUtils as su
 import matplotlib.pyplot as pyplot
 import numpy as np
