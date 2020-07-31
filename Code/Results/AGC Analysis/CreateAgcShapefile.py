@@ -2,7 +2,6 @@ from __future__ import print_function
 from __future__ import division
 from builtins import str
 from builtins import range
-from past.utils import old_div
 import gdal
 import ogr
 import numpy as np
@@ -17,10 +16,8 @@ from collections import OrderedDict
 # # Python Imaging Library imports
 # from PIL import Image
 # from PIL import ImageDraw
-import sys
 # sys.path.append("C:\Data\Development\Projects\PhD GeoInformatics\Code\Misc Tools")
-import SpatialUtils as su
-
+from modules import SpatialUtils as su
 
 # |layerid=0|subset="Comment" LIKE 'H%'
 correctedShapeFileNames = [

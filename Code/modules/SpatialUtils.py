@@ -177,8 +177,8 @@ def scatter_ds(data, x_col=None, y_col=None, class_col=None, label_col=None, thu
         yhat = x * slope + intercept
         rmse = np.sqrt(np.mean((y - yhat) ** 2))
 
-        print('RMSE1 = {0:.4f}'.format(rmse))
-        print('RMSE2 = {0:.4f}'.format(np.sqrt(scores['test_user'].mean())))
+        print('RMSE = {0:.4f}'.format(rmse))
+        print('LOOCV RMSE = {0:.4f}'.format(np.sqrt(-scores['test_user'].mean())))
         print('R^2  = {0:.4f}'.format(r ** 2))
         print('Stacked R^2  = {0:.4f}'.format(scores['R2_stacked']))
         print('P (slope=0) = {0:f}'.format(p))

@@ -1,10 +1,8 @@
 import sys
-import SpatialUtils as su
-import pylab
+from modules import SpatialUtils as su
 import numpy as np
-from sklearn import linear_model, metrics
-import joblib, pickle
-import logging
+import pickle
+
 # logging.basicConfig(level=logging.DEBUG)
 # reload(su)
 

@@ -2,16 +2,21 @@
 
 """
 from builtins import zip
-from Modules import allometry as allom
-import SpatialUtils as su
 import matplotlib.pyplot as pyplot
 import numpy as np
-import pathlib
+import pathlib, sys, os
 from csv import DictWriter
 import pandas as pd
 from scipy.stats import gaussian_kde
 
-root_path = pathlib.Path(allom.__file__).parent.parent.absolute()
+if '__file__' in globals():
+    root_path = pathlib.Path(__file__).absolute().parents[2]
+else:
+    root_path = pathlib.Path(os.getcwd()).parents[0]
+
+sys.path.append(str(root_path.joinpath('Code')))
+from modules import allometry
+from modules import SpatialUtils as su
 
 model_file_name = root_path.joinpath('Data/Sampling Inputs/Allometry/Allometric Models.xlsx')
 litter_file_name = root_path.joinpath('Data/Sampling Inputs/Allometry/Litter Allometric Data.xlsx')
@@ -21,7 +26,7 @@ plant_abc_file_name = root_path.joinpath('Data/Outputs/Allometry/Plant ABC 3.csv
 plot_agc_file_name = root_path.joinpath('Data/Outputs/Allometry/Plot AGC 3.csv')
 surrogate_file_name = root_path.joinpath('Data/Outputs/Allometry/Master Surrogate Map 3.csv')
 
-agc_plot_est = allom.AgcPlotEstimator(model_file_name=model_file_name, correction_method=allom.BiomassCorrectionMethod.NicklessZou)
+agc_plot_est = allometry.AgcPlotEstimator(model_file_name=model_file_name, correction_method=allometry.BiomassCorrectionMethod.NicklessZou)
 agc_plot_est.Estimate(woody_file_name=woody_file_name, litter_file_name=litter_file_name)
 
 if True:

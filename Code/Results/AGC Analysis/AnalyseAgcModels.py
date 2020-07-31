@@ -4,17 +4,18 @@ from __future__ import division
 
 from builtins import range
 from past.utils import old_div
-import sys, os
 # TO DO: get rid of these manual paths
 # sys.path.append("C:\Data\Development\Projects\PhD GeoInformatics\Code\Misc Tools")
 # os.environ['PATH'] += "C:\ProgramData\Anaconda3\envs\py27\Library\\bin"
 # os.environ['GDAL_DATA'] ="C:\Miniconda3\envs\geospatial\Library\share\gdal"
 # os.environ['PROJ_LIB']= "C:\Miniconda3\envs\geospatial\Library\share\proj"
 
-import SpatialUtils as su
+from modules import SpatialUtils as su
 import pylab
 import numpy as np
-from sklearn import linear_model, metrics
+from sklearn import linear_model
+
+
 # reload(su)
 
 def scatter_y_pred(y, pred, scores):
@@ -187,10 +188,9 @@ if False:   # write out models to files
     # print
 
 if False:
-    from sklearn.svm import SVR, NuSVR
     from sklearn.kernel_ridge import KernelRidge
     from sklearn.preprocessing import StandardScaler
-    from sklearn.svm import SVR, NuSVR
+    from sklearn.svm import SVR
     from sklearn import pipeline
 
     pl = pipeline.make_pipeline(StandardScaler(), SVR(kernel='rbf', C=100, gamma=1.))
@@ -229,7 +229,7 @@ fig.savefig(r'C:\Data\Development\Projects\PhD GeoInformatics\Docs\Funding\GEF5\
 
 #------------------------------------------------------------------------------------------------------------------------
 # Correlation analysis of the ground cover classification
-import SpatialUtils as su
+import modules.SpatialUtils as su
 import pylab
 import numpy as np
 from sklearn import linear_model, metrics

@@ -3,14 +3,11 @@ from __future__ import division
 
 #################################################################################################################
 # test ModelCalibrationTest for all images in array notation
-from builtins import zip
 from past.utils import old_div
-import SpatialUtils as su
-import pylab
+from modules import SpatialUtils as su
 import numpy as np
-from sklearn import linear_model, metrics
+from sklearn import linear_model
 
-from scipy import stats as stats
 # reload(su)
 
 samplingPlotGtFile = r"C:\Data\Development\Projects\GEF-5 SLM\Data\Outputs\Geospatial\GEF Plot Polygons with AGC.shp"
