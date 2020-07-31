@@ -168,7 +168,7 @@ class AbcAggregator:
         self.__ConstructModels(model_file_name)
         self.__ConstructSurrogateMap(model_file_name)
 
-        self.plot_abc_ds = pd.DataFrame()
+        self.plot_abc_df = pd.DataFrame()
         # self.plot_abc_dict = {}
         self.unmodelled_species = {}
         self.woody_file_name = None
@@ -396,7 +396,7 @@ class AbcAggregator:
                 # else:
                 #     plot_abc_dict[plot_id] = [meas_dict]
 
-            self.plot_abc_ds = pd.DataFrame(plot_abc_list)
+            self.plot_abc_df = pd.DataFrame(plot_abc_list)
             if make_marked_file:
                 out_file_name = str.format('{0}/{1}_Marked.xlsx', os.path.dirname(woody_file_name),
                                            os.path.splitext(os.path.basename(woody_file_name))[0])
@@ -411,17 +411,17 @@ class AbcAggregator:
         for k, v in self.unmodelled_species['none'].items():
             print(k, v)
 
-        return self.plot_abc_ds
+        return self.plot_abc_df
 
     def WriteFile(self, out_file_name=None):
-        if len(self.plot_abc_ds) == 0:
+        if len(self.plot_abc_df) == 0:
             raise Exception("There is no ABC data - call Aggregate first")
 
         if out_file_name is None:
             out_file_name = str.format(str('{0}/{1} - All WoodyC.csv'), os.path.dirname(self.woody_file_name),
                                      os.path.splitext(os.path.basename(self.woody_file_name))[0])
 
-        self.plot_abc_ds.to_csv(out_file_name, index=False)
+        self.plot_abc_df.to_csv(out_file_name, index=False)
         # with open(out_file_name,'w', newline='') as outfile:
         #     writer = DictWriter(outfile, list(list(self.plot_abc_dict.values())[0][0].keys()))
         #     writer.writeheader()
@@ -441,8 +441,8 @@ class AgcPlotEstimator:
             Biomass correction method to use (default WoodyBiomassCorrectionMethod.NicklessZou)
         """
         self.abc_aggregator = AbcAggregator(model_file_name=model_file_name, correction_method=correction_method)
-        self.plot_litter_ds = pd.DataFrame()
-        self.plot_summary_agc_ds = pd.DataFrame()
+        self.plot_litter_df = pd.DataFrame()
+        self.plot_summary_agc_df = pd.DataFrame()
         self.woody_file_name = None
 
     def __ReadLitter(self, litter_file_name=None):
@@ -484,8 +484,8 @@ class AgcPlotEstimator:
                     plot_litter_dict[plot_id] = {'dry_weight': dry_weight}
         finally:
             wb.close()
-            self.plot_litter_ds = pd.DataFrame.from_dict(plot_litter_dict, orient='index')
-            self.plot_litter_ds['ID'] = self.plot_litter_ds.index
+            self.plot_litter_df = pd.DataFrame.from_dict(plot_litter_dict, orient='index')
+            self.plot_litter_df['ID'] = self.plot_litter_df.index
 
     def Estimate(self, woody_file_name='', litter_file_name='', make_marked_file=False):
         """ Estimate total AGC per plot
@@ -504,15 +504,15 @@ class AgcPlotEstimator:
             a dict of plot AGC etc values
         """
         plot_summary_agc_dict = {}
-        self.plot_summary_agc_ds = pd.DataFrame()
+        self.plot_summary_agc_df = pd.DataFrame()
         self.abc_aggregator.Aggregate(woody_file_name=woody_file_name, make_marked_file=make_marked_file)
         self.woody_file_name = woody_file_name
-        self.plot_litter_ds = pd.DataFrame()
+        self.plot_litter_df = pd.DataFrame()
         self.__ReadLitter(litter_file_name)
 
         fields_to_summarise = ['yc', 'height', 'vol']
         # for plot_id, plot in self.abc_aggregator.plot_abc_dict.items():
-        for plot_id, plot in self.abc_aggregator.plot_abc_ds.groupby('ID'):
+        for plot_id, plot in self.abc_aggregator.plot_abc_df.groupby('ID'):
             # plot_sizes = np.array([record['plot_size'] for record in plot.iterrows()])
             plot_sizes_un = np.unique(plot['plot_size'])
             vectors_to_summarise = {}
@@ -556,11 +556,11 @@ class AgcPlotEstimator:
             summary_plot['Abc'] = vector_dict['yc']['sum_v']
             summary_plot['AbcHa'] = (100. ** 2) * vector_dict['yc']['sum_v'] / (plot_sizes_un.max(initial=5.) ** 2)
 
-            if len(self.plot_litter_ds) == 0:
+            if len(self.plot_litter_df) == 0:
                 warnings.warn('No litter data')
             else:
-                if plot_id in self.plot_litter_ds.index and self.plot_litter_ds.loc[plot_id, 'dry_weight'] > 0.:
-                    summary_plot['LitterC'] = biomass_to_carbon_w * self.plot_litter_ds.loc[plot_id, 'dry_weight'] / 1000.  # g to kg
+                if plot_id in self.plot_litter_df.index and self.plot_litter_df.loc[plot_id, 'dry_weight'] > 0.:
+                    summary_plot['LitterC'] = biomass_to_carbon_w * self.plot_litter_df.loc[plot_id, 'dry_weight'] / 1000.  # g to kg
                     # The litter quadrats are uniform across all plot sizes.  The dry weight is converted to carbon using  biomass_to_carbon_w
                     summary_plot['LitterCHa'] = summary_plot['LitterC'] * (100. ** 2) / (4 * (0.5 ** 2))
                     summary_plot['AgcHa'] = summary_plot['LitterCHa'] + summary_plot['AbcHa']
@@ -572,8 +572,8 @@ class AgcPlotEstimator:
 
             plot_summary_agc_dict[plot_id] = summary_plot
 
-        self.plot_summary_agc_ds = pd.DataFrame.from_dict(plot_summary_agc_dict, orient='index')
-        return self.plot_summary_agc_ds
+        self.plot_summary_agc_df = pd.DataFrame.from_dict(plot_summary_agc_dict, orient='index')
+        return self.plot_summary_agc_df
 
     def WriteAbcPlantFile(self, out_file_name=None):
         """ Write aggreagted plant ABC etc values to CSV file.
@@ -583,7 +583,7 @@ class AgcPlotEstimator:
         out_file_name
             (optional) name of csv file to write to
         """
-        if len(self.abc_aggregator.plot_abc_ds) == 0:
+        if len(self.abc_aggregator.plot_abc_df) == 0:
             raise Exception('There is no ABC data - call Estimate() first')
         self.abc_aggregator.WriteFile(out_file_name=out_file_name)
 
@@ -596,7 +596,7 @@ class AgcPlotEstimator:
             (optional) name of csv file to write to
         """
 
-        if len(self.plot_summary_agc_ds) == 0:
+        if len(self.plot_summary_agc_df) == 0:
             raise Exception('There is no AGC data - call Estimate() first')
 
         # self.abc_aggregator.WriteAgcPlotFile()
@@ -606,7 +606,7 @@ class AgcPlotEstimator:
                                      os.path.splitext(os.path.basename(self.woody_file_name))[0])
 
         print('Writing plot AGC summary to: {0}'.format(out_file_name))
-        self.plot_summary_agc_ds.to_csv(out_file_name, index=False)
+        self.plot_summary_agc_df.to_csv(out_file_name, index=False)
         # with open(out_file_name, 'w', newline='') as outfile:
         #     writer = DictWriter(outfile, list(self.plot_summary_agc_dict.values())[0].keys())
         #     writer.writeheader()
