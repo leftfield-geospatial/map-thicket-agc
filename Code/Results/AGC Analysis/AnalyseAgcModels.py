@@ -14,7 +14,8 @@ from modules import SpatialUtils as su
 import pylab
 import numpy as np
 from sklearn import linear_model
-
+import rasterio
+from sklearn import metrics
 
 # reload(su)
 
@@ -51,10 +52,11 @@ imageFile = r"D:\OneDrive\GEF Essentials\Source Images\WorldView3 Oct 2017\World
 
 vr = su.GdalVectorReader(samplingPlotGtFile)
 ld = vr.read()
-imr = su.GdalImageReader(imageFile)
-fex = su.ImPlotFeatureExtractor(image_reader=imr, plot_feat_dict=ld['GEF Plot Polygons with AGC'])
-# reload(su)
-implot_feat_dict = fex.extract_all_features(patch_fn=su.ImPlotFeatureExtractor.extract_patch_ms_features_ex)
+# imr = su.GdalImageReader(imageFile)
+with rasterio.open(imageFile, 'r') as imr:
+    fex = su.ImPlotFeatureExtractor(image_reader=imr, plot_feat_dict=ld['GEF Plot Polygons with AGC'])
+    # reload(su)
+    implot_feat_dict = fex.extract_all_features(patch_fn=su.ImPlotFeatureExtractor.extract_patch_ms_features_ex)
 # implot_feat_dict.pop('ST49')
 
 # set DegrClass field in implot_feat_dict using plot ID

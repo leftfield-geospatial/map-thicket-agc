@@ -1,3 +1,9 @@
+# TODO remove future etc
+# TODO replace GladImageReader with rasterio or equivalent
+# TODO replace GladVectorReader with ?? - something that reads to pandas?
+
+
+
 from __future__ import print_function
 from __future__ import division
 from builtins import zip
@@ -32,8 +38,9 @@ import os
 import numpy as np
 import rasterio
 import re
+import rasterio
 from rasterio.features import sieve
-
+from rasterio.windows import Window
 
 def nanentropy(x, axis=None):
     """
@@ -339,94 +346,94 @@ def scatter_plot(x, y, class_labels=None, labels=None, thumbnails=None, do_regre
             pylab.legend(classes, fontsize=12)
     return r ** 2, rmse
 
-class GdalImageReader(object):
-    def __init__(self, file_name):
-        self.file_name = file_name
-        if not os.path.exists(file_name):
-            raise Exception("File does not exist: {0}".format(file_name))
-        self.ds = None
-        self.__open()
-
-    def __open(self):
-        self.ds = gdal.OpenEx(self.file_name, gdal.OF_RASTER)
-        if self.ds is None:
-            raise Exception("Could not open {0}".format(self.file_name))
-
-        print('Driver: {0}'.format(self.ds.GetDriver().LongName))
-        self.width = self.ds.RasterXSize
-        self.height = self.ds.RasterYSize
-        self.num_bands = self.ds.RasterCount
-        print('Size: {0} x {1} x {2} (width x height x bands)'.format(self.ds.RasterXSize, self.ds.RasterYSize, self.ds.RasterCount))
-        print('Projection: {0}'.format(self.ds.GetProjection()))
-        self.spatial_ref = osr.SpatialReference(self.ds.GetProjection())
-        self.geotransform = self.ds.GetGeoTransform()
-        if not self.geotransform is None:
-            self.origin = np.array([self.geotransform[0], self.geotransform[3]])
-            print('Origin = ({0}, {1})'.format(self.geotransform[0], self.geotransform[3]))
-            print('Pixel Size =  = ({0}, {1})'.format(self.geotransform[0], self.geotransform[3]))
-            print('Pixel Size = ({0}, {1})'.format(self.geotransform[1], self.geotransform[5]))
-            self.pixel_size = np.array([self.geotransform[1], self.geotransform[5]])
-        else:
-            self.origin = np.array([0, 0])
-            self.pixel_size = np.array([1, 1])
-        self.gdal_dtype = self.ds.GetRasterBand(1).DataType
-        if self.gdal_dtype == gdal.GDT_UInt16:
-            self.dtype = np.uint16
-        elif self.gdal_dtype == gdal.GDT_Int16:
-            self.dtype = np.int16
-        if self.gdal_dtype == gdal.GDT_Float32:
-            self.dtype = np.float32
-        elif self.gdal_dtype == gdal.GDT_Float64:
-            self.dtype = np.float64
-        else:
-            self.dtype = np.float32
-
-        self.block_size = self.ds.GetRasterBand(1).GetBlockSize()
-        self.image_array = None
-
-    def cleanup(self):
-        self.image_array = None
-        self.ds = None
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        self.cleanup()
-    def __del__(self):
-        self.cleanup()
-
-    def world_to_pixel(self, x, y):
-        row = old_div((y - self.origin[1]),self.pixel_size[1])     # row
-        col =  old_div((x - self.origin[0]),self.pixel_size[0])    # col
-        return (col, row)
-
-    def pixel_to_world(self, col, row):
-        y = row * self.pixel_size[1] + self.origin[1]
-        x = col * self.pixel_size[0] + self.origin[0]
-        return (col, row)
-
-    def read_image(self):
-        # the below orders pixels by band, row, col but we want band as last dimension
-        # self.image_array = self.ds.ReadAsArray(buf_type=self.gdal_dtype)
-        self.image_array = self.read_image_roi()
-        return self.image_array
-
-    def read_image_roi(self, col_range=None, row_range=None, band_range=None):
-        if row_range is None:
-            row_range = [0, self.height]
-        if col_range is None:
-            col_range = [0, self.width]
-        if band_range is None:
-            band_range = [0, self.num_bands]
-
-        # check ranges
-        for drange, drange_max in zip([row_range, col_range, band_range], [self.height, self.width, self.num_bands]):
-            drange[0] = np.maximum(0, drange[0])
-            drange[1] = np.minimum(drange_max, drange[1])
-
-        image_roi = np.zeros((np.diff(row_range)[0], np.diff(col_range)[0], np.diff(band_range)[0]), dtype=self.dtype)
-        for bi in range(band_range[0], band_range[1]):
-            image_roi[:, :, bi] = self.ds.GetRasterBand(bi + 1).ReadAsArray(int(col_range[0]), int(row_range[0]), int(np.diff(col_range)[0]),
-                                                                 int(np.diff(row_range)[0]), buf_type=self.gdal_dtype)
-        return image_roi
+# class GdalImageReader(object):
+#     def __init__(self, file_name):
+#         self.file_name = file_name
+#         if not os.path.exists(file_name):
+#             raise Exception("File does not exist: {0}".format(file_name))
+#         self.ds = None
+#         self.__open()
+#
+#     def __open(self):
+#         self.ds = gdal.OpenEx(self.file_name, gdal.OF_RASTER)
+#         if self.ds is None:
+#             raise Exception("Could not open {0}".format(self.file_name))
+#
+#         print('Driver: {0}'.format(self.ds.GetDriver().LongName))
+#         self.width = self.ds.RasterXSize
+#         self.height = self.ds.RasterYSize
+#         self.num_bands = self.ds.RasterCount
+#         print('Size: {0} x {1} x {2} (width x height x bands)'.format(self.ds.RasterXSize, self.ds.RasterYSize, self.ds.RasterCount))
+#         print('Projection: {0}'.format(self.ds.GetProjection()))
+#         self.spatial_ref = osr.SpatialReference(self.ds.GetProjection())
+#         self.geotransform = self.ds.GetGeoTransform()
+#         if not self.geotransform is None:
+#             self.origin = np.array([self.geotransform[0], self.geotransform[3]])
+#             print('Origin = ({0}, {1})'.format(self.geotransform[0], self.geotransform[3]))
+#             print('Pixel Size =  = ({0}, {1})'.format(self.geotransform[0], self.geotransform[3]))
+#             print('Pixel Size = ({0}, {1})'.format(self.geotransform[1], self.geotransform[5]))
+#             self.pixel_size = np.array([self.geotransform[1], self.geotransform[5]])
+#         else:
+#             self.origin = np.array([0, 0])
+#             self.pixel_size = np.array([1, 1])
+#         self.gdal_dtype = self.ds.GetRasterBand(1).DataType
+#         if self.gdal_dtype == gdal.GDT_UInt16:
+#             self.dtype = np.uint16
+#         elif self.gdal_dtype == gdal.GDT_Int16:
+#             self.dtype = np.int16
+#         if self.gdal_dtype == gdal.GDT_Float32:
+#             self.dtype = np.float32
+#         elif self.gdal_dtype == gdal.GDT_Float64:
+#             self.dtype = np.float64
+#         else:
+#             self.dtype = np.float32
+#
+#         self.block_size = self.ds.GetRasterBand(1).GetBlockSize()
+#         self.image_array = None
+#
+#     def cleanup(self):
+#         self.image_array = None
+#         self.ds = None
+#
+#     def __exit__(self, exc_type, exc_val, exc_tb):
+#         self.cleanup()
+#     def __del__(self):
+#         self.cleanup()
+#
+#     def world_to_pixel(self, x, y):
+#         row = old_div((y - self.origin[1]),self.pixel_size[1])     # row
+#         col =  old_div((x - self.origin[0]),self.pixel_size[0])    # col
+#         return (col, row)
+#
+#     def pixel_to_world(self, col, row):
+#         y = row * self.pixel_size[1] + self.origin[1]
+#         x = col * self.pixel_size[0] + self.origin[0]
+#         return (col, row)
+#
+#     def read_image(self):
+#         # the below orders pixels by band, row, col but we want band as last dimension
+#         # self.image_array = self.ds.ReadAsArray(buf_type=self.gdal_dtype)
+#         self.image_array = self.read_image_roi()
+#         return self.image_array
+#
+#     def read_image_roi(self, col_range=None, row_range=None, band_range=None):
+#         if row_range is None:
+#             row_range = [0, self.height]
+#         if col_range is None:
+#             col_range = [0, self.width]
+#         if band_range is None:
+#             band_range = [0, self.num_bands]
+#
+#         # check ranges
+#         for drange, drange_max in zip([row_range, col_range, band_range], [self.height, self.width, self.num_bands]):
+#             drange[0] = np.maximum(0, drange[0])
+#             drange[1] = np.minimum(drange_max, drange[1])
+#
+#         image_roi = np.zeros((np.diff(row_range)[0], np.diff(col_range)[0], np.diff(band_range)[0]), dtype=self.dtype)
+#         for bi in range(band_range[0], band_range[1]):
+#             image_roi[:, :, bi] = self.ds.GetRasterBand(bi + 1).ReadAsArray(int(col_range[0]), int(row_range[0]), int(np.diff(col_range)[0]),
+#                                                                  int(np.diff(row_range)[0]), buf_type=self.gdal_dtype)
+#         return image_roi
 
 class GdalVectorReader(object):
     def __init__(self, file_name):
@@ -530,7 +537,7 @@ class GroundClass(Enum):
 
 # class to extract features from polygons in an raster
 class ImPlotFeatureExtractor(object):
-    def __init__(self, image_reader=GdalImageReader, plot_feat_dict={}):
+    def __init__(self, image_reader=rasterio.io.DatasetReader, plot_feat_dict={}):
         self.image_reader = image_reader
         self.plot_feat_dict = plot_feat_dict
         self.im_feat_dict = {}
@@ -815,12 +822,12 @@ class ImPlotFeatureExtractor(object):
     # per_pixel = True, patch_fn = su.ImPlotFeatureExtractor.extract_patch_ms_features
     def extract_all_features(self, per_pixel=False, patch_fn=extract_patch_ms_features):
         # geotransform = ds.GetGeoTransform()
-        transform = osr.CoordinateTransformation(self.plot_feat_dict['spatial_ref'], self.image_reader.spatial_ref)
+        transform = osr.CoordinateTransformation(self.plot_feat_dict['spatial_ref'], gdal.osr.SpatialReference(self.image_reader.crs.to_string()))
         self.im_feat_count = 0
         self.im_feat_dict = {}
         # plotTagcDict = {}
         # class_labels = ['Pristine', 'Moderate', 'Severe']
-        max_im_vals = np.zeros((self.image_reader.num_bands))
+        max_im_vals = np.zeros((self.image_reader.count))
         for plot in list(self.plot_feat_dict['feat_dict'].values()):
             # transform plot corners into ds pixel space
             # plotCnrsWorld = plot['points']
@@ -832,7 +839,8 @@ class ImPlotFeatureExtractor(object):
                 point = ogr.Geometry(ogr.wkbPoint)
                 point.AddPoint(cnr[0], cnr[1])
                 point.Transform(transform)              # xform into image projection
-                (pixel, line) = self.image_reader.world_to_pixel(point.GetX(), point.GetY())
+                # (pixel, line) = self.image_reader.world_to_pixel(point.GetX(), point.GetY())
+                line, pixel = self.image_reader.index(point.GetX(), point.GetY())
                 plot_cnrs_pixel.append([pixel, line])
 
             plot_cnrs_pixel = np.array(plot_cnrs_pixel)
@@ -846,7 +854,7 @@ class ImPlotFeatureExtractor(object):
                 plot_size_pixel = np.int32(lr_cnr - ul_cnr) + 1
 
                 # make a mask for this plot
-                img = Image.fromarray(np.zeros((plot_size_pixel[1], plot_size_pixel[0])))
+                img = Image.fromarray(np.zeros((plot_size_pixel[1], plot_size_pixel[0])))   # TODO use rasterio masking
 
                 # Draw a rotated rectangle on the image.
                 draw = ImageDraw.Draw(img)
@@ -864,7 +872,7 @@ class ImPlotFeatureExtractor(object):
                 if 'Abc' in plot and 'LitterHa' in plot:
                     litterHa = np.max([plot['LitterHa'], 0.])
                     abc = np.max([plot['Abc'], 0.])
-                    plot_area_m2_ = plot_mask.sum()*(np.prod(np.abs(self.image_reader.pixel_size)))
+                    plot_area_m2_ = plot_mask.sum()*(np.prod(np.abs(self.image_reader.scales)))
                     plot_geom = plot['geom'].Clone()
                     plot_geom.Transform(transform)
                     plot_area_m2 = plot_geom.GetArea()
@@ -875,7 +883,10 @@ class ImPlotFeatureExtractor(object):
                 #      print '%s - no yc' % (plot['ID'])
 
                 # extract image patch with mask
-                imbuf = self.image_reader.read_image_roi(col_range=[ul_cnr[0], lr_cnr[0]+1], row_range=[ul_cnr[1], lr_cnr[1]+1])
+                # imbuf = self.image_reader.read_image_roi(col_range=[ul_cnr[0], lr_cnr[0]+1], row_range=[ul_cnr[1], lr_cnr[1]+1])
+
+                imbuf = self.image_reader.read(window=Window(ul_cnr[0], ul_cnr[1], plot_size_pixel[0], plot_size_pixel[1]))     # TODO ul_cnr + plot_size_pixel, reshape imbuf
+                imbuf = np.moveaxis(imbuf, 0, 2)    # TODO get rid of this somehow eg change all imbuf axis orderings to bands first
                 # imbuf = np.zeros((plot_size_pixel[1], plot_size_pixel[0], self.image_reader.num_bands), dtype=float)
                 # for b in range(0, self.image_reader.num_bands):
                 #     imbuf[:, :, b] = self.image_reader. ds.GetRasterBand(b).ReadAsArray(ul_cnr[0], ul_cnr[1], plot_size_pixel[0],
@@ -915,7 +926,7 @@ class ImPlotFeatureExtractor(object):
                 # plotTagcDict[plot['PLOT']] = csGtDict[plot['PLOT']]['TAGC']
 
                 # store max thumbnail vals for scaling later
-                tmp = np.reshape(plot_dict['thumbnail'], (np.prod(plot_size_pixel), self.image_reader.num_bands))
+                tmp = np.reshape(plot_dict['thumbnail'], (np.prod(plot_size_pixel), self.image_reader.count))
                 # max_tmp = tmp.max(axis=0)
                 max_tmp = np.percentile(tmp, 98., axis=0)
                 max_im_vals[max_tmp > max_im_vals] = max_tmp[max_tmp > max_im_vals]
@@ -943,7 +954,7 @@ class ImPlotFeatureExtractor(object):
             # print "{0} - scaling thumbnail".format(v['ID'])
             thumb = v['thumbnail']
             # max_im_vals[1] = max_im_vals[1]
-            for b in range(0, self.image_reader.num_bands):
+            for b in range(0, self.image_reader.count):
                 thumb[:, :, b] = old_div(thumb[:, :, b], max_im_vals[b])
                 thumb[:, :, b][thumb[:, :, b] > 1.] = 1.
                 thumb[:, :, b] = thumb[:, :, b]

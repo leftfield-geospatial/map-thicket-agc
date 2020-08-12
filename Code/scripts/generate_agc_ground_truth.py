@@ -1,3 +1,4 @@
+# TODO boilerplate (author) and license
 """
 
 """
@@ -41,7 +42,7 @@ if True:
         writer.writerows(list(agc_plot_est.abc_aggregator.master_surrogate_dict.values()))
 
     # plot relationships between plant volume and C stocks
-    f1 = pyplot.figure()
+    f1 = pyplot.figure('Relation between plant vol. and C stocks')
     f1.set_size_inches(10, 4, forward=True)
     ax = pyplot.subplot(1, 2, 1, aspect='equal')
     su.scatter_ds(agc_plot_est.plot_summary_agc_df, x_col='VolHa', y_col='AbcHa', xfn=lambda x: x / 1000., yfn=lambda y: y / 1000.,
@@ -56,7 +57,7 @@ if True:
     f1.waitforbuttonpress(.5)
     f1.savefig(root_path.joinpath('Data/Outputs/Allometry/VolVsAgcScatter.png'), dpi=300)
 
-    f2 = pyplot.figure()
+    f2 = pyplot.figure('Relation between Litter C and ABC')
     f2.set_size_inches(5, 4, forward=True)
     su.scatter_ds(agc_plot_est.plot_summary_agc_df, x_col='VolHa', y_col='AgcHa', xfn=lambda x: x / 1000., yfn=lambda y: y / 1000.,
                   x_label='Litter C (t C ha$^{-1}$)', y_label='ABC (t C ha$^{-1}$)')
@@ -99,7 +100,7 @@ if True:
     overall_degr_species_abc_df = pd.DataFrame()
     overall_plot_area_ttl = np.array([ps ** 2 for ps in plot_species_abc_df['plot_size']]).sum()
 
-    f1 = pyplot.figure()
+    f1 = pyplot.figure('Species contribution to ABC per stratum')
     f1.set_size_inches(10, 4, forward=True)
     plot_idxs = [1, 3, 2]
     for (degr_class, degr_group), plotIdx in zip(plot_species_abc_df.groupby('degr_class', sort=False), plot_idxs):
@@ -187,7 +188,7 @@ if True:
         pyplot.title(degr_class)
         pyplot.tight_layout()
 
-    f.waitforbuttonpress(0.2)
+    f.waitforbuttonpress(-1)    # wait before closing all windows
     f.savefig(root_path.joinpath('Data/Outputs/Allometry/PlantHeightContributionToAbcByStratum.png'), dpi=300)
 
 # TODO  - we can simulate what the "error" is when we increase the height cutoff idx (exclude heights less than x in

@@ -1,3 +1,4 @@
+# TODO boilerplate (author) and license
 """ Classes for estimating AGC from plant measurements using allometric models.
 
 """
