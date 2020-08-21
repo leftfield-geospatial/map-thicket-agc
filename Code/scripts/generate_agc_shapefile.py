@@ -8,6 +8,7 @@ import fiona, pyproj
 import geopandas as gpd, pandas as pd
 from modules import SpatialUtils as su
 import pathlib, sys, os, glob
+import shapely, fiona
 
 if '__file__' in globals():
     root_path = pathlib.Path(__file__).absolute().parents[2]
@@ -17,46 +18,69 @@ else:
 sys.path.append(str(root_path.joinpath('Code')))
 from modules import SpatialUtils as su
 
-
-# |layerid=0|subset="Comment" LIKE 'H%'
+# most DGSPS plot locations were corrected / post-processed to ~30cm accuracy = corr_*
+# some could not be post-processed and are corrected manually here using GCPs = uncorr_*
 corr_plot_loc_root_path = root_path.joinpath(r'Data\Sampling Inputs\Plot locations\Corrected')
 uncorr_plot_loc_root_path = root_path.joinpath(r'Data\Sampling Inputs\Plot locations\Uncorrected\March 2019')
 
-corr_shapefile_names = [sub_item.joinpath('Point_ge.shp') for sub_item in corr_plot_loc_root_path.iterdir() if sub_item.is_dir()]
-uncorr_shapefile_names = [pathlib.Path(p) for p in glob.glob(str(uncorr_plot_loc_root_path.joinpath('GEF_FIELD*.shp')))]
+corr_shapefile_names = [sub_item.joinpath('Point_ge.shp') for sub_item in corr_plot_loc_root_path.iterdir() if sub_item.is_dir()]   # corrected dgps locs
+uncorr_shapefile_names = [pathlib.Path(p) for p in glob.glob(str(uncorr_plot_loc_root_path.joinpath('GEF_FIELD*.shp')))]            # uncorrected locs
 gcp_shapefile_name = uncorr_plot_loc_root_path.joinpath('GeomaxFieldReferencePts.shp')
 
-
-# out_shape_file_name = root_path.joinpath('Data\Outputs\Geospatial\GEF Plot Polygons with AGC.shp')
-
-def world2Pixel(geoMatrix, x, y):
-    """
-    Uses a gdal geomatrix (gdal.GetGeoTransform()) to calculate
-    the pixel location of a geospatial coordinate
-    """
-    ulX = geoMatrix[0]
-    ulY = geoMatrix[3]
-    xDist = geoMatrix[1]
-    yDist = geoMatrix[5]
-    rtnX = geoMatrix[2]
-    rtnY = geoMatrix[4]
-    pixel = ((x - ulX)/xDist)
-    line = ((y - ulY)/yDist)
-    return (pixel, line)
-
-corr_gdf = pd.concat([gpd.read_file(str(corr_shapefile_name)) for corr_shapefile_name in corr_shapefile_names])
-corr_gdf['PlotName'] = corr_gdf['Datafile'].str[:-4]
-corr_gdf['ID'] = corr_gdf['Datafile'].str[:-4] + '-' + corr_gdf['Comment']
-corr_gdf = corr_gdf.set_crs("EPSG:4326")        # WGS84
-
+# read corrected locations
+corr_plot_loc_gdf = pd.concat([gpd.read_file(str(corr_shapefile_name)) for corr_shapefile_name in corr_shapefile_names])
+corr_plot_loc_gdf['PlotName'] = corr_plot_loc_gdf['Datafile'].str[:-4].str.replace('_0','')
+corr_plot_loc_gdf['ID'] = corr_plot_loc_gdf['PlotName'] + '-' + corr_plot_loc_gdf['Comment']
+corr_plot_loc_gdf = corr_plot_loc_gdf.set_crs(epsg=4326)        # WGS84
+corr_plot_loc_gdf = corr_plot_loc_gdf[['ID', 'PlotName', 'geometry', 'Comment']]
+# read (corrected) gcps for uncorrected locations
 gcp_gdf = gpd.read_file(gcp_shapefile_name)
-geomax_to_dgps_transform = osr.CoordinateTransformation(gcp_gdf.crs.to, gcp_gdf.crs.to_wkt())
-gcp_gdf.to_crs(corr_gdf.crs)
+# gcp_gdf.to_crs(corr_plot_loc_gdf.crs.to_wkt())  # convert to corr_plot_loc_gdf CRS (does not work with geopandas from https://www.lfd.uci.edu/~gohlke/pythonlibs/ - use conda)
 
-# ref_gcp_point_dict = gcp_reader.layer_dict['GeomaxFieldReferencePts']['feat_dict']
-# ref_gcp_point_names = np.array([point['ID'] for point in list(ref_gcp_point_dict.values())])
+uncorr_shapefile_name = uncorr_shapefile_names[0]
+for uncorr_shapefile_name in uncorr_shapefile_names:
+    uncorr_plot_loc_gdf = gpd.read_file(uncorr_shapefile_name)
+    pt_idx = uncorr_plot_loc_gdf['NAME'].str.contains('_H')
+    uncorr_plot_loc_gdf['ID'] = uncorr_plot_loc_gdf['NAME'].str.replace('_H', '-H').str.replace('_','')
+    uncorr_plot_loc_gdf['PlotName'] = [id[:id.find('-H')] for id in uncorr_plot_loc_gdf['ID']]
+    uncorr_plot_loc_gdf['Comment'] = [id[id.find('-H')+1:] for id in uncorr_plot_loc_gdf['ID']]
+    if uncorr_plot_loc_gdf.crs is None:
+        uncorr_plot_loc_gdf = uncorr_plot_loc_gdf.set_crs(gcp_gdf.crs)
+    # tmp_corr_gdf = uncorr_plot_loc_gdf.copy()
 
-# geomax_to_dgps_transform = osr.CoordinateTransformation(gcp_reader.layer_dict['GeomaxFieldReferencePts']['spatial_ref'], dgpsSrs)
+    # match GCPs in uncorr_plot_gdf to gcp_gdf
+    gcp_ids, uncorr_idx, gcp_idx = np.intersect1d(uncorr_plot_loc_gdf['NAME'], gcp_gdf['ID'], return_indices=True)
+
+    # No high level way of converting GeoSeries to numpy arrays, and or doing array type arithmetic on GeoSeries,
+    #   so we do the below
+    offsets = np.array([(np.array(gcp_pt)[:2] - np.array(uncorr_gcp_pt)[:2]).tolist()
+                        for gcp_pt, uncorr_gcp_pt in zip(uncorr_plot_loc_gdf.iloc[uncorr_idx]['geometry'], gcp_gdf.iloc[gcp_idx]['geometry'])])
+    offset = np.mean(offsets, axis=0)
+    tmp_plot_loc_gdf = uncorr_plot_loc_gdf['geometry'].translate(xoff=offset[0], yoff=offset[1])
+
+    # apply GCP offset correction
+    tmp_gdf = uncorr_plot_loc_gdf[pt_idx][['ID', 'PlotName', 'geometry', 'Comment']]
+    tmp_gdf['geometry'] = uncorr_plot_loc_gdf[pt_idx]['geometry'].translate(xoff=offset[0], yoff=offset[1])
+    # corr_geom_gdf.to_file('{0}_Corrected.shp'.format(str(uncorr_shapefile_name)[:-4]))
+
+    corr_plot_loc_gdf = corr_plot_loc_gdf.append(tmp_gdf, ignore_index=True)
+
+# corr_plot_loc_gdf.to_file('C:/Temp/temp.csv', driver='CSV')
+
+
+
+    if '_H' in key and not 'REF' in key:
+        plot_name = key[:key.find('_H')]
+        comment = key[key.find('_H') + 1:]
+        point = {}
+        point['PlotName'] = str(plot_name).replace('_', '')
+        point['Comment'] = comment
+        point['geom'] = field_point['geom_corr'].Clone()
+        # point['geom'] = field_point['geom'].Clone()
+        point['geom'].Transform(geomax_to_dgps_transform)
+        point['X'] = point['geom'].GetX()
+        point['Y'] = point['geom'].GetX()
+        dgpsDict[key] = point
 
 field_readers = []
 make_corrected_files = False
