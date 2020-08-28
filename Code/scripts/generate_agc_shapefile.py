@@ -67,6 +67,7 @@ for uncorr_shapefile_name in uncorr_shapefile_names:
 # read in AGC ground truth
 plot_agc_gdf = gpd.GeoDataFrame(pd.read_csv(plot_agc_allom_filename))
 plot_agc_gdf['geometry'] = gpd.GeoSeries()
+plot_agc_gdf = plot_agc_gdf.set_crs(corr_plot_loc_gdf.crs)
 
 # merge AGC ground truth with plot geometry
 for plot_name, plot_group in corr_plot_loc_gdf.groupby('PlotName'):

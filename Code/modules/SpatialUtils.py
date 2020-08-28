@@ -30,6 +30,7 @@ from sklearn.preprocessing import PolynomialFeatures
 from skimage.feature import greycomatrix, greycoprops
 from skimage import data
 import matplotlib.pyplot as pyplot
+import geopandas as gpd, pandas as pd
 
 # Python Imaging Library imports
 from PIL import Image
@@ -537,9 +538,10 @@ class GroundClass(Enum):
 
 # class to extract features from polygons in an raster
 class ImPlotFeatureExtractor(object):
-    def __init__(self, image_reader=rasterio.io.DatasetReader, plot_feat_dict={}):
+    def __init__(self, image_reader=rasterio.io.DatasetReader, plot_feat_dict={}, plot_data_gdf=gpd.GeoDataFrame()):
         self.image_reader = image_reader
         self.plot_feat_dict = plot_feat_dict
+        self.plot_data_gdf = plot_data_gdf
         self.im_feat_dict = {}
         self.im_feat_count = 0
 
@@ -822,22 +824,30 @@ class ImPlotFeatureExtractor(object):
     # per_pixel = True, patch_fn = su.ImPlotFeatureExtractor.extract_patch_ms_features
     def extract_all_features(self, per_pixel=False, patch_fn=extract_patch_ms_features):
         # geotransform = ds.GetGeoTransform()
-        transform = osr.CoordinateTransformation(self.plot_feat_dict['spatial_ref'], gdal.osr.SpatialReference(self.image_reader.crs.to_string()))
+        # transform = osr.CoordinateTransformation(self.plot_feat_dict['spatial_ref'], gdal.osr.SpatialReference(self.image_reader.crs.to_string()))
+        # transform = osr.CoordinateTransformation(gdal.osr.SpatialReference(self.plot_data_gdf.crs.to_wkt()),
+        #                                          gdal.osr.SpatialReference(self.image_reader.crs.to_wkt()))
+
+        self.plot_data_gdf = self.plot_data_gdf.to_crs(self.image_reader.crs)
+
         self.im_feat_count = 0
         self.im_feat_dict = {}
         # plotTagcDict = {}
         # class_labels = ['Pristine', 'Moderate', 'Severe']
         max_im_vals = np.zeros((self.image_reader.count))
-        for plot in list(self.plot_feat_dict['feat_dict'].values()):
+        # for plot in list(self.plot_feat_dict['feat_dict'].values()):
+
+        for i, plot in self.plot_data_gdf.iterrows():
             # transform plot corners into ds pixel space
             # plotCnrsWorld = plot['points']
             # if plot['ID'] == 'PV11':        #hack
             #     continue
 
             plot_cnrs_pixel = []
-            for cnr in plot['points']:
+            # if False:
+            for cnr in plot['geometry'].boundary.coords:
                 point = ogr.Geometry(ogr.wkbPoint)
-                point.AddPoint(cnr[0], cnr[1])
+                point.AddPoint(cnr[1], cnr[0])
                 point.Transform(transform)              # xform into image projection
                 # (pixel, line) = self.image_reader.world_to_pixel(point.GetX(), point.GetY())
                 line, pixel = self.image_reader.index(point.GetX(), point.GetY())
