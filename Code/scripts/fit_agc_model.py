@@ -6,6 +6,7 @@ import geopandas as gpd, pandas as pd
 import pathlib, sys, os, glob, warnings
 from sklearn import linear_model
 from modules import SpatialUtils as su
+from matplotlib import pyplot
 
 if '__file__' in globals():
     root_path = pathlib.Path(__file__).absolute().parents[2]
@@ -22,23 +23,23 @@ from sklearn import metrics
 def scatter_y_pred(y, pred, scores):
     import matplotlib.pyplot as plt
     su.scatter_plot(y, pred, xlabel='Measured AGC (t C ha$^{-1}$)', ylabel='Predicted AGC (t C ha$^{-1}$)', do_regress = False)
-    # fig, ax = pylab.subplots()
-    # pylab.plot(y, pred, 'o')
+    # fig, ax = pyplot.subplots()
+    # pyplot.plot(y, pred, 'o')
     mn = np.min([y, pred])
     mx = np.max([y, pred])
     h, = plt.plot([0, mx], [0, mx], 'k--', lw=2, zorder=-1, label='1:1')
     # ax.set_xlabel('Measured AGC (tC/ha)')
     # ax.set_ylabel('Estimated AGC (tC/ha)')
-    pylab.xlim(0, mx)
-    pylab.ylim(0, mx)
-    # pylab.grid()
-    pylab.text(26, 5, str.format('$R^2$ = {0:.2f}', scores['R2_stacked']),
+    pyplot.xlim(0, mx)
+    pyplot.ylim(0, mx)
+    # pyplot.grid()
+    pyplot.text(26, 5, str.format('$R^2$ = {0:.2f}', scores['R2_stacked']),
                fontdict={'size': 11})
-    pylab.text(26, 2, str.format('RMSE = {0:.2f} t C ha{1}',np.abs(scores['test_user']).mean(),'$^{-1}$'),
+    pyplot.text(26, 2, str.format('RMSE = {0:.2f} t C ha{1}',np.abs(scores['test_user']).mean(),'$^{-1}$'),
                fontdict={'size': 11})
-    pylab.show()
-    pylab.tight_layout()
-    pylab.legend([h], ['1:1'], frameon=False)
+    pyplot.show()
+    pyplot.tight_layout()
+    pyplot.legend([h], ['1:1'], frameon=False)
 
 #--------------------------------------------------------------------------------------------------------------
 # WV3 im analysis
@@ -73,7 +74,7 @@ for f in list(implot_feat_dict.values()):
 # implot_feat_dict.pop('ST49')
 X, y, feat_keys = fex.get_feat_array_ex(y_feat_key='AgcHa')
 
-pylab.figure()
+pyplot.figure()
 fex.scatter_plot(x_feat_key='pan/R', y_feat_key='AgcHa', class_key='DegrClass', xfn=lambda x: np.log10(x), do_regress=True)
 # R^2 = 0.8306
 # P (slope=0) = 0.000000
@@ -81,13 +82,13 @@ fex.scatter_plot(x_feat_key='pan/R', y_feat_key='AgcHa', class_key='DegrClass', 
 # Std error of slope = 19458.2934
 # RMS error = 7976.5274
 # Out[8]: (0.83059870877446296, 7976.5274329637823)
-pylab.figure()
+pyplot.figure()
 fex.scatter_plot(x_feat_key='pan/R', y_feat_key='AbcHa', class_key='DegrClass', xfn=lambda x: np.log10(x), do_regress=True)
 
-pylab.figure()
+pyplot.figure()
 fex.scatter_plot(x_feat_key='(R/G)^2', y_feat_key='AgcHa', class_key='DegrClass', xfn=lambda x: np.log10(x), do_regress=True)
 
-# pylab.figure()
+# pyplot.figure()
 # fex.scatter_plot(x_feat_key='diss(GLCM)[-1]', y_feat_key='AgcHa', class_key='DegrClass', xfn=lambda x: np.log10(x), do_regress=True)
 
 
@@ -120,41 +121,41 @@ for i in range(0, selected_scores.__len__()):
 print(' ')
 
 # fontSize = 12.
-# pylab.rcParams.update({'font.size': fontSize})
+# pyplot.rcParams.update({'font.size': fontSize})
 
 # plots for report
-fig = pylab.figure()
+fig = pyplot.figure()
 fig.set_size_inches(8, 6, forward=True)
-pylab.subplot(2, 1, 1)
-pylab.plot(num_feats, r2, 'k-')
-pylab.xlabel('Number of features')
-pylab.ylabel('$\mathit{R}^2$')
-# pylab.grid()
-pylab.tight_layout()
-pylab.subplot(2, 1, 2)
-pylab.plot(num_feats, rmse, 'k-')
-pylab.xlabel('Number of features')
-pylab.ylabel('RMSE (t C ha$^{-1}$)')
-# pylab.grid()
-pylab.tight_layout()
+pyplot.subplot(2, 1, 1)
+pyplot.plot(num_feats, r2, 'k-')
+pyplot.xlabel('Number of features')
+pyplot.ylabel('$\mathit{R}^2$')
+# pyplot.grid()
+pyplot.tight_layout()
+pyplot.subplot(2, 1, 2)
+pyplot.plot(num_feats, rmse, 'k-')
+pyplot.xlabel('Number of features')
+pyplot.ylabel('RMSE (t C ha$^{-1}$)')
+# pyplot.grid()
+pyplot.tight_layout()
 fig.savefig(r'C:\Data\Development\Projects\PhD GeoInformatics\Docs\Funding\GEF5\Invoices, Timesheets and Reports\Final Report\AgcAccVsNumFeatsPy38Cv5.png', dpi=300)
 
-fig, ax1 = pylab.subplots()
+fig, ax1 = pyplot.subplots()
 fig.set_size_inches(8, 4, forward=True)
 color = 'tab:red'
 ax1.set_xlabel('Number of features')
 ax1.set_ylabel('$\mathit{R}^2$', color=color)  # we already handled the x-label with ax1
 ax1.plot(num_feats, r2, color=color)
 ax1.tick_params(axis='y', labelcolor=color)
-# pylab.grid()
+# pyplot.grid()
 ax2 = ax1.twinx()
 color = 'tab:blue'
 ax2.set_ylabel('-RMSE (t C ha$^{-1}$)', color=color)  # we already handled the x-label with ax1
 ax2.plot(num_feats, -rmse, color=color)
 ax2.tick_params(axis='y', labelcolor=color)
-# pylab.grid()
+# pyplot.grid()
 fig.tight_layout()  # otherwise the right y-label is slightly clipped
-pylab.show()
+pyplot.show()
 fig.savefig(r'C:\Data\Development\Projects\PhD GeoInformatics\Docs\Funding\GEF5\Invoices, Timesheets and Reports\Final Report\AgcAccVsNumFeatsPy38Cv5.png', dpi=300)
 
 #------------------------------------------------------------------------------------------------------------------------
@@ -206,32 +207,32 @@ if False:
 
 
 # su.scatter_plot(y/1000., predicted/1000., labels=implot_feat_dict.keys())
-fig = pylab.figure()
+fig = pyplot.figure()
 fig.set_size_inches(5, 4, forward=True)
 scatter_y_pred(y/1000., predicted, scores)
 fig.savefig(r'C:\Data\Development\Projects\PhD GeoInformatics\Docs\Funding\GEF5\Invoices, Timesheets and Reports\Final Report\MeasVsPredAgcBestModel.png', dpi=300)
 
 if False:
-    fig = pylab.figure()
+    fig = pyplot.figure()
     su.scatter_plot(y/1000., predicted, labels=list(implot_feat_dict.keys()))
 
-fig = pylab.figure()
+fig = pyplot.figure()
 fig.set_size_inches(10, 4, forward=True)
-pylab.subplot(1,2,1)
+pyplot.subplot(1,2,1)
 scatter_y_pred(y/1000., predicted, scores)
-pylab.title('(a)')
-pylab.subplot(1,2,2)
+pyplot.title('(a)')
+pyplot.subplot(1,2,2)
 print('\nBest single feature model scores:')
 scores, predicted = su.FeatureSelector.score_model(Xselected_feats[:, :1], y/1000., model=linear_model.LinearRegression(),
                                                    find_predicted=True, cv=X.shape[0], print_scores=True)
 scatter_y_pred(y/1000., predicted, scores)
-pylab.title('(b)')
+pyplot.title('(b)')
 fig.savefig(r'C:\Data\Development\Projects\PhD GeoInformatics\Docs\Funding\GEF5\Invoices, Timesheets and Reports\Final Report\MeasVsPredAgcBestModels.png', dpi=300)
 
 #------------------------------------------------------------------------------------------------------------------------
 # Correlation analysis of the ground cover classification
 import modules.SpatialUtils as su
-import pylab
+import pyplot
 import numpy as np
 from sklearn import linear_model, metrics
 reload(su)
@@ -262,11 +263,11 @@ X_clf, y_clf, feat_keys_clf = fex_clf.get_feat_array_ex(y_feat_key='AgcHa')
 feat_scores = su.FeatureSelector.ranking(X_clf, y_clf, feat_keys=feat_keys_clf)
 classes = [plot['DegrClass'] for plot in list(implot_feat_dict_clf.values())]
 
-pylab.figure()
+pyplot.figure()
 fex_clf.scatter_plot(x_feat_key='VegCover', y_feat_key='AgcHa', do_regress=True, class_key='DegrClass', show_labels=False, yfn= lambda x: x/1000.)
-pylab.xlabel('Veg. cover (%)')
-pylab.ylabel('AGC (tC/ha)')
-pylab.tight_layout()
+pyplot.xlabel('Veg. cover (%)')
+pyplot.ylabel('AGC (tC/ha)')
+pyplot.tight_layout()
 
 # feature selection and model plot
 Xselected_feats, selected_scores, selected_keys = su.FeatureSelector.forward_selection(X_clf, y_clf, feat_keys=feat_keys_clf, max_num_feats=4, cv=5,
@@ -305,17 +306,17 @@ for f in list(implot_feat_dict.values()):
     else:
         f['DegrClass'] = '?'
 
-pylab.figure()
+pyplot.figure()
 fex.scatter_plot(x_feat_key='R/pan', y_feat_key='AgcHa', class_key='DegrClass', xfn=lambda x: np.log10(x))
-pylab.xlabel('R/pan')
-pylab.ylabel('AGC (tC/ha)')
-pylab.tight_layout()
+pyplot.xlabel('R/pan')
+pyplot.ylabel('AGC (tC/ha)')
+pyplot.tight_layout()
 
-pylab.figure()
+pyplot.figure()
 fex.scatter_plot(x_feat_key='NDVI', y_feat_key='AgcHa', class_key='DegrClass', xfn=lambda x: np.log10(x+1.))
-pylab.xlabel('NDVI')
-pylab.ylabel('AGC (tC/ha)')
-pylab.tight_layout()
+pyplot.xlabel('NDVI')
+pyplot.ylabel('AGC (tC/ha)')
+pyplot.tight_layout()
 
 vr.cleanup()
 imr.cleanup()
@@ -340,41 +341,41 @@ for i in range(0, selected_scores.__len__()):
 print(' ')
 
 # fontSize = 12.
-# pylab.rcParams.update({'font.size': fontSize})
+# pyplot.rcParams.update({'font.size': fontSize})
 
 # plots for report
-fig = pylab.figure()
+fig = pyplot.figure()
 fig.set_size_inches(8, 6, forward=True)
-pylab.subplot(2,1,1)
-pylab.plot(num_feats, r2, 'k-')
-pylab.xlabel('Number of features')
-pylab.ylabel('$\mathit{R}^2$')
-# pylab.grid()
-pylab.tight_layout()
-pylab.subplot(2,1,2)
-pylab.plot(num_feats, rmse, 'k-')
-pylab.xlabel('Number of features')
-pylab.ylabel('RMSE (t C ha$^{-1}$)')
-# pylab.grid()
-pylab.tight_layout()
+pyplot.subplot(2,1,1)
+pyplot.plot(num_feats, r2, 'k-')
+pyplot.xlabel('Number of features')
+pyplot.ylabel('$\mathit{R}^2$')
+# pyplot.grid()
+pyplot.tight_layout()
+pyplot.subplot(2,1,2)
+pyplot.plot(num_feats, rmse, 'k-')
+pyplot.xlabel('Number of features')
+pyplot.ylabel('RMSE (t C ha$^{-1}$)')
+# pyplot.grid()
+pyplot.tight_layout()
 fig.savefig(r'C:\Data\Development\Projects\PhD GeoInformatics\Docs\Funding\GEF5\Invoices, Timesheets and Reports\Final Report\NgiAgcAccVsNumFeats1.png', dpi=300)
 
-fig, ax1 = pylab.subplots()
+fig, ax1 = pyplot.subplots()
 fig.set_size_inches(8, 4, forward=True)
 color = 'tab:red'
 ax1.set_xlabel('Number of features')
 ax1.set_ylabel('$\mathit{R}^2$', color=color)  # we already handled the x-label with ax1
 ax1.plot(num_feats, r2, color=color)
 ax1.tick_params(axis='y', labelcolor=color)
-# pylab.grid()
+# pyplot.grid()
 ax2 = ax1.twinx()
 color = 'tab:blue'
 ax2.set_ylabel('-RMSE (t C ha$^{-1}$)', color=color)  # we already handled the x-label with ax1
 ax2.plot(num_feats, -rmse, color=color)
 ax2.tick_params(axis='y', labelcolor=color)
-# pylab.grid()
+# pyplot.grid()
 fig.tight_layout()  # otherwise the right y-label is slightly clipped
-pylab.show()
+pyplot.show()
 fig.savefig(r'C:\Data\Development\Projects\PhD GeoInformatics\Docs\Funding\GEF5\Invoices, Timesheets and Reports\Final Report\NgiAgcAccVsNumFeats2.png', dpi=300)
 
 #------------------------------------------------------------------------------------------------------------------------
@@ -389,20 +390,20 @@ for k in selected_keys[:best_model_idx+1]:
     print(k)
 
 # su.scatter_plot(y/1000., predicted/1000., labels=implot_feat_dict.keys())
-fig = pylab.figure()
+fig = pyplot.figure()
 fig.set_size_inches(5, 4, forward=True)
 scatter_y_pred(y/1000., predicted, scores)
 fig.savefig(r'C:\Data\Development\Projects\PhD GeoInformatics\Docs\Funding\GEF5\Invoices, Timesheets and Reports\Final Report\MeasVsNgiPredAgcBestModel.png', dpi=300)
 
-fig = pylab.figure()
+fig = pyplot.figure()
 fig.set_size_inches(10, 4, forward=True)
-pylab.subplot(1, 2, 1)
+pyplot.subplot(1, 2, 1)
 scatter_y_pred(y/1000., predicted, scores)
-pylab.title('(a)')
-pylab.subplot(1, 2, 2)
+pyplot.title('(a)')
+pyplot.subplot(1, 2, 2)
 print('\nBest single feature model scores:')
 scores, predicted = su.FeatureSelector.score_model(Xselected_feats[:, :1], old_div(y,1000), model=linear_model.LinearRegression(),
                                                    find_predicted=True, cv=X.shape[0], print_scores=True)
 scatter_y_pred(y/1000., predicted, scores)
-pylab.title('(b)')
+pyplot.title('(b)')
 fig.savefig(r'C:\Data\Development\Projects\PhD GeoInformatics\Docs\Funding\GEF5\Invoices, Timesheets and Reports\Final Report\MeasVsNgiPredAgcBestModels.png', dpi=300)

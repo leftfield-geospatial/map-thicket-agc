@@ -42,6 +42,7 @@ import re
 import rasterio
 from rasterio.features import sieve
 from rasterio.windows import Window
+from rasterio.mask import raster_geometry_mask
 
 def nanentropy(x, axis=None):
     """
@@ -843,18 +844,22 @@ class ImPlotFeatureExtractor(object):
             # if plot['ID'] == 'PV11':        #hack
             #     continue
 
+            # USE rasterio.mask.raster_geometry_mask with crop=True to generate window and mask
+
+
             plot_cnrs_pixel = []
             # if False:
             for cnr in plot['geometry'].boundary.coords:
                 point = ogr.Geometry(ogr.wkbPoint)
-                point.AddPoint(cnr[1], cnr[0])
-                point.Transform(transform)              # xform into image projection
+                point.AddPoint(cnr[0], cnr[1])
+                # point.Transform(transform)              # xform into image projection
                 # (pixel, line) = self.image_reader.world_to_pixel(point.GetX(), point.GetY())
                 line, pixel = self.image_reader.index(point.GetX(), point.GetY())
                 plot_cnrs_pixel.append([pixel, line])
 
             plot_cnrs_pixel = np.array(plot_cnrs_pixel)
             # if all the points fall inside the image
+            # TODO use something like plot_cnrs_pixel np.array(window.toranges()).transpose()(.flip)
             if np.all(plot_cnrs_pixel >= 0) and np.all(plot_cnrs_pixel[:, 0] < self.image_reader.width) \
                     and np.all(plot_cnrs_pixel[:, 1] < self.image_reader.height):  # and plot.has_key('Yc') and plot['Yc'] > 0.:
 
@@ -872,6 +877,9 @@ class ImPlotFeatureExtractor(object):
                 draw.polygon([tuple(np.round(p - ul_cnr)) for p in plot_cnrs_pixel], fill=1)
                 # Convert the Image data to a numpy array.
                 plot_mask = np.bool8(np.asarray(img))
+
+                # TODO use the below instead of manual process - does not produce exactly same mask as draw.polygon though!
+                plot_mask2, out_transform, window = raster_geometry_mask(self.image_reader, [plot['geometry']], crop=True, all_touched=False)
 
                 # if plot.has_key('Yc') and plot['Yc'] > 0:
                 #     plot['YcPp'] = plot['Yc'] / plot_mask.sum()         # the average per pixel in the mask
