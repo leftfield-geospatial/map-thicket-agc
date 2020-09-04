@@ -840,7 +840,6 @@ class ImPlotFeatureExtractor(object):
         # for plot in list(self.plot_feat_dict['feat_dict'].values()):
 
         for i, plot in self.plot_data_gdf.iterrows():
-            log_msg = 'Complete'
             plot_mask, plot_transform, plot_window = raster_geometry_mask(self.image_reader, [plot['geometry']], crop=True,
                                                                      all_touched=False)
             plot_cnrs_pixel =  np.fliplr(np.array(plot_window.toranges()).transpose())
@@ -852,8 +851,6 @@ class ImPlotFeatureExtractor(object):
                 abc = np.max([plot['Abc'], 0.])
                 plot['AbcHa2'] = abc * (100. ** 2) /  plot['geometry'].area
                 plot['AgcHa2'] = litterCHa + plot['AbcHa2']
-            else:
-                log_msg += ' No ABC data'
 
             # check plot window lies inside image
             if not (np.all(plot_cnrs_pixel >= 0) and np.all(plot_cnrs_pixel[:, 0] < self.image_reader.width) \
@@ -880,10 +877,6 @@ class ImPlotFeatureExtractor(object):
 
             plot_dict['thumbnail'] = np.float32(im_buf.copy())
             plot_dict['thumbnail'][~plot_mask] = 0.
-
-            if not plot_mask.shape == plot_dict['thumbnail'].shape[0:2]:    # should not happen?
-                raise Exception("Error - mask and thumbnail different sizes")
-
             self.im_feat_dict[plot['ID']] = plot_dict
 
             # store max thumbnail vals for scaling later
@@ -891,18 +884,11 @@ class ImPlotFeatureExtractor(object):
             max_im_vals[max_val > max_im_vals] = max_val[max_val > max_im_vals]
             self.im_feat_count += 1
 
-            if 'Abc' not in plot or plot['Abc'] <= 0:
-                log_msg += ', no ABC field'
-            if np.any(im_buf == 0):
-                log_msg += ', np.any(imbuf == 0) count {0}'.format(np.sum(im_buf == 0))
-            if np.any(im_buf < 0):
-                log_msg += ', np.any(imbuf < 0) count {0}'.format(np.sum(im_buf < 0))
-            if np.any(np.isnan(im_buf)):
-                log_msg += ', np.any(np.isnan(imbuf)) count {0}'.format(np.sum(np.any(np.isnan(im_buf))))
+            log_dict = {'ABC': 'Abc' in plot, 'Num 0 pixels': (im_buf == 0).sum(), 'Num -ve pixels': (im_buf < 0).sum(),
+                'Num nan pixels': np.isnan(im_buf).sum()}
+            print(*([f'Plot {plot["ID"]}'] + ['{} : {}'.format(k, v) for k, v in log_dict.items()]), sep=", ")
 
-            print("Plot {0}: {1}".format(plot['ID'], log_msg))
-
-        print('Found features for {0} polygons'.format(self.im_feat_count))
+        print('Processed {0} plots'.format(self.im_feat_count))
 
         # scale thumbnails
         for k, v in self.im_feat_dict.items():
