@@ -12,6 +12,7 @@ from builtins import range
 from builtins import object
 from past.utils import old_div
 import sys
+import warnings
 import gdal
 import ogr
 import numpy as np
@@ -839,147 +840,77 @@ class ImPlotFeatureExtractor(object):
         # for plot in list(self.plot_feat_dict['feat_dict'].values()):
 
         for i, plot in self.plot_data_gdf.iterrows():
-            # transform plot corners into ds pixel space
-            # plotCnrsWorld = plot['points']
-            # if plot['ID'] == 'PV11':        #hack
-            #     continue
+            log_msg = 'Complete'
+            plot_mask, plot_transform, plot_window = raster_geometry_mask(self.image_reader, [plot['geometry']], crop=True,
+                                                                     all_touched=False)
+            plot_cnrs_pixel =  np.fliplr(np.array(plot_window.toranges()).transpose())
+            plot_mask = ~plot_mask
 
-            # USE rasterio.mask.raster_geometry_mask with crop=True to generate window and mask
-
-
-            plot_cnrs_pixel = []
-            # if False:
-            for cnr in plot['geometry'].boundary.coords:
-                point = ogr.Geometry(ogr.wkbPoint)
-                point.AddPoint(cnr[0], cnr[1])
-                # point.Transform(transform)              # xform into image projection
-                # (pixel, line) = self.image_reader.world_to_pixel(point.GetX(), point.GetY())
-                line, pixel = self.image_reader.index(point.GetX(), point.GetY())
-                plot_cnrs_pixel.append([pixel, line])
-
-            plot_cnrs_pixel = np.array(plot_cnrs_pixel)
-            # if all the points fall inside the image
-            # TODO use something like plot_cnrs_pixel np.array(window.toranges()).transpose()(.flip)
-            if np.all(plot_cnrs_pixel >= 0) and np.all(plot_cnrs_pixel[:, 0] < self.image_reader.width) \
-                    and np.all(plot_cnrs_pixel[:, 1] < self.image_reader.height):  # and plot.has_key('Yc') and plot['Yc'] > 0.:
-
-                # get rectangular window extents
-                ul_cnr = np.int32(np.floor(np.min(plot_cnrs_pixel, 0)))
-                lr_cnr = np.int32(np.ceil(np.max(plot_cnrs_pixel, 0)))
-                plot_size_pixel = np.int32(lr_cnr - ul_cnr) + 1
-
-                # make a mask for this plot
-                img = Image.fromarray(np.zeros((plot_size_pixel[1], plot_size_pixel[0])))   # TODO use rasterio masking
-
-                # Draw a rotated rectangle on the image.
-                draw = ImageDraw.Draw(img)
-                # rect = get_rect(x=120, y=80, width=100, height=40, angle=30.0)
-                draw.polygon([tuple(np.round(p - ul_cnr)) for p in plot_cnrs_pixel], fill=1)
-                # Convert the Image data to a numpy array.
-                plot_mask = np.bool8(np.asarray(img))
-
-                # TODO use the below instead of manual process - does not produce exactly same mask as draw.polygon though!
-                plot_mask2, out_transform, window = raster_geometry_mask(self.image_reader, [plot['geometry']], crop=True, all_touched=False)
-
-                # if plot.has_key('Yc') and plot['Yc'] > 0:
-                #     plot['YcPp'] = plot['Yc'] / plot_mask.sum()         # the average per pixel in the mask
-                #     # plot['YcPm2'] = plot['Yc'] / (plot['Size'] ** 2)    # the average per m2 in the theoretical plot size
-
-                # extrap cs to to per ha based on actual plot size
-                # if 'Yc' in plot and 'LitterHa' in plot:
-                if 'Abc' in plot and 'LitterHa' in plot:
-                    litterHa = np.max([plot['LitterHa'], 0.])
-                    abc = np.max([plot['Abc'], 0.])
-                    plot_area_m2_ = plot_mask.sum()*(np.prod(np.abs(self.image_reader.scales)))
-                    plot_geom = plot['geom'].Clone()
-                    plot_geom.Transform(transform)
-                    plot_area_m2 = plot_geom.GetArea()
-                    plot['AbcHa2'] = (old_div(abc * (100.**2), plot_area_m2))
-                    plot['AgcHa2'] = litterHa + plot['AbcHa2']
-
-                # else:
-                #      print '%s - no yc' % (plot['ID'])
-
-                # extract image patch with mask
-                # imbuf = self.image_reader.read_image_roi(col_range=[ul_cnr[0], lr_cnr[0]+1], row_range=[ul_cnr[1], lr_cnr[1]+1])
-
-                imbuf = self.image_reader.read(window=Window(ul_cnr[0], ul_cnr[1], plot_size_pixel[0], plot_size_pixel[1]))     # TODO ul_cnr + plot_size_pixel, reshape imbuf
-                imbuf = np.moveaxis(imbuf, 0, 2)    # TODO get rid of this somehow eg change all imbuf axis orderings to bands first
-                # imbuf = np.zeros((plot_size_pixel[1], plot_size_pixel[0], self.image_reader.num_bands), dtype=float)
-                # for b in range(0, self.image_reader.num_bands):
-                #     imbuf[:, :, b] = self.image_reader. ds.GetRasterBand(b).ReadAsArray(ul_cnr[0], ul_cnr[1], plot_size_pixel[0],
-                #                                                          plot_size_pixel[1])
-
-                # imbuf[:, :, 3] = imbuf[:, :, 3] / 2  # hack for NGI XCALIB
-                if np.all(imbuf == 0) and not patch_fn == self.extract_patch_clf_features:
-                    print('Plot {0} has image data == zero, ommitting'.format(plot['ID']))
-                    continue
-                # for b in range(0, 4):
-                #     imbuf[:, :, b] = imbuf[:, :, b] / max_im_vals_[b]
-                if not plot_mask.shape == imbuf.shape[0:2]:
-                    print("error - mask and buf different sizes")
-                    raise Exception("error - mask and buf different sizes")
-
-                # ignore <=0 pixels (sometimes pan sharp outputs <= 0)
-                if patch_fn == self.extract_patch_clf_features:
-                    plot_mask = plot_mask & np.all(~np.isnan(imbuf), axis=2)
-                else:
-                    plot_mask = plot_mask & np.all(imbuf > 0, axis=2) & np.all(~np.isnan(imbuf), axis=2)
-
-                feat_dict = patch_fn(imbuf.copy(), mask=plot_mask, per_pixel=per_pixel)
-
-                # copy across other plot fields into plot_dict
-                plot_dict = OrderedDict(plot)
-                plot_dict['feats'] = feat_dict
-                # for f in plot.keys():
-                #     feat_dict[f] = plot[f]
-
-                plot_dict['thumbnail'] = np.float32(imbuf.copy())
-                plot_dict['thumbnail'][~plot_mask] = 0.
-                if not plot_mask.shape == plot_dict['thumbnail'].shape[0:2]:
-                    print("error - mask and thumbnail different sizes")
-                    raise Exception("error - mask and thumbnail different sizes")
-
-                self.im_feat_dict[plot['ID']] = plot_dict
-                # plotTagcDict[plot['PLOT']] = csGtDict[plot['PLOT']]['TAGC']
-
-                # store max thumbnail vals for scaling later
-                tmp = np.reshape(plot_dict['thumbnail'], (np.prod(plot_size_pixel), self.image_reader.count))
-                # max_tmp = tmp.max(axis=0)
-                max_tmp = np.percentile(tmp, 98., axis=0)
-                max_im_vals[max_tmp > max_im_vals] = max_tmp[max_tmp > max_im_vals]
-                # print plot['PLOT']
-                self.im_feat_count += 1
-
-                log_msg = 'complete'
-                if 'Abc' not in plot or plot['Abc'] <= 0:
-                    log_msg += ', no Abc field'
-                if np.any(imbuf == 0):
-                    log_msg += ', np.any(imbuf == 0) count {0}'.format(np.sum(imbuf == 0))
-                if np.any(imbuf < 0):
-                    log_msg += ', np.any(imbuf < 0) count {0}'.format(np.sum(imbuf < 0))
-                if np.any(np.isnan(imbuf)):
-                    log_msg += ', np.any(np.isnan(imbuf)) count {0}'.format(np.sum(np.any(np.isnan(imbuf))))
-
-                print("Plot {0}: {1}".format(plot['ID'], log_msg))
+            # find ABC and AGC with actual polygon area, rather than theoretical plot sizes
+            if 'Abc' in plot and 'LitterCHa' in plot:
+                litterCHa = np.max([plot['LitterCHa'], 0.])
+                abc = np.max([plot['Abc'], 0.])
+                plot['AbcHa2'] = abc * (100. ** 2) /  plot['geometry'].area
+                plot['AgcHa2'] = litterCHa + plot['AbcHa2']
             else:
-                print("Plot {0}: cannot include (outside image extent or no Abc data)".format(plot['ID']))
+                log_msg += ' No ABC data'
+
+            # check plot window lies inside image
+            if not (np.all(plot_cnrs_pixel >= 0) and np.all(plot_cnrs_pixel[:, 0] < self.image_reader.width) \
+                    and np.all(plot_cnrs_pixel[:, 1] < self.image_reader.height)):  # and plot.has_key('Yc') and plot['Yc'] > 0.:
+                warnings.warn(f'Excluding plot {plot["ID"]} - outside image extent')
+                continue
+
+            im_buf = self.image_reader.read(window=plot_window)
+            im_buf = np.moveaxis(im_buf, 0, 2)  # TODO get rid of this somehow eg change all imbuf axis orderings to bands first
+
+            if np.all(im_buf == 0) and not patch_fn == self.extract_patch_clf_features:
+                warnings.warn(f'Excluding plot {plot["ID"]} - all pixels are zero')
+                continue
+
+            # amend plot_mask to exclude NAN and -ve pixels
+            if patch_fn == self.extract_patch_clf_features:
+                plot_mask = plot_mask & np.all(~np.isnan(im_buf), axis=2)
+            else:
+                plot_mask = plot_mask & np.all(im_buf > 0, axis=2) & np.all(~np.isnan(im_buf), axis=2)
+
+            # TODO make this dict a dataframe (with geom?)
+            plot_dict = OrderedDict(plot)
+            plot_dict['feats'] = patch_fn(im_buf.copy(), mask=plot_mask, per_pixel=per_pixel)
+
+            plot_dict['thumbnail'] = np.float32(im_buf.copy())
+            plot_dict['thumbnail'][~plot_mask] = 0.
+
+            if not plot_mask.shape == plot_dict['thumbnail'].shape[0:2]:    # should not happen?
+                raise Exception("Error - mask and thumbnail different sizes")
+
+            self.im_feat_dict[plot['ID']] = plot_dict
+
+            # store max thumbnail vals for scaling later
+            max_val = np.percentile(plot_dict['thumbnail'], 98., axis=(0,1))
+            max_im_vals[max_val > max_im_vals] = max_val[max_val > max_im_vals]
+            self.im_feat_count += 1
+
+            if 'Abc' not in plot or plot['Abc'] <= 0:
+                log_msg += ', no ABC field'
+            if np.any(im_buf == 0):
+                log_msg += ', np.any(imbuf == 0) count {0}'.format(np.sum(im_buf == 0))
+            if np.any(im_buf < 0):
+                log_msg += ', np.any(imbuf < 0) count {0}'.format(np.sum(im_buf < 0))
+            if np.any(np.isnan(im_buf)):
+                log_msg += ', np.any(np.isnan(imbuf)) count {0}'.format(np.sum(np.any(np.isnan(im_buf))))
+
+            print("Plot {0}: {1}".format(plot['ID'], log_msg))
 
         print('Found features for {0} polygons'.format(self.im_feat_count))
 
         # scale thumbnails
         for k, v in self.im_feat_dict.items():
-            # print "{0} - scaling thumbnail".format(v['ID'])
             thumb = v['thumbnail']
-            # max_im_vals[1] = max_im_vals[1]
             for b in range(0, self.image_reader.count):
-                thumb[:, :, b] = old_div(thumb[:, :, b], max_im_vals[b])
+                thumb[:, :, b] /= max_im_vals[b]
                 thumb[:, :, b][thumb[:, :, b] > 1.] = 1.
-                thumb[:, :, b] = thumb[:, :, b]
-            # thumb[:, :, 0] = thumb[:, :, 0] / 1.5
-            # thumb[:, :, 1] = thumb[:, :, 1] * 1.2
-            # thumb[:, :, 1][thumb[:, :, 1] > 1.] = 1.
-            self.im_feat_dict[k]['thumbnail'] = thumb   #[:, :, [4, 2, 1]]
+            self.im_feat_dict[k]['thumbnail'] = thumb
 
         return self.im_feat_dict
 
