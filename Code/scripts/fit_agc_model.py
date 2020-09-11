@@ -7,6 +7,7 @@ import pathlib, sys, os, glob, warnings
 from sklearn import linear_model
 from modules import SpatialUtils as su
 from matplotlib import pyplot
+import logging
 
 if '__file__' in globals():
     root_path = pathlib.Path(__file__).absolute().parents[2]
@@ -14,7 +15,7 @@ else:
     root_path = pathlib.Path(os.getcwd()).parents[0]
 
 sys.path.append(str(root_path.joinpath('Code')))
-
+logging.basicConfig(format='%(levelname)s %(name)s: %(message)s')
 
 from sklearn import metrics
 

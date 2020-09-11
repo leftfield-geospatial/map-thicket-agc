@@ -9,6 +9,7 @@ import pathlib, sys, os
 from csv import DictWriter
 import pandas as pd
 from scipy.stats import gaussian_kde
+import logging
 
 if '__file__' in globals():
     root_path = pathlib.Path(__file__).absolute().parents[2]
@@ -16,8 +17,12 @@ else:
     root_path = pathlib.Path(os.getcwd()).parents[0]
 
 sys.path.append(str(root_path.joinpath('Code')))
+logging.basicConfig(format='%(levelname)s %(name)s: %(message)s')
+
 from modules import allometry
 from modules import SpatialUtils as su
+
+#
 
 model_file_name = root_path.joinpath('Data/Sampling Inputs/Allometry/Allometric Models.xlsx')
 litter_file_name = root_path.joinpath('Data/Sampling Inputs/Allometry/Litter Allometric Data.xlsx')

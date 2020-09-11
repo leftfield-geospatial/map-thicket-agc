@@ -3,8 +3,6 @@
 
 """
 
-from __future__ import print_function
-from __future__ import division
 from builtins import str
 from past.utils import old_div
 from openpyxl import load_workbook
@@ -14,16 +12,20 @@ from csv import DictWriter
 from collections import OrderedDict
 import os.path
 from enum import Enum
-import warnings
+import logging
 from openpyxl.styles import PatternFill
 from openpyxl.styles.colors import Color
 from openpyxl.styles import colors
 import pandas as pd
+import logging
 
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
 
 # (Note that CDM and J Reeler use 0.37, while C Bolus, M vd Vyver and A Mills use 0.48)
 biomass_to_carbon_w = 0.48      # factor to convert from biomass to carbon weight
 nested_height_thresh = 50.      # cutoff plant height for nested plot (cm)
+
 
 def FormatSpeciesName(species):
     """ Formats the species name into abbreviated dot notation.
@@ -103,11 +105,11 @@ class AbcPlantEstimator:
 
         # check in surrogate_dict , then return area / vol only (yc = 0)
         if species not in self.surrogate_dict:
-            warnings.warn('{0} has no key in species map, setting yc = 0'.format(species))
+            logger.warning('{0} has no key in species map, setting yc = 0'.format(species))
             return abc_dict
         allom_species = self.surrogate_dict[species]['allom_species']
         if allom_species == 'none':
-            warnings.warn('{0} has no model, setting yc = 0'.format(species))
+            logger.warning('{0} has no model, setting yc = 0'.format(species))
             return abc_dict
         elif allom_species not in self.model_dict:  # should never happen
             raise Exception('{0} has no key in model_dict'.format(allom_species))
@@ -144,7 +146,7 @@ class AbcPlantEstimator:
         if model['use_wd_ratio']:
             wd_species = self.surrogate_dict[species]['wd_species']
             if wd_species not in self.wd_ratio_dict:
-                warnings.warn('{0} has no key in wd_ratio_dict, using 1'.format(wd_species))
+                logger.warning('{0} has no key in wd_ratio_dict, using 1'.format(wd_species))
             else:
                 yc = yc * self.wd_ratio_dict[wd_species]['wd_ratio']
 
@@ -276,16 +278,16 @@ class AbcAggregator:
             self.master_surrogate_dict[species] = copy.deepcopy(surrogate_species_dict)
             # do some error checking
             if surrogate_species_dict['allom_species'] not in self.model_dict:
-                warnings.warn('Species: {0}, allom surrogate: {1} - No allometric model'.format(species, surrogate_species_dict['allom_species']))
+                logger.warning('Species: {0}, allom surrogate: {1} - No allometric model'.format(species, surrogate_species_dict['allom_species']))
             else:
                 if self.model_dict[surrogate_species_dict['allom_species']]['use_wd_ratio']:
                     if surrogate_species_dict['wd_species'] is not None:
                         if surrogate_species_dict['wd_species'] not in self.wd_ratio_dict:
-                            warnings.warn('Species: {0}, wd surrogate: {1} - No wet:dry ratio'.format(species,
+                            logger.warning('Species: {0}, wd surrogate: {1} - No wet:dry ratio'.format(species,
                                                                                                       surrogate_species_dict['wd_species']))
                             self.master_surrogate_dict[species]['wd_species'] = None
                     else:
-                        warnings.warn('Species: {0}, no wd surrogate'.format(species))
+                        logger.warning('Species: {0}, no wd surrogate'.format(species))
 
         # now add Cos' map, with wet/dry ratios
         for species, surrogate_species_dict in self.cb_surrogate_dict.items():
@@ -304,7 +306,7 @@ class AbcAggregator:
                     if surrogate_species_dict['allom_species'] in self.mvdv_surrogate_dict and self.mvdv_surrogate_dict[surrogate_species_dict['allom_species']]['wd_species'] is not None:
                         self.master_surrogate_dict[species]['wd_species'] = self.mvdv_surrogate_dict[surrogate_species_dict['allom_species']]['wd_species']
                     else:
-                        warnings.warn('Species: {0}, allom surrogate: {1} - No wd surrogate'.format(species, surrogate_species_dict['allom_species']))
+                        logger.warning('Species: {0}, allom surrogate: {1} - No wd surrogate'.format(species, surrogate_species_dict['allom_species']))
 
 
     def Aggregate(self, woody_file_name='', make_marked_file=False):
@@ -362,7 +364,7 @@ class AbcAggregator:
                 fields_ok = True
                 for f in fields:
                     if meas_dict[f] is None:
-                        warnings.warn('ID: {0}, species: {1}, has incomplete data'.format(plot_id, species))
+                        logger.warning('ID: {0}, species: {1}, has incomplete data'.format(plot_id, species))
                         meas_dict[f] = 0
                         fields_ok = False
 
@@ -375,7 +377,7 @@ class AbcAggregator:
                 if make_marked_file:    # mark problem cells in excel spreadsheet
                     if species not in self.master_surrogate_dict or not fields_ok:
                         r[3].fill = PatternFill(fgColor=colors.YELLOW, fill_type='solid')
-                        print('Marking row {0}'.format(r[3].row))
+                        logger.debug('Marking row {0}'.format(r[3].row))
                     else:
                         r[3].fill = PatternFill(fgColor=ok_colour, fill_type='solid',)
 
@@ -405,12 +407,12 @@ class AbcAggregator:
         finally:
             wb.close()
 
-        print('Unknown species:')
+        logger.info('Unknown species:')
         for k, v in self.unmodelled_species['unknown'].items():
-            print(k, v)
-        print('Unmodelled species:')
+            logger.info(f'{k} {v}')
+        logger.info('Unmodelled species:')
         for k, v in self.unmodelled_species['none'].items():
-            print(k, v)
+            logger.info(f'{k} {v}')
 
         return self.plot_abc_df
 
@@ -470,17 +472,17 @@ class AgcPlotEstimator:
                 plot_id = plot_id.replace('-0', '')
                 plot_id = plot_id.replace('-', '')
                 if plot_id == '' or plot_id is None or plot_id == 'NONE' or r[1].value == 0:
-                    warnings.warn('Empty record, continuing...')
+                    logger.warning('Empty record, continuing...')
                     continue
 
                 if not np.isreal(r[1].value) or r[1].value is None:
                     dry_weight = 0.
-                    warnings.warn('No data for plot {0}'.format(plot_id))        # these are typically excluded / not sampled plots
+                    logger.warning('No data for plot {0}'.format(plot_id))        # these are typically excluded / not sampled plots
                 else:
                     dry_weight = r[1].value
                 if plot_id in plot_litter_dict:
                     plot_litter_dict[plot_id]['dry_weight'] += dry_weight
-                    warnings.warn('Multiple values for plot {0}'.format(plot_id))
+                    logger.warning('Multiple values for plot {0}'.format(plot_id))
                 else:
                     plot_litter_dict[plot_id] = {'dry_weight': dry_weight}
         finally:
@@ -558,7 +560,7 @@ class AgcPlotEstimator:
             summary_plot['AbcHa'] = (100. ** 2) * vector_dict['yc']['sum_v'] / (plot_sizes_un.max(initial=5.) ** 2)
 
             if len(self.plot_litter_df) == 0:
-                warnings.warn('No litter data')
+                logger.warning('No litter data')
             else:
                 if plot_id in self.plot_litter_df.index and self.plot_litter_df.loc[plot_id, 'dry_weight'] > 0.:
                     summary_plot['LitterC'] = biomass_to_carbon_w * self.plot_litter_df.loc[plot_id, 'dry_weight'] / 1000.  # g to kg
@@ -566,7 +568,7 @@ class AgcPlotEstimator:
                     summary_plot['LitterCHa'] = summary_plot['LitterC'] * (100. ** 2) / (4 * (0.5 ** 2))
                     summary_plot['AgcHa'] = summary_plot['LitterCHa'] + summary_plot['AbcHa']
                 else:
-                    warnings.warn('No litter data for Plot ID: {0}'.format(plot_id))
+                    logger.warning('No litter data for Plot ID: {0}'.format(plot_id))
                     summary_plot['LitterC'] = np.nan
                     summary_plot['LitterCHa'] = np.nan
                     summary_plot['AgcHa'] = summary_plot['AbcHa']
@@ -606,7 +608,7 @@ class AgcPlotEstimator:
             out_file_name = str.format(str('{0}/{1} - Summary WoodyC & LitterC.csv'), os.path.dirname(self.woody_file_name),
                                      os.path.splitext(os.path.basename(self.woody_file_name))[0])
 
-        print('Writing plot AGC summary to: {0}'.format(out_file_name))
+        logger.info('Writing plot AGC summary to: {0}'.format(out_file_name))
         self.plot_summary_agc_df.to_csv(out_file_name, index=False)
         # with open(out_file_name, 'w', newline='') as outfile:
         #     writer = DictWriter(outfile, list(self.plot_summary_agc_dict.values())[0].keys())

@@ -12,7 +12,7 @@ from builtins import range
 from builtins import object
 from past.utils import old_div
 import sys
-import warnings
+import warnings, logging
 import gdal
 import ogr
 import numpy as np
@@ -44,6 +44,10 @@ import rasterio
 from rasterio.features import sieve
 from rasterio.windows import Window
 from rasterio.mask import raster_geometry_mask
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+
 
 def nanentropy(x, axis=None):
     """
@@ -187,13 +191,13 @@ def scatter_ds(data, x_col=None, y_col=None, class_col=None, label_col=None, thu
         yhat = x * slope + intercept
         rmse = np.sqrt(np.mean((y - yhat) ** 2))
 
-        print('RMSE = {0:.4f}'.format(rmse))
-        print('LOOCV RMSE = {0:.4f}'.format(np.sqrt(-scores['test_user'].mean())))
-        print('R^2  = {0:.4f}'.format(r ** 2))
-        print('Stacked R^2  = {0:.4f}'.format(scores['R2_stacked']))
-        print('P (slope=0) = {0:f}'.format(p))
-        print('Slope = {0:.4f}'.format(slope))
-        print('Std error of slope = {0:.4f}'.format(stde))
+        logger.info('RMSE = {0:.4f}'.format(rmse))
+        logger.info('LOOCV RMSE = {0:.4f}'.format(np.sqrt(-scores['test_user'].mean())))
+        logger.info('R^2  = {0:.4f}'.format(r ** 2))
+        logger.info('Stacked R^2  = {0:.4f}'.format(scores['R2_stacked']))
+        logger.info('P (slope=0) = {0:f}'.format(p))
+        logger.info('Slope = {0:.4f}'.format(slope))
+        logger.info('Std error of slope = {0:.4f}'.format(stde))
     else:
         r = np.nan
         rmse = np.nan
@@ -315,14 +319,14 @@ def scatter_plot(x, y, class_labels=None, labels=None, thumbnails=None, do_regre
 
         pylab.text((xlim[0] + xd * 0.7), (ylim[0] + yd * 0.05), '$R^2$ = {0:.2f}'.format(np.round(scores['R2_stacked'], 2)),
                    fontdict={'size': 12})
-        print('RMSE^2 = {0:.4f}'.format(rmse))
-        print('R^2 = {0:.4f}'.format(r ** 2))
-        print('P (slope=0) = {0:f}'.format(p))
-        print('Slope = {0:.4f}'.format(slope))
-        print('Std error of slope = {0:.4f}'.format(stde))
+        logger.info('RMSE^2 = {0:.4f}'.format(rmse))
+        logger.info('R^2 = {0:.4f}'.format(r ** 2))
+        logger.info('P (slope=0) = {0:f}'.format(p))
+        logger.info('Slope = {0:.4f}'.format(slope))
+        logger.info('Std error of slope = {0:.4f}'.format(stde))
         yhat = cfn(x) * slope + intercept
         rmse = np.sqrt(np.mean((cfn(y) - yhat) ** 2))
-        print('RMS error = {0:.4f}'.format(rmse))
+        logger.info('RMS error = {0:.4f}'.format(rmse))
 
         yr = [0, 0]
         yr[0] = xlim[0]*slope + intercept
@@ -362,19 +366,19 @@ def scatter_plot(x, y, class_labels=None, labels=None, thumbnails=None, do_regre
 #         if self.ds is None:
 #             raise Exception("Could not open {0}".format(self.file_name))
 #
-#         print('Driver: {0}'.format(self.ds.GetDriver().LongName))
+#         logger.info('Driver: {0}'.format(self.ds.GetDriver().LongName))
 #         self.width = self.ds.RasterXSize
 #         self.height = self.ds.RasterYSize
 #         self.num_bands = self.ds.RasterCount
-#         print('Size: {0} x {1} x {2} (width x height x bands)'.format(self.ds.RasterXSize, self.ds.RasterYSize, self.ds.RasterCount))
-#         print('Projection: {0}'.format(self.ds.GetProjection()))
+#         logger.info('Size: {0} x {1} x {2} (width x height x bands)'.format(self.ds.RasterXSize, self.ds.RasterYSize, self.ds.RasterCount))
+#         logger.info('Projection: {0}'.format(self.ds.GetProjection()))
 #         self.spatial_ref = osr.SpatialReference(self.ds.GetProjection())
 #         self.geotransform = self.ds.GetGeoTransform()
 #         if not self.geotransform is None:
 #             self.origin = np.array([self.geotransform[0], self.geotransform[3]])
-#             print('Origin = ({0}, {1})'.format(self.geotransform[0], self.geotransform[3]))
-#             print('Pixel Size =  = ({0}, {1})'.format(self.geotransform[0], self.geotransform[3]))
-#             print('Pixel Size = ({0}, {1})'.format(self.geotransform[1], self.geotransform[5]))
+#             logger.info('Origin = ({0}, {1})'.format(self.geotransform[0], self.geotransform[3]))
+#             logger.info('Pixel Size =  = ({0}, {1})'.format(self.geotransform[0], self.geotransform[3]))
+#             logger.info('Pixel Size = ({0}, {1})'.format(self.geotransform[1], self.geotransform[5]))
 #             self.pixel_size = np.array([self.geotransform[1], self.geotransform[5]])
 #         else:
 #             self.origin = np.array([0, 0])
@@ -471,7 +475,7 @@ class GdalVectorReader(object):
             layer.ResetReading()
             feat_defn = layer.GetLayerDefn()
             feat_dict = {}
-            print('Reading feats in layer: {0}'.format(layer.GetName()))
+            logger.info('Reading feats in layer: {0}'.format(layer.GetName()))
             for feati, feat in enumerate(layer):
                 # print '.',
                 fdict = {}
@@ -508,13 +512,13 @@ class GdalVectorReader(object):
                 geom = feat.GetGeometryRef()
                 fdict['geom'] = geom.Clone()
                 if geom is not None and (geom.GetGeometryType() == ogr.wkbPolygon):
-                    print("%s Polygon with %d points"  % (id, geom.GetGeometryRef(0).GetPointCount()))
+                    logger.info("%s Polygon with %d points"  % (id, geom.GetGeometryRef(0).GetPointCount()))
                     fdict['points'] = geom.GetGeometryRef(0).GetPoints()[:-1]
                     # pixCnr = []
                     # for point in f['points']:
                     #     pixCnr.append(World2Pixel(geotransform, point[0], point[1]))
                 elif geom is not None and (geom.GetGeometryType() == ogr.wkbPoint or geom.GetGeometryType() == ogr.wkbPoint25D or geom.GetGeometryType() == ogr.wkbPointZM):
-                    print("%s Point (%.6f, %.6f)" % (id, geom.GetX(), geom.GetY()))
+                    logger.info("%s Point (%.6f, %.6f)" % (id, geom.GetX(), geom.GetY()))
                     fdict['X'] = geom.GetX()
                     fdict['Y'] = geom.GetY()
                     if False:    #'GNSS_Heigh' in fdict.keys():
@@ -523,7 +527,7 @@ class GdalVectorReader(object):
                         fdict['Z'] = geom.GetZ()  # this has been xformed from elippsoidal to Sa Geoid 2010
                     # f['ID'] = f['Datafile'][:-4] + str(f['Point_ID'])
                 else:
-                    print("unknown geometry/n")
+                    logger.warning("Unknown geometry")
                 feat_dict[id] = fdict
                 # print ' '
 
@@ -855,14 +859,14 @@ class ImPlotFeatureExtractor(object):
             # check plot window lies inside image
             if not (np.all(plot_cnrs_pixel >= 0) and np.all(plot_cnrs_pixel[:, 0] < self.image_reader.width) \
                     and np.all(plot_cnrs_pixel[:, 1] < self.image_reader.height)):  # and plot.has_key('Yc') and plot['Yc'] > 0.:
-                warnings.warn(f'Excluding plot {plot["ID"]} - outside image extent')
+                logger.warning(f'Excluding plot {plot["ID"]} - outside image extent')
                 continue
 
             im_buf = self.image_reader.read(window=plot_window)
             im_buf = np.moveaxis(im_buf, 0, 2)  # TODO get rid of this somehow eg change all imbuf axis orderings to bands first
 
             if np.all(im_buf == 0) and not patch_fn == self.extract_patch_clf_features:
-                warnings.warn(f'Excluding plot {plot["ID"]} - all pixels are zero')
+                logger.warning(f'Excluding plot {plot["ID"]} - all pixels are zero')
                 continue
 
             # amend plot_mask to exclude NAN and -ve pixels
@@ -884,11 +888,11 @@ class ImPlotFeatureExtractor(object):
             max_im_vals[max_val > max_im_vals] = max_val[max_val > max_im_vals]
             self.im_feat_count += 1
 
-            log_dict = {'ABC': 'Abc' in plot, 'Num 0 pixels': (im_buf == 0).sum(), 'Num -ve pixels': (im_buf < 0).sum(),
+            log_dict = {'ABC': 'Abc' in plot, 'Num zero pixels': (im_buf == 0).sum(), 'Num -ve pixels': (im_buf < 0).sum(),
                 'Num nan pixels': np.isnan(im_buf).sum()}
-            print(*([f'Plot {plot["ID"]}'] + ['{} : {}'.format(k, v) for k, v in log_dict.items()]), sep=", ")
+            logger.info(', '.join([f'Plot {plot["ID"]}'] + ['{}: {}'.format(k, v) for k, v in log_dict.items()]))
 
-        print('Processed {0} plots'.format(self.im_feat_count))
+        logger.info('Processed {0} plots'.format(self.im_feat_count))
 
         # scale thumbnails
         for k, v in self.im_feat_dict.items():
@@ -940,11 +944,11 @@ class ImPlotFeatureExtractor(object):
         id = np.array([plot['ID'] for plot in list(self.im_feat_dict.values())])
         feat_keys_mod = np.array(feat_keys_mod)
         X = np.array(X).transpose()
-        print('feat_array nan sum: {0}'.format(np.isnan(X).sum()))
-        print('feat_array nan feats: ' + str(feat_keys_mod[np.any(np.isnan(X), axis=0)]))
+        logger.info('feat_array nan sum: {0}'.format(np.isnan(X).sum()))
+        logger.info('feat_array nan feats: ' + str(feat_keys_mod[np.any(np.isnan(X), axis=0)]))
         # print 'feat_array nan plots: ' + str(id[np.any(np.isnan(X), axis=1)])
-        print('feat_array inf sum: {0}'.format((X == np.inf).sum()))
-        print('feat_array inf feats: ' + str(feat_keys_mod[np.any((X == np.inf), axis=0)]))
+        logger.info('feat_array inf sum: {0}'.format((X == np.inf).sum()))
+        logger.info('feat_array inf feats: ' + str(feat_keys_mod[np.any((X == np.inf), axis=0)]))
         # print 'feat_array inf plots: ' + str(id[np.any((X == np.inf), axis=1)])
         return X, y, feat_keys_mod
 
@@ -968,12 +972,12 @@ class ImPlotFeatureExtractor(object):
         id = np.array([plot['ID'] for plot in list(self.im_feat_dict.values())])
         feat_keys = np.array(feat_keys)
         X = np.array(X).transpose()
-        print('feat_array nan sum: {0}'.format(np.isnan(X).sum()))
-        print('feat_array nan feats: ' + str(feat_keys[np.any(np.isnan(X), axis=0)]))
-        # print 'feat_array nan plots: ' + str(id[np.any(np.isnan(X), axis=1)])
-        print('feat_array inf sum: {0}'.format((X == np.inf).sum()))
-        print('feat_array inf feats: ' + str(feat_keys[np.any((X == np.inf), axis=0)]))
-        # print 'feat_array inf plots: ' + str(id[np.any((X == np.inf), axis=1)])
+        logger.info('feat_array nan sum: {0}'.format(np.isnan(X).sum()))
+        logger.info('feat_array nan feats: ' + str(feat_keys[np.any(np.isnan(X), axis=0)]))
+        # logger.info 'feat_array nan plots: ' + str(id[np.any(np.isnan(X), axis=1)])
+        logger.info('feat_array inf sum: {0}'.format((X == np.inf).sum()))
+        logger.info('feat_array inf feats: ' + str(feat_keys[np.any((X == np.inf), axis=0)]))
+        # logger.info 'feat_array inf plots: ' + str(id[np.any((X == np.inf), axis=1)])
         return X, y, feat_keys
 
 
@@ -1061,13 +1065,13 @@ class ImPlotFeatureExtractor(object):
             (slope, intercept, r, p, stde) = stats.linregress(cfn(x), cfn(y))
             pylab.text((xlim[0] + xd * 0.7), (ylim[0] + yd * 0.05), '$R^2$ = {0:.2f}'.format(np.round(r ** 2, 2)),
                        fontdict={'size': 12})
-            print('R^2 = {0:.4f}'.format(r ** 2))
-            print('P (slope=0) = {0:f}'.format(p))
-            print('Slope = {0:.4f}'.format(slope))
-            print('Std error of slope = {0:.4f}'.format(stde))
+            logger.info('R^2 = {0:.4f}'.format(r ** 2))
+            logger.info('P (slope=0) = {0:f}'.format(p))
+            logger.info('Slope = {0:.4f}'.format(slope))
+            logger.info('Std error of slope = {0:.4f}'.format(stde))
             yhat = cfn(x)*slope + intercept
             rmse = np.sqrt(np.mean((cfn(y) - yhat) ** 2))
-            print('RMS error = {0:.4f}'.format(rmse))
+            logger.info('RMS error = {0:.4f}'.format(rmse))
         else:
             r = np.nan
             rmse = np.nan
@@ -1142,7 +1146,7 @@ class FeatureSelector(object):
         selected_scores = []
         available_feats = feat_dict
 
-        print('Forward selection: ', end=' ')
+        logger.info('Forward selection: ', end=' ')
         while len(selected_feats) < max_num_feats:
             best_score = -np.inf
             best_feat = []
@@ -1157,14 +1161,14 @@ class FeatureSelector(object):
             selected_feats[best_key] = best_feat
             selected_scores.append(best_score)
             available_feats.pop(best_key)
-            print(best_key + ', ', end=' ')
-        print(' ')
+            logger.info(best_key + ', ', end=' ')
+        logger.info(' ')
         selected_scores = np.array(selected_scores)
         selected_feat_keys = list(selected_feats.keys())
         best_selected_feat_keys = selected_feat_keys[:np.argmax(selected_scores) + 1]
-        print('Best score: {0}'.format(selected_scores.max()))
-        print('Num feats at best score: {0}'.format(np.argmax(selected_scores) + 1))
-        print('Feat keys at best score: {0}'.format(best_selected_feat_keys))
+        logger.info('Best score: {0}'.format(selected_scores.max()))
+        logger.info('Num feats at best score: {0}'.format(np.argmax(selected_scores) + 1))
+        logger.info('Feat keys at best score: {0}'.format(best_selected_feat_keys))
 
         return np.array(list(selected_feats.values())).transpose(), selected_scores, selected_feat_keys
 
@@ -1187,12 +1191,12 @@ class FeatureSelector(object):
                 # score = scores['R2_stacked']        #hack
             feat_scores.append(score)
             if i%20==0:
-                print('.', end=' ')
-        print(' ')
+                logger.info('.', end=' ')
+        logger.info(' ')
         feat_scores = np.array(feat_scores)
 
-        print('Best score: {0}'.format(feat_scores.max()))
-        print('Best feat: {0}'.format(feat_keys[np.argmax(feat_scores)]))
+        logger.info('Best score: {0}'.format(feat_scores.max()))
+        logger.info('Best feat: {0}'.format(feat_keys[np.argmax(feat_scores)]))
         return feat_scores
 
     @staticmethod
@@ -1217,15 +1221,15 @@ class FeatureSelector(object):
         if print_scores:
             rmse_ci = np.percentile(-scores['test_-RMSE'], [5, 95])
             r2_ci = np.percentile(-scores['test_R2'], [5, 95])
-            print('RMSE: {0:.4f} ({1:.4f})'.format(-scores['test_-RMSE'].mean(), scores['test_-RMSE'].std()))
-            print('RMSE 5-95%: {0:.4f} - {1:.4f}'.format(rmse_ci[0], rmse_ci[1]))
-            print('R2 (average over folds): {0:.4f} ({1:.4f})'.format(scores['test_R2'].mean(), scores['test_R2'].std()))
-            print('R2 5-95%: {0:.4f} - {1:.4f}'.format(r2_ci[0], r2_ci[1]))
+            logger.info('RMSE: {0:.4f} ({1:.4f})'.format(-scores['test_-RMSE'].mean(), scores['test_-RMSE'].std()))
+            logger.info('RMSE 5-95%: {0:.4f} - {1:.4f}'.format(rmse_ci[0], rmse_ci[1]))
+            logger.info('R2 (average over folds): {0:.4f} ({1:.4f})'.format(scores['test_R2'].mean(), scores['test_R2'].std()))
+            logger.info('R2 5-95%: {0:.4f} - {1:.4f}'.format(r2_ci[0], r2_ci[1]))
         if find_predicted:
             predicted = cross_val_predict(model, X, y, cv=cv)  #)
             scores['R2_stacked'] = metrics.r2_score(y, predicted)   # DO NOT USE FOR VALIDATION
             if print_scores:
-                print('R2 (stacked): {0:.4f}'.format(scores['R2_stacked']))
+                logger.info('R2 (stacked): {0:.4f}'.format(scores['R2_stacked']))
         return scores, predicted
         # score = {}
         # score = score_fn(y, predicted)
@@ -1399,24 +1403,24 @@ class ModelCalibrationTest(object):
                                                 'mean(rmse)': model_scores['rmse'].mean(), 'std(rmse)': model_scores['rmse'].std()}
                 self.calib_scores_array[fmi, tmi] = {'mean(r2)': calib_scores['r2'].mean(axis=0), 'std(r2)': calib_scores['r2'].std(axis=0),
                                                 'mean(rmse)': calib_scores['rmse'].mean(axis=0), 'std(rmse)': calib_scores['rmse'].std(axis=0)}
-                print('Model scores (fit model {0}, calib model {1})'.format(fmi, tmi))
-                print('mean(R^2): {0:.4f}'.format(model_scores['r2'].mean()))
-                print('std(R^2): {0:.4f}'.format(model_scores['r2'].std()))
-                print('mean(RMSE): {0:.4f}'.format(model_scores['rmse'].mean()))
-                print('std(RMSE): {0:.4f}'.format(model_scores['rmse'].std()))
-                print(' ')
-                print('Calib scores (fit model {0}, calib model {1})'.format(fmi, tmi))
-                print('mean(R^2): {0}'.format(calib_scores['r2'].mean(axis=0)))
-                print('std(R^2): {0}'.format(calib_scores['r2'].std(axis=0)))
-                print('mean(RMSE): {0}'.format(calib_scores['rmse'].mean(axis=0)))
-                print('std(RMSE): {0}'.format(calib_scores['rmse'].std(axis=0)))
-                print(' ')
+                logger.info('Model scores (fit model {0}, calib model {1})'.format(fmi, tmi))
+                logger.info('mean(R^2): {0:.4f}'.format(model_scores['r2'].mean()))
+                logger.info('std(R^2): {0:.4f}'.format(model_scores['r2'].std()))
+                logger.info('mean(RMSE): {0:.4f}'.format(model_scores['rmse'].mean()))
+                logger.info('std(RMSE): {0:.4f}'.format(model_scores['rmse'].std()))
+                logger.info(' ')
+                logger.info('Calib scores (fit model {0}, calib model {1})'.format(fmi, tmi))
+                logger.info('mean(R^2): {0}'.format(calib_scores['r2'].mean(axis=0)))
+                logger.info('std(R^2): {0}'.format(calib_scores['r2'].std(axis=0)))
+                logger.info('mean(RMSE): {0}'.format(calib_scores['rmse'].mean(axis=0)))
+                logger.info('std(RMSE): {0}'.format(calib_scores['rmse'].std(axis=0)))
+                logger.info(' ')
         return self.model_scores_array, self.calib_scores_array
 
     def PrintScores(self):
         for scores_array, label in zip([self.model_scores_array, self.calib_scores_array], ['Model', 'Calib']):
             for key in ['mean(r2)', 'std(r2)', 'mean(rmse)', 'std(rmse)']:
-                print('{0} {1}:'.format(label, key))
+                logger.info('{0} {1}:'.format(label, key))
                 score_array = np.zeros(scores_array.shape)
                 for ri in range(scores_array.shape[0]):
                     for ci in range(scores_array.shape[1]):
@@ -1424,10 +1428,10 @@ class ModelCalibrationTest(object):
                             score_array[ri, ci] = 0.
                         else:
                             score_array[ri, ci] = scores_array[ri, ci][key]
-                print(score_array)
+                logger.info(score_array)
                 overall_mean = np.diag(np.flipud(score_array)).mean()
-                print('Overall mean({0} {1}): {2:0.4f}'.format(label, key, overall_mean))
-                print(' ')
+                logger.info('Overall mean({0} {1}): {2:0.4f}'.format(label, key, overall_mean))
+                logger.info(' ')
 
         return
 
@@ -1528,24 +1532,24 @@ class ModelCalibrationTestEx(object):
                                                 'mean(rmse)': model_scores['rmse'].mean(), 'std(rmse)': model_scores['rmse'].std()}
                 self.calib_scores_array[fmi, tmi] = {'mean(r2)': calib_scores['r2'].mean(axis=0), 'std(r2)': calib_scores['r2'].std(axis=0),
                                                 'mean(rmse)': calib_scores['rmse'].mean(axis=0), 'std(rmse)': calib_scores['rmse'].std(axis=0)}
-                print('Model scores (fit model {0}, calib model {1})'.format(fmi, tmi))
-                print('mean(R^2): {0:.4f}'.format(model_scores['r2'].mean()))
-                print('std(R^2): {0:.4f}'.format(model_scores['r2'].std()))
-                print('mean(RMSE): {0:.4f}'.format(model_scores['rmse'].mean()))
-                print('std(RMSE): {0:.4f}'.format(model_scores['rmse'].std()))
-                print(' ')
-                print('Calib scores (fit model {0}, calib model {1})'.format(fmi, tmi))
-                print('mean(R^2): {0}'.format(calib_scores['r2'].mean(axis=0)))
-                print('std(R^2): {0}'.format(calib_scores['r2'].std(axis=0)))
-                print('mean(RMSE): {0}'.format(calib_scores['rmse'].mean(axis=0)))
-                print('std(RMSE): {0}'.format(calib_scores['rmse'].std(axis=0)))
-                print(' ')
+                logger.info('Model scores (fit model {0}, calib model {1})'.format(fmi, tmi))
+                logger.info('mean(R^2): {0:.4f}'.format(model_scores['r2'].mean()))
+                logger.info('std(R^2): {0:.4f}'.format(model_scores['r2'].std()))
+                logger.info('mean(RMSE): {0:.4f}'.format(model_scores['rmse'].mean()))
+                logger.info('std(RMSE): {0:.4f}'.format(model_scores['rmse'].std()))
+                logger.info(' ')
+                logger.info('Calib scores (fit model {0}, calib model {1})'.format(fmi, tmi))
+                logger.info('mean(R^2): {0}'.format(calib_scores['r2'].mean(axis=0)))
+                logger.info('std(R^2): {0}'.format(calib_scores['r2'].std(axis=0)))
+                logger.info('mean(RMSE): {0}'.format(calib_scores['rmse'].mean(axis=0)))
+                logger.info('std(RMSE): {0}'.format(calib_scores['rmse'].std(axis=0)))
+                logger.info(' ')
         return self.model_scores_array, self.calib_scores_array
 
     def PrintScores(self):
         for scores_array, label in zip([self.model_scores_array, self.calib_scores_array], ['Model', 'Calib']):
             for key in ['mean(r2)', 'std(r2)', 'mean(rmse)', 'std(rmse)']:
-                print('{0} {1}:'.format(label, key))
+                logger.info('{0} {1}:'.format(label, key))
                 score_array = np.zeros(scores_array.shape)
                 for ri in range(scores_array.shape[0]):
                     for ci in range(scores_array.shape[1]):
@@ -1553,10 +1557,10 @@ class ModelCalibrationTestEx(object):
                             score_array[ri, ci] = 0.
                         else:
                             score_array[ri, ci] = scores_array[ri, ci][key]
-                print(score_array)
+                logger.info(score_array)
                 overall_mean = np.diag(np.flipud(score_array)).mean()
-                print('Overall mean({0} {1}): {2:0.4f}'.format(label, key, overall_mean))
-                print(' ')
+                logger.info('Overall mean({0} {1}): {2:0.4f}'.format(label, key, overall_mean))
+                logger.info(' ')
 
         return
 
