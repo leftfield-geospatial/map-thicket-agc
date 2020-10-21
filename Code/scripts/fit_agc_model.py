@@ -57,20 +57,24 @@ with rasterio.open(image_filename, 'r') as imr:
     # fex = su.ImPlotFeatureExtractor(image_reader=imr, plot_feat_dict=ld['GEF Plot Polygons with AGC'])
     fex = su.ImPlotFeatureExtractor(image_reader=imr, plot_data_gdf=plot_agc_gdf)
     # reload(su)
-    implot_feat_dict = fex.extract_all_features(patch_fn=su.ImPlotFeatureExtractor.extract_patch_ms_features_ex)
+    implot_feat_gdf = fex.extract_all_features(patch_fn=su.ImPlotFeatureExtractor.extract_patch_ms_features_ex)
 # implot_feat_dict.pop('ST49')
 
 # set DegrClass field in implot_feat_dict using plot ID
-for f in list(implot_feat_dict.values()):
-    id = f['ID']
-    if id[0] == 'S' or id[:3] == 'TCH':
-        f['DegrClass'] = 'Severe'
-    elif id[0] == 'M':
-        f['DegrClass'] = 'Moderate'
-    elif id[0] == 'P' or id[:3] == 'INT':
-        f['DegrClass'] = 'Pristine'
-    else:
-        f['DegrClass'] = '?'
+if False:
+    for f in list(implot_feat_dict.values()):
+        id = f['ID']
+        if id[0] == 'S' or id[:3] == 'TCH':
+            f['DegrClass'] = 'Severe'
+        elif id[0] == 'M':
+            f['DegrClass'] = 'Moderate'
+        elif id[0] == 'P' or id[:3] == 'INT':
+            f['DegrClass'] = 'Pristine'
+        else:
+            f['DegrClass'] = '?'
+
+degr_class = ['?'] * implot_feat_gdf.shape[0]
+
 
 # implot_feat_dict.pop('ST49')
 X, y, feat_keys = fex.get_feat_array_ex(y_feat_key='AgcHa')

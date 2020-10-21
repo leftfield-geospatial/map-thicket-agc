@@ -546,10 +546,8 @@ class GroundClass(Enum):
 class ImPlotFeatureExtractor(object):
     def __init__(self, image_reader=rasterio.io.DatasetReader, plot_feat_dict={}, plot_data_gdf=gpd.GeoDataFrame()):
         self.image_reader = image_reader
-        self.plot_feat_dict = plot_feat_dict
         self.plot_data_gdf = plot_data_gdf
-        self.im_feat_dict = {}
-        self.im_feat_count = 0
+        self.plot_feat_data_gdf = gpd.GeoDataFrame()
 
     # 1st im channel is dtm, 2nd im channel is dsm
     @staticmethod
@@ -835,28 +833,27 @@ class ImPlotFeatureExtractor(object):
         #                                          gdal.osr.SpatialReference(self.image_reader.crs.to_wkt()))
 
         self.plot_data_gdf = self.plot_data_gdf.to_crs(self.image_reader.crs)
+        self.plot_data_gdf = self.plot_data_gdf.set_index('ID').sort_index()
 
-        self.im_feat_count = 0
-        self.im_feat_dict = {}
-        # plotTagcDict = {}
-        # class_labels = ['Pristine', 'Moderate', 'Severe']
+        # self.im_data_df = pd.DataFrame()
+        im_data_dict = {}
+
+        im_feat_count = 0
+        plot_feat_list = []
+        plot_thumbnail_list = []
         max_im_vals = np.zeros((self.image_reader.count))
-        # for plot in list(self.plot_feat_dict['feat_dict'].values()):
 
-        for i, plot in self.plot_data_gdf.iterrows():
+        # loop through plot polygons
+        for plot_id, plot in self.plot_data_gdf.iterrows():
+            # convert polygon to mask with rio
             plot_mask, plot_transform, plot_window = raster_geometry_mask(self.image_reader, [plot['geometry']], crop=True,
                                                                      all_touched=False)
             plot_cnrs_pixel =  np.fliplr(np.array(plot_window.toranges()).transpose())
             plot_mask = ~plot_mask
 
-            # find ABC and AGC with actual polygon area, rather than theoretical plot sizes
-            if 'Abc' in plot and 'LitterCHa' in plot:
-                litterCHa = np.max([plot['LitterCHa'], 0.])
-                abc = np.max([plot['Abc'], 0.])
-                plot['AbcHa2'] = abc * (100. ** 2) /  plot['geometry'].area
-                plot['AgcHa2'] = litterCHa + plot['AbcHa2']
 
             # check plot window lies inside image
+            # TODO - is there a rio shortcut for this?
             if not (np.all(plot_cnrs_pixel >= 0) and np.all(plot_cnrs_pixel[:, 0] < self.image_reader.width) \
                     and np.all(plot_cnrs_pixel[:, 1] < self.image_reader.height)):  # and plot.has_key('Yc') and plot['Yc'] > 0.:
                 logger.warning(f'Excluding plot {plot["ID"]} - outside image extent')
@@ -875,34 +872,63 @@ class ImPlotFeatureExtractor(object):
             else:
                 plot_mask = plot_mask & np.all(im_buf > 0, axis=2) & np.all(~np.isnan(im_buf), axis=2)
 
-            # TODO make this dict a dataframe (with geom?)
-            plot_dict = OrderedDict(plot)
-            plot_dict['feats'] = patch_fn(im_buf.copy(), mask=plot_mask, per_pixel=per_pixel)
+            feat_dict = patch_fn(im_buf.copy(), mask=plot_mask, per_pixel=per_pixel)
 
-            plot_dict['thumbnail'] = np.float32(im_buf.copy())
-            plot_dict['thumbnail'][~plot_mask] = 0.
-            self.im_feat_dict[plot['ID']] = plot_dict
+            # copy plot data into feat dict
+            im_dict = feat_dict.copy()
+            for k, v in plot.items():
+                im_dict[k] = v
+
+            # find versions of ABC and AGC with actual polygon area, rather than theoretical plot sizes
+            if 'Abc' in plot and 'LitterCHa' in plot:
+                litterCHa = np.max([plot['LitterCHa'], 0.])
+                abc = np.max([plot['Abc'], 0.])
+                im_dict['AbcHa2'] = abc * (100. ** 2) /  plot['geometry'].area
+                im_dict['AgcHa2'] = litterCHa + im_dict['AbcHa2']
+
+            # plot_feat_list.append(feat_dict)
+
+            # for k, v in plot.items():
+            #     plot_dict[k] = v
+
+            thumbnail = np.float32(im_buf.copy())
+            thumbnail[~plot_mask] = 0.
+            im_dict['thumbnail'] = thumbnail
+
+            # plot_thumbnail_list += [thumbnail]
+            # plot_dict['thumbnail'] = thumbnail
+            # im_feat_list.append(plot)
+
+            im_data_dict[plot_id] = im_dict
 
             # store max thumbnail vals for scaling later
-            max_val = np.percentile(plot_dict['thumbnail'], 98., axis=(0,1))
+            max_val = np.percentile(thumbnail, 98., axis=(0,1))
             max_im_vals[max_val > max_im_vals] = max_val[max_val > max_im_vals]
-            self.im_feat_count += 1
+            im_feat_count += 1
 
             log_dict = {'ABC': 'Abc' in plot, 'Num zero pixels': (im_buf == 0).sum(), 'Num -ve pixels': (im_buf < 0).sum(),
                 'Num nan pixels': np.isnan(im_buf).sum()}
-            logger.info(', '.join([f'Plot {plot["ID"]}'] + ['{}: {}'.format(k, v) for k, v in log_dict.items()]))
+            logger.info(', '.join([f'Plot {plot_id}'] + ['{}: {}'.format(k, v) for k, v in log_dict.items()]))
 
-        logger.info('Processed {0} plots'.format(self.im_feat_count))
+        logger.info('Processed {0} plots'.format(im_feat_count))
 
         # scale thumbnails
-        for k, v in self.im_feat_dict.items():
-            thumb = v['thumbnail']
+        for im_dict in im_data_dict.values():
+            thumbnail = im_dict['thumbnail']
             for b in range(0, self.image_reader.count):
-                thumb[:, :, b] /= max_im_vals[b]
-                thumb[:, :, b][thumb[:, :, b] > 1.] = 1.
-            self.im_feat_dict[k]['thumbnail'] = thumb
+                thumbnail[:, :, b] /= max_im_vals[b]
+                thumbnail[:, :, b][thumbnail[:, :, b] > 1.] = 1.
+            im_dict['thumbnail'] = thumbnail
 
-        return self.im_feat_dict
+        # self.im_data_df = pd.DataFrame.from_dict(im_data_dict, 'index')
+
+        data_labels = ['feats']*len(feat_dict) + ['data']*(len(im_dict) - len(feat_dict))
+        columns = pd.MultiIndex.from_arrays([data_labels, list(im_dict.keys())], names=['high','low'])
+
+        self.im_feat_gdf = gpd.GeoDataFrame.from_dict(im_data_dict, orient='index')
+        self.im_feat_gdf.columns = columns
+
+        return self.im_feat_gdf
 
 
     # get array of non-lin function features
