@@ -54,33 +54,27 @@ plot_agc_gdf = gpd.GeoDataFrame.from_file(plot_agc_shapefile_name)
 # ld = vr.read()
 # imr = su.GdalImageReader(imageFile)
 with rasterio.open(image_filename, 'r') as imr:
-    # fex = su.ImPlotFeatureExtractor(image_reader=imr, plot_feat_dict=ld['GEF Plot Polygons with AGC'])
     fex = su.ImPlotFeatureExtractor(image_reader=imr, plot_data_gdf=plot_agc_gdf)
-    # reload(su)
-    implot_feat_gdf = fex.extract_all_features(patch_fn=su.ImPlotFeatureExtractor.extract_patch_ms_features_ex)
-# implot_feat_dict.pop('ST49')
+    im_plot_data_gdf = fex.extract_all_features(patch_fn=su.ImPlotFeatureExtractor.extract_patch_ms_features_ex)
+    # im_plot_data_gdf.pop('ST49')
 
-# set DegrClass field in implot_feat_dict using plot ID
-if False:
-    for f in list(implot_feat_dict.values()):
-        id = f['ID']
-        if id[0] == 'S' or id[:3] == 'TCH':
-            f['DegrClass'] = 'Severe'
-        elif id[0] == 'M':
-            f['DegrClass'] = 'Moderate'
-        elif id[0] == 'P' or id[:3] == 'INT':
-            f['DegrClass'] = 'Pristine'
-        else:
-            f['DegrClass'] = '?'
+# fix stratum labels
+im_plot_data_gdf.loc[im_plot_data_gdf['data']['Stratum'] == 'Degraded', ('data', 'Stratum')] = 'Severe'
+im_plot_data_gdf.loc[im_plot_data_gdf['data']['Stratum'] == 'Intact', ('data', 'Stratum')] = 'Pristine'
 
-degr_class = ['?'] * implot_feat_gdf.shape[0]
-
+# X = im_plot_data_gdf['feats'].to_numpy()
 
 # implot_feat_dict.pop('ST49')
-X, y, feat_keys = fex.get_feat_array_ex(y_feat_key='AgcHa')
+X, y, feat_keys = fex.get_feat_array_ex(y_data_key='AgcHa')
 
 pyplot.figure()
-fex.scatter_plot(x_feat_key='pan/R', y_feat_key='AgcHa', class_key='DegrClass', xfn=lambda x: np.log10(x), do_regress=True)
+# su.scatter_ds(im_plot_data_gdf, x_col=('feats','pan/R'), y_col=('data','AgcHa'), class_col=('data','Stratum'),
+#               xfn=lambda x: np.log10(x), do_regress=True)
+su.scatter_ds(im_plot_data_gdf, x_col=('feats','pan/R'), y_col=('data','AgcHa'), class_col=('data','Stratum'),
+              xfn=lambda x: np.log10(x), do_regress=True, thumbnail_col=('data','thumbnail'), label_col=('data', 'ID'))
+# fex.scatter_plot(x_feat_key='pan/R', y_feat_key='AgcHa', class_key='Stratum', xfn=lambda x: np.log10(x), do_regress=True)
+
+
 # R^2 = 0.8306
 # P (slope=0) = 0.000000
 # Slope = -404187.9402
@@ -264,7 +258,7 @@ for f in list(implot_feat_dict_clf.values()):
     else:
         f['DegrClass'] = '?'
 
-X_clf, y_clf, feat_keys_clf = fex_clf.get_feat_array_ex(y_feat_key='AgcHa')
+X_clf, y_clf, feat_keys_clf = fex_clf.get_feat_array_ex(y_data_key='AgcHa')
 feat_scores = su.FeatureSelector.ranking(X_clf, y_clf, feat_keys=feat_keys_clf)
 classes = [plot['DegrClass'] for plot in list(implot_feat_dict_clf.values())]
 
@@ -326,7 +320,7 @@ pyplot.tight_layout()
 vr.cleanup()
 imr.cleanup()
 
-X, y, feat_keys = fex.get_feat_array_ex(y_feat_key='AgcHa')
+X, y, feat_keys = fex.get_feat_array_ex(y_data_key='AgcHa')
 Xselected_feats, selected_scores, selected_keys = su.FeatureSelector.forward_selection(X, y, feat_keys=feat_keys, max_num_feats=30, cv=5,
                                                                                        score_fn=lambda y,pred: -np.sqrt(metrics.mean_squared_error(y, pred)))
 

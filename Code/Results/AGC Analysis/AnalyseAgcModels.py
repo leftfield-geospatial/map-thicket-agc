@@ -72,7 +72,7 @@ for f in list(implot_feat_dict.values()):
         f['DegrClass'] = '?'
 
 # implot_feat_dict.pop('ST49')
-X, y, feat_keys = fex.get_feat_array_ex(y_feat_key='AgcHa')
+X, y, feat_keys = fex.get_feat_array_ex(y_data_key='AgcHa')
 
 pylab.figure()
 fex.scatter_plot(x_feat_key='pan/R', y_feat_key='AgcHa', class_key='DegrClass', xfn=lambda x: np.log10(x), do_regress=True)
@@ -259,7 +259,7 @@ for f in list(implot_feat_dict_clf.values()):
     else:
         f['DegrClass'] = '?'
 
-X_clf, y_clf, feat_keys_clf = fex_clf.get_feat_array_ex(y_feat_key='AgcHa')
+X_clf, y_clf, feat_keys_clf = fex_clf.get_feat_array_ex(y_data_key='AgcHa')
 feat_scores = su.FeatureSelector.ranking(X_clf, y_clf, feat_keys=feat_keys_clf)
 classes = [plot['DegrClass'] for plot in list(implot_feat_dict_clf.values())]
 
@@ -321,7 +321,7 @@ pylab.tight_layout()
 vr.cleanup()
 imr.cleanup()
 
-X, y, feat_keys = fex.get_feat_array_ex(y_feat_key='AgcHa')
+X, y, feat_keys = fex.get_feat_array_ex(y_data_key='AgcHa')
 Xselected_feats, selected_scores, selected_keys = su.FeatureSelector.forward_selection(X, y, feat_keys=feat_keys, max_num_feats=30, cv=5,
                                                                                        score_fn=lambda y,pred: -np.sqrt(metrics.mean_squared_error(y, pred)))
 

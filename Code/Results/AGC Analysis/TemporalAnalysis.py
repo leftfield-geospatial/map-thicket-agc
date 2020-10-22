@@ -46,7 +46,7 @@ for feat_dict in implot_feat_dicts:
             f['DegrClass'] = '?'
 
 if False:   # find best single feat models so that we know which feats to try calibrate with
-    X, y, feat_keys = feature_extractors[0].get_feat_array_ex(y_feat_key='AgcHa')
+    X, y, feat_keys = feature_extractors[0].get_feat_array_ex(y_data_key='AgcHa')
     r2 = []
     rmse = []
     from collections import OrderedDict
@@ -129,7 +129,7 @@ if False:
 X_list = []
 calib_feat_keys = ['Log(R/pan)']
 for fex in feature_extractors:
-    X, y, feat_keys = fex.get_feat_array_ex(y_feat_key='AgcHa')
+    X, y, feat_keys = fex.get_feat_array_ex(y_data_key='AgcHa')
     feat_idx = []
     for calib_feat_key in calib_feat_keys:
         feat_idx.append(np.argwhere(feat_keys == calib_feat_key)[0][0])

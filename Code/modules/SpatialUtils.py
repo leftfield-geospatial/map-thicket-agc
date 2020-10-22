@@ -141,7 +141,7 @@ def scatter_ds(data, x_col=None, y_col=None, class_col=None, label_col=None, thu
     if n_classes == 1:
         colours = [(0., 0., 0.)]
     else:
-        colours = ['g', 'tab:orange', 'r', 'b', 'y', 'k', 'm']
+        colours = ['tab:orange', 'g', 'r', 'b', 'y', 'k', 'm']
 
     xlim = [x.min(), x.max()]
     ylim = [y.min(), y.max()]
@@ -157,6 +157,130 @@ def scatter_ds(data, x_col=None, y_col=None, class_col=None, label_col=None, thu
         colour = colours[class_i]
         if thumbnail_col is None:
             pylab.plot(xfn(class_data[x_col]), yfn(class_data[y_col]), markerfacecolor=colour, marker='.', label=class_label, linestyle='None',
+                       markeredgecolor=colour)
+        for rowi, row in class_data.iterrows():
+            xx = xfn(row[x_col])
+            yy = yfn(row[y_col])
+            if label_col is not None:   # add a text label for each point
+                pylab.text(xx - .0015, yy - .0015, row[label_col],
+                           fontdict={'size': 9, 'color': colour, 'weight': 'bold'})
+
+            if thumbnail_col is not None:   # add a thumbnail for each point
+                imbuf = np.array(row[thumbnail_col])
+                band_idx = [0, 1, 2]
+                if imbuf.shape[2] == 8:  # wv3
+                    band_idx = [4, 2, 1]
+                elif imbuf.shape[2] >= 8:  # wv3 + pan
+                    band_idx = [5, 3, 2]
+
+                extent = [xx - xd/(2 * ims), xx + xd/(2 * ims), yy - yd/(2 * ims), yy + yd/(2 * ims)]
+                pyplot.imshow(imbuf[:, :, band_idx], extent=extent, aspect='auto')
+                handles[class_i] = ax.add_patch(patches.Rectangle((extent[0], extent[2]), xd/ims, yd/ims,
+                                                fill=False, edgecolor=colour, linewidth=2.))
+
+    if do_regress:  # find and display regression error stats
+        (slope, intercept, r, p, stde) = stats.linregress(x, y)
+        scores, predicted = FeatureSelector.score_model(x[:,None], y[:,None], model=linear_model.LinearRegression(),
+                                                        find_predicted=True, cv=len(x), print_scores=True)
+
+        pylab.text((xlim[0] + xd * 0.7), (ylim[0] + yd * 0.05), '$R^2$ = {0:.2f}'.format(np.round(scores['R2_stacked'], 2)),
+                   fontdict={'size': 12})
+        yr = np.array(xlim)*slope + intercept
+        pyplot.plot(xlim, yr, 'k--', lw=2, zorder=-1)
+
+        yhat = x * slope + intercept
+        rmse = np.sqrt(np.mean((y - yhat) ** 2))
+
+        logger.info('RMSE = {0:.4f}'.format(rmse))
+        logger.info('LOOCV RMSE = {0:.4f}'.format(np.sqrt(-scores['test_user'].mean())))
+        logger.info('R^2  = {0:.4f}'.format(r ** 2))
+        logger.info('Stacked R^2  = {0:.4f}'.format(scores['R2_stacked']))
+        logger.info('P (slope=0) = {0:f}'.format(p))
+        logger.info('Slope = {0:.4f}'.format(slope))
+        logger.info('Std error of slope = {0:.4f}'.format(stde))
+    else:
+        r = np.nan
+        rmse = np.nan
+
+    if x_label is not None:
+        pyplot.xlabel(x_label, fontdict={'size': 12})
+    else:
+        pylab.xlabel(x_col[-1], fontdict={'size': 12})
+
+    if y_label is not None:
+        pyplot.ylabel(y_label, fontdict={'size': 12})
+    else:
+        pylab.ylabel(y_col[-1], fontdict={'size': 12})
+
+    if n_classes > 1:
+        if not thumbnail_col is None:
+            pylab.legend(handles, classes, fontsize=12)
+        else:
+            pylab.legend(classes, fontsize=12)
+    return r ** 2, rmse
+
+def scatter(x, y, class_labels=None, labels=None, thumbnails=None, do_regress=True,
+               x_label=None, y_label=None, xfn=lambda x: x, yfn=lambda y: y):
+    """
+
+    Parameters
+    ----------
+    data
+    x_col
+    y_col
+    class_col
+    label_col
+    thumbnail_col
+    do_regress
+    x_label
+    y_label
+    xfn
+    yfn
+
+    Returns
+    -------
+
+    """
+    ims = 20.       # scale factor for thumbnails
+
+    x = xfn(x)
+    y = yfn(y)
+
+    if class_labels is None:
+        class_labels = pd.DataFrame({'class_col':np.zeros((x.shape[0],1))})
+        class_col = 'class_col'
+
+    # TO DO: either remove thumbnail option or refactor
+    # TO DO: sort classes
+    # if 'Intact' in classes and 'Moderate' in classes and 'Degraded' in classes and classes.size==3:
+    #     classes = np.array(['Degraded', 'Moderate', 'Intact'])
+    classes = np.unique(class_labels)   # np.array([class_name for class_name, class_group in class_labels.groupby(by=class_col)])
+    n_classes =  len(classes)
+    if n_classes == 1:
+        colours = [(0., 0., 0.)]
+    else:
+        colours = ['g', 'tab:orange', 'r', 'b', 'y', 'k', 'm']
+
+    xlim = [x.min(), x.max()]
+    ylim = [y.min(), y.max()]
+    xd = np.diff(xlim)[0]
+    yd = np.diff(ylim)[0]
+
+    pyplot.axis('tight')
+    pyplot.axis(xlim + ylim)
+    ax = pyplot.gca()
+    handles = [0] * n_classes
+
+    # for class_i, (class_label, class_data) in enumerate(class_labels.groupby(by=class_col)):
+    for class_i, class_label in enumerate(classes):
+        class_idx = class_labels == class_label
+        colour = colours[class_i]
+        y_i = y[class_idx]
+        x_i = x[class_idx]
+        label_i = labels[class_idx]
+
+        if thumbnails is None:
+            pylab.plot(x_i, y_i, markerfacecolor=colour, marker='.', label=class_label, linestyle='None',
                        markeredgecolor=colour)
         for rowi, row in class_data.iterrows():
             xx = xfn(row[x_col])
@@ -218,7 +342,6 @@ def scatter_ds(data, x_col=None, y_col=None, class_col=None, label_col=None, thu
         else:
             pylab.legend(classes, fontsize=12)
     return r ** 2, rmse
-
 
 def scatter_plot(x, y, class_labels=None, labels=None, thumbnails=None, do_regress=True, xlabel=None, ylabel=None,
                  xfn=lambda x: x, yfn=lambda y: y):
@@ -547,7 +670,7 @@ class ImPlotFeatureExtractor(object):
     def __init__(self, image_reader=rasterio.io.DatasetReader, plot_feat_dict={}, plot_data_gdf=gpd.GeoDataFrame()):
         self.image_reader = image_reader
         self.plot_data_gdf = plot_data_gdf
-        self.plot_feat_data_gdf = gpd.GeoDataFrame()
+        self.im_plot_data_gdf = gpd.GeoDataFrame()
 
     # 1st im channel is dtm, 2nd im channel is dsm
     @staticmethod
@@ -836,12 +959,10 @@ class ImPlotFeatureExtractor(object):
         self.plot_data_gdf = self.plot_data_gdf.set_index('ID').sort_index()
 
         # self.im_data_df = pd.DataFrame()
-        im_data_dict = {}
+        im_plot_data_dict = {}
 
-        im_feat_count = 0
-        plot_feat_list = []
-        plot_thumbnail_list = []
-        max_im_vals = np.zeros((self.image_reader.count))
+        im_plot_count = 0
+        max_thumbnail_vals = np.zeros((self.image_reader.count))
 
         # loop through plot polygons
         for plot_id, plot in self.plot_data_gdf.iterrows():
@@ -851,7 +972,6 @@ class ImPlotFeatureExtractor(object):
             plot_cnrs_pixel =  np.fliplr(np.array(plot_window.toranges()).transpose())
             plot_mask = ~plot_mask
 
-
             # check plot window lies inside image
             # TODO - is there a rio shortcut for this?
             if not (np.all(plot_cnrs_pixel >= 0) and np.all(plot_cnrs_pixel[:, 0] < self.image_reader.width) \
@@ -859,7 +979,7 @@ class ImPlotFeatureExtractor(object):
                 logger.warning(f'Excluding plot {plot["ID"]} - outside image extent')
                 continue
 
-            im_buf = self.image_reader.read(window=plot_window)
+            im_buf = self.image_reader.read(window=plot_window)     # read plot ROI from image
             im_buf = np.moveaxis(im_buf, 0, 2)  # TODO get rid of this somehow eg change all imbuf axis orderings to bands first
 
             if np.all(im_buf == 0) and not patch_fn == self.extract_patch_clf_features:
@@ -872,138 +992,76 @@ class ImPlotFeatureExtractor(object):
             else:
                 plot_mask = plot_mask & np.all(im_buf > 0, axis=2) & np.all(~np.isnan(im_buf), axis=2)
 
-            feat_dict = patch_fn(im_buf.copy(), mask=plot_mask, per_pixel=per_pixel)
+            im_feat_dict = patch_fn(im_buf.copy(), mask=plot_mask, per_pixel=per_pixel)    # extract image features for this plot
 
-            # copy plot data into feat dict
-            im_dict = feat_dict.copy()
+            im_data_dict = im_feat_dict.copy()      # copy plot data into feat dict
             for k, v in plot.items():
-                im_dict[k] = v
+                im_data_dict[k] = v
 
-            # find versions of ABC and AGC with actual polygon area, rather than theoretical plot sizes
+            # calculate versions of ABC and AGC with actual polygon area, rather than theoretical plot sizes
             if 'Abc' in plot and 'LitterCHa' in plot:
                 litterCHa = np.max([plot['LitterCHa'], 0.])
                 abc = np.max([plot['Abc'], 0.])
-                im_dict['AbcHa2'] = abc * (100. ** 2) /  plot['geometry'].area
-                im_dict['AgcHa2'] = litterCHa + im_dict['AbcHa2']
+                im_data_dict['AbcHa2'] = abc * (100. ** 2) /  plot['geometry'].area
+                im_data_dict['AgcHa2'] = litterCHa + im_data_dict['AbcHa2']
 
-            # plot_feat_list.append(feat_dict)
-
-            # for k, v in plot.items():
-            #     plot_dict[k] = v
-
+            # create and store plot thumbnail
             thumbnail = np.float32(im_buf.copy())
             thumbnail[~plot_mask] = 0.
-            im_dict['thumbnail'] = thumbnail
+            im_data_dict['thumbnail'] = thumbnail
 
-            # plot_thumbnail_list += [thumbnail]
-            # plot_dict['thumbnail'] = thumbnail
-            # im_feat_list.append(plot)
-
-            im_data_dict[plot_id] = im_dict
+            im_plot_data_dict[plot_id] = im_data_dict
 
             # store max thumbnail vals for scaling later
             max_val = np.percentile(thumbnail, 98., axis=(0,1))
-            max_im_vals[max_val > max_im_vals] = max_val[max_val > max_im_vals]
-            im_feat_count += 1
+            max_thumbnail_vals[max_val > max_thumbnail_vals] = max_val[max_val > max_thumbnail_vals]
+            im_plot_count += 1
 
             log_dict = {'ABC': 'Abc' in plot, 'Num zero pixels': (im_buf == 0).sum(), 'Num -ve pixels': (im_buf < 0).sum(),
                 'Num nan pixels': np.isnan(im_buf).sum()}
             logger.info(', '.join([f'Plot {plot_id}'] + ['{}: {}'.format(k, v) for k, v in log_dict.items()]))
 
-        logger.info('Processed {0} plots'.format(im_feat_count))
+        logger.info('Processed {0} plots'.format(im_plot_count))
 
-        # scale thumbnails
-        for im_dict in im_data_dict.values():
-            thumbnail = im_dict['thumbnail']
+        # scale thumbnails for display
+        for im_data_dict in im_plot_data_dict.values():
+            thumbnail = im_data_dict['thumbnail']
             for b in range(0, self.image_reader.count):
-                thumbnail[:, :, b] /= max_im_vals[b]
+                thumbnail[:, :, b] /= max_thumbnail_vals[b]
                 thumbnail[:, :, b][thumbnail[:, :, b] > 1.] = 1.
-            im_dict['thumbnail'] = thumbnail
+            im_data_dict['thumbnail'] = thumbnail
 
-        # self.im_data_df = pd.DataFrame.from_dict(im_data_dict, 'index')
+        # create MultiIndex column labels that separate features from other data
+        data_labels = ['feats']*len(im_feat_dict) + ['data']*(len(im_data_dict) - len(im_feat_dict))
+        columns = pd.MultiIndex.from_arrays([data_labels, list(im_data_dict.keys())], names=['high','low'])
 
-        data_labels = ['feats']*len(feat_dict) + ['data']*(len(im_dict) - len(feat_dict))
-        columns = pd.MultiIndex.from_arrays([data_labels, list(im_dict.keys())], names=['high','low'])
+        self.im_plot_data_gdf = gpd.GeoDataFrame.from_dict(im_plot_data_dict, orient='index')
+        self.im_plot_data_gdf.columns = columns
+        self.im_plot_data_gdf[('data','ID')] = self.im_plot_data_gdf.index
 
-        self.im_feat_gdf = gpd.GeoDataFrame.from_dict(im_data_dict, orient='index')
-        self.im_feat_gdf.columns = columns
+        return self.im_plot_data_gdf
 
-        return self.im_feat_gdf
-
-
-    # get array of non-lin function features
-    def get_feat_array(self, feat_keys=None, y_feat_key=None, include_nonlin=True):
-        if feat_keys is None:  # get all feats
-            feat_keys = ['i', 'r_n', 'g_n', 'b_n', 'ir_n', 'ir_rat', 'SAVI', 'NDVI', 'i_std', 'NDVI_std']
-            available_feat_keys = list(self.im_feat_dict.values())[0]['feats'].keys()
-            feat_keys = np.intersect1d(feat_keys, available_feat_keys).tolist()
-
-        y = []
-        if y_feat_key is not None:
-            y = np.hstack([np.tile(plot[y_feat_key], plot['feats'][feat_keys[0]].size) for plot in list(self.im_feat_dict.values())])
-
-        X = []
-        feat_keys_mod = []
-        for feat_key in feat_keys:
-            f = np.hstack([plot['feats'][feat_key] for plot in list(self.im_feat_dict.values())])
-            X.append(f)
-            feat_keys_mod.append(feat_key)
-
-        if include_nonlin:
-            for feat_key in feat_keys:
-                f = np.hstack([plot['feats'][feat_key] for plot in list(self.im_feat_dict.values())])
-                if feat_key == 'SAVI' or feat_key == 'NDVI':
-                    f += 1.
-                X.append(np.log10(f))
-                feat_keys_mod.append('log10({0})'.format(feat_key))
-            for feat_key in feat_keys:
-                f = np.hstack([plot['feats'][feat_key] for plot in list(self.im_feat_dict.values())])
-                X.append(f ** 2)
-                feat_keys_mod.append(('{0}^2'.formatfeat_key))
-            for feat_key in feat_keys:
-                f = np.hstack([plot['feats'][feat_key] for plot in list(self.im_feat_dict.values())])
-                if feat_key == 'SAVI' or feat_key == 'NDVI':
-                    f += 1.
-                X.append(np.sqrt(f))
-                feat_keys_mod.append('{0}^.5'.format(feat_key))
-
-        id = np.array([plot['ID'] for plot in list(self.im_feat_dict.values())])
-        feat_keys_mod = np.array(feat_keys_mod)
-        X = np.array(X).transpose()
-        logger.info('feat_array nan sum: {0}'.format(np.isnan(X).sum()))
-        logger.info('feat_array nan feats: ' + str(feat_keys_mod[np.any(np.isnan(X), axis=0)]))
-        # print 'feat_array nan plots: ' + str(id[np.any(np.isnan(X), axis=1)])
-        logger.info('feat_array inf sum: {0}'.format((X == np.inf).sum()))
-        logger.info('feat_array inf feats: ' + str(feat_keys_mod[np.any((X == np.inf), axis=0)]))
-        # print 'feat_array inf plots: ' + str(id[np.any((X == np.inf), axis=1)])
-        return X, y, feat_keys_mod
 
     # this version goes with extract_patch_ms_features_ex
-    def get_feat_array_ex(self, y_feat_key=None, feat_keys=None):
-        if self.im_feat_dict is None or len(self.im_feat_dict) == 0:
-            raise Exception('No features')
+    def get_feat_array_ex(self, y_data_key=None, feat_keys=None):
+        if self.im_plot_data_gdf is None or len(self.im_plot_data_gdf) == 0:
+            raise Exception('No features - run extract_all_features() first')
+
+        y = np.array([])
+        if y_data_key is not None:
+            y = self.im_plot_data_gdf[('data', y_data_key)]
 
         if feat_keys is None:  # get all feats
-            feat_keys = list(list(self.im_feat_dict.values())[0]['feats'].keys())
+            feat_keys = self.im_plot_data_gdf['feats'].columns
+            X = self.im_plot_data_gdf['feats']
+        else:
+            X = self.im_plot_data_gdf['feats'][feat_keys]
 
-        y = []
-        if y_feat_key is not None:
-            y = np.hstack([np.tile(plot[y_feat_key], plot['feats'][feat_keys[0]].size) for plot in list(self.im_feat_dict.values())])
 
-        X = []
-        for feat_key in feat_keys:
-            f = np.hstack([plot['feats'][feat_key] for plot in list(self.im_feat_dict.values())])
-            X.append(f)
-
-        id = np.array([plot['ID'] for plot in list(self.im_feat_dict.values())])
-        feat_keys = np.array(feat_keys)
-        X = np.array(X).transpose()
-        logger.info('feat_array nan sum: {0}'.format(np.isnan(X).sum()))
-        logger.info('feat_array nan feats: ' + str(feat_keys[np.any(np.isnan(X), axis=0)]))
-        # logger.info 'feat_array nan plots: ' + str(id[np.any(np.isnan(X), axis=1)])
-        logger.info('feat_array inf sum: {0}'.format((X == np.inf).sum()))
-        logger.info('feat_array inf feats: ' + str(feat_keys[np.any((X == np.inf), axis=0)]))
-        # logger.info 'feat_array inf plots: ' + str(id[np.any((X == np.inf), axis=1)])
+        logger.info('X NaN ttl: {0}'.format(np.isnan(X).sum()))
+        logger.info('X NaN feats: ' + str(feat_keys[np.any(np.isnan(X), axis=0)]))
+        logger.info('X inf ttl: {0}'.format((X == np.inf).sum()))
+        logger.info('X inf feats: ' + str(feat_keys[np.any((X == np.inf), axis=0)]))
         return X, y, feat_keys
 
 
