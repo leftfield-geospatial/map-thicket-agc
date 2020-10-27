@@ -1,5 +1,5 @@
 import sys
-from modules import SpatialUtils as su
+from modules import modelling as su
 import numpy as np
 import pickle
 
@@ -27,11 +27,11 @@ if sys.version_info.major == 3 and (type(selected_keys[0]) is bytes or type(sele
     selected_keys = [sk.decode() for sk in selected_keys]       # convert bytes to unicode for py 3
 print([(i,key) for i,key in enumerate(selected_keys)])
 
-mapper = su.AgcMap(in_file_name=inFile, out_file_name=outFile, model=lm, model_keys=selected_keys,
-                   feat_ex_fn=su.ImPlotFeatureExtractor.extract_patch_ms_features_ex, save_feats=False)
+mapper = su.ApplyLinearModel(in_file_name=inFile, out_file_name=outFile, model=lm, model_keys=selected_keys,
+                             feat_ex_fn=su.ImPlotFeatureExtractor.extract_patch_ms_features_ex, save_feats=False)
 
-mapper.Create(win_size=(33, 33), step_size=(33, 33))
-mapper.PostProc()
+mapper.create(win_size=(33, 33), step_size=(33, 33))
+mapper.post_proc()
 
 # gdal_fillnodata -md 20 -si 0 -b 1 o17OCT01084657-M2AS_R1C12-058217622010_01_P001_AGC_Py27Cv5v2_24Feat_10m.tif -of GTiff -co COMPRESS=DEFLATE o17OCT01084657-M2AS_R1C12-058217622010_01_P001_AGC_Py27Cv5v2_24Feat_10m_fillnodata.tif
 # gdal_merge -o GEF_WV3_Oct2017_AGC_10m.tif -co COMPRESS=DEFLATE -separate -a_nodata nan o17OCT01084657-M2AS_R1C12-058217622010_01_P001_AGC_Py27Cv5v2_1Feat_10m_postproc.tif o17OCT01084657-M2AS_R1C12-058217622010_01_P001_AGC_Py27Cv5v2_24Feat_10m_postproc.tif

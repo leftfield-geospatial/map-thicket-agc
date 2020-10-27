@@ -4,7 +4,7 @@ from __future__ import division
 #################################################################################################################
 # test ModelCalibrationTest for all images in array notation
 from past.utils import old_div
-from modules import SpatialUtils as su
+from modules import modelling as su
 import numpy as np
 from sklearn import linear_model
 

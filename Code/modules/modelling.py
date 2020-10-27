@@ -68,7 +68,7 @@ def nanentropy(x, axis=None):
         # p = np.array([np.size(x[x == i]) / (1.0 * x.size) for i in np.unique(x)])
         # compute Shannon entropy in bits
         return -np.sum(p * np.log2(p))
-    else:        # hack for 2D slices of 3D array (on a RollingWindow 3D array)
+    else:        # hack for 2D slices of 3D array (on a rolling_window 3D array)
         along_axis = np.setdiff1d(range(0, len(x.shape)), axis)[0]
         e = np.zeros((x.shape[along_axis]))
         for slice in range(x.shape[along_axis]):
@@ -157,7 +157,7 @@ def scatter_ds(data, x_col=None, y_col=None, class_col=None, label_col=None, thu
         colour = colours[class_i]
         if thumbnail_col is None:
             pylab.plot(xfn(class_data[x_col]), yfn(class_data[y_col]), markerfacecolor=colour, marker='.', label=class_label, linestyle='None',
-                       markeredgecolor=colour)
+                       markeredgecolor=colour, markersize=5)
         for rowi, row in class_data.iterrows():
             xx = xfn(row[x_col])
             yy = yfn(row[y_col])
@@ -476,6 +476,68 @@ def scatter_plot(x, y, class_labels=None, labels=None, thumbnails=None, do_regre
             pylab.legend(classes, fontsize=12)
     return r ** 2, rmse
 
+
+    @staticmethod
+    def plot_clf(clf, X, y, feat_keys=None, class_labels=None):
+        import matplotlib.pyplot as plt
+        from matplotlib.patches import Patch
+        from matplotlib.colors import ListedColormap
+
+        if X.shape[1] > 2:
+            raise Exception('X.shape[1] > 2')
+        if X.shape[1] > 2:
+            raise Exception('X.shape[1] > 2')
+        h = 0.002
+        x_min, x_max = X[:, 0].min() - .5, X[:, 0].max() + .5
+        y_min, y_max = X[:, 1].min() - .5, X[:, 1].max() + .5
+        xx, yy = np.meshgrid(np.arange(x_min, x_max, h),
+                             np.arange(y_min, y_max, h))
+
+        # just plot the dataset first
+        cm = plt.cm.Set2
+        plt.figure()
+        ax = plt.subplot(1, 1, 1)
+
+        # Plot the decision boundary. For that, we will assign a color to each
+        # point in the mesh [x_min, x_max]x[y_min, y_max].
+        # if hasattr(clf, "decision_function"):
+        #     Z = clf.decision_function(np.c_[xx.ravel(), yy.ravel()])
+        # else:
+        #     # Z = clf.predict_proba(np.c_[xx.ravel(), yy.ravel()])[:, 1]
+        Z = clf.predict(np.c_[xx.ravel(), yy.ravel()])
+
+        # Put the result into a color plot
+        Z = Z.reshape(xx.shape)
+        # ax.contourf(xx, yy, Z, cmap=cm, alpha=1, levels=[0,1,2,3,4,5])
+        ax.imshow(Z, extent=[x_min, x_max, y_min, y_max], origin='lower', cmap=cm, aspect='auto')
+
+        # Plot the training points
+        s = 100
+        colours = cm(np.linspace(0., 1., np.unique(y).size))  #make same colours as contourf
+        h = []
+        for i, class_id in enumerate(np.unique(y)):
+            class_idx = y == class_id
+            h.append(ax.scatter(X[class_idx, 0], X[class_idx, 1], color=colours[i], edgecolor='black', s=20))
+
+        # ax.scatter(X[::s, 0], X[::s, 1], c=y[::s], cmap=cm, edgecolor='black', s=15)
+        ax.set_xlim(xx.min(), xx.max())
+        ax.set_ylim(yy.min(), yy.max())
+        if feat_keys is not None:
+            ax.set_xlabel(feat_keys[0])
+            ax.set_ylabel(feat_keys[1])
+
+        # from matplotlib.lines import
+        # custom_lines = [Line2D([0], [0], color=cm(0.), lw=4),
+        #                 Line2D([0], [0], color=cm(.5), lw=4),
+        #                 Line2D([0], [0], color=cm(1.), lw=4)]
+
+        # fig, ax = plt.subplots()
+        # lines = ax.plot(data)
+        if class_labels is not None:
+            ax.legend(h, class_labels)
+        # ax.set_xticks(())
+        # ax.set_yticks(())
+
 # class GdalImageReader(object):
 #     def __init__(self, file_name):
 #         self.file_name = file_name
@@ -668,60 +730,17 @@ class GroundClass(Enum):
 # class to extract features from polygons in an raster
 class ImPlotFeatureExtractor(object):
     def __init__(self, image_reader=rasterio.io.DatasetReader, plot_feat_dict={}, plot_data_gdf=gpd.GeoDataFrame()):
+        ''' Class
+        Parameters
+        ----------
+        image_reader
+        plot_feat_dict
+        plot_data_gdf
+        '''
         self.image_reader = image_reader
         self.plot_data_gdf = plot_data_gdf
         self.im_plot_data_gdf = gpd.GeoDataFrame()
 
-    # 1st im channel is dtm, 2nd im channel is dsm
-    @staticmethod
-    def extract_patch_clf_features(imbuf, mask, per_pixel=False):
-        if mask is None:
-            mask = np.any(imbuf>0, axis=2)  #np.ones(imbuf.shape[:2])
-        mask = np.bool8(mask)
-
-        imbuf_mask = np.ndarray(shape=(np.int32(mask.sum()), imbuf.shape[2]), dtype=np.float64)
-        for i in range(0, imbuf.shape[2]):
-            band = imbuf[:, :, i]
-            imbuf_mask[:, i] = np.int32(band[mask])
-        # imbuf_mask[:, 3] = imbuf_mask[:,  3]/2.
-        # wv3 bands
-        ground_classes = OrderedDict([('Ground', 1), ('DPlant', 2), ('LPlant', 3), ('Shadow', 4)])
-        feat_dict = {}
-        for cl_key, cl_num in ground_classes.items():
-            feat_dict['{0}Cover'.format(cl_key)] = old_div(100*(imbuf_mask == cl_num).sum(),mask.sum())
-        feat_dict['VegCover'] = old_div(100*((imbuf_mask == ground_classes['DPlant']) | (imbuf_mask == ground_classes['LPlant'])).sum(),mask.sum())
-        return feat_dict
-
-    @staticmethod
-    # 1st im channel is dtm, 2nd im channel is dsm
-    def extract_patch_dem_features(imbuf, mask=None, per_pixel=False):
-        if mask is None:
-            mask = np.any(imbuf>0, axis=2)  #np.ones(imbuf.shape[:2])
-        mask = np.bool8(mask)
-
-        imbuf_mask = np.ndarray(shape=(np.int32(mask.sum()), imbuf.shape[2]), dtype=np.float64)
-        for i in range(0, imbuf.shape[2]):
-            band = imbuf[:, :, i]
-            imbuf_mask[:, i] = np.float64(band[mask])
-        # imbuf_mask[:, 3] = imbuf_mask[:,  3]/2.
-        # wv3 bands
-        dtm = imbuf_mask[:, 0]
-        dsm = imbuf_mask[:, 1]
-        veg_height = dtm-dsm
-
-        feat_dict = {}
-
-        feat_dict['sum(veg.hgt)'] = veg_height.sum()
-        feat_dict['mean(veg.hgt)'] = veg_height.mean()
-        feat_dict['max(veg.hgt)'] = veg_height.max()
-        feat_dict['min(veg.hgt)'] = veg_height.min()
-        feat_dict['std(veg.hgt)'] = veg_height.std()
-        if imbuf_mask.shape[1] == 3:
-            tri = imbuf_mask[:, 2]
-            feat_dict['mean(tri)'] = tri.mean()
-            feat_dict['std(tri)'] = tri.mean()
-
-        return feat_dict
 
     @staticmethod
     def get_band_info(num_bands=9):
@@ -889,67 +908,8 @@ class ImPlotFeatureExtractor(object):
             return poly_feat_dict
 
 
-    @staticmethod
-    def extract_patch_ms_features(imbuf, mask=None, per_pixel=False):
-        feat_dict = {}
-        L = 0.05
-        if imbuf.shape[2] == 8:     # assume Wv3
-            b_i = 1
-            g_i = 2
-            r_i = 4
-            ir_i = 5
-        else:                       # assume NGI
-            b_i = 2
-            g_i = 1
-            r_i = 0
-            ir_i = 3
-
-        if mask is None:
-            mask = np.any(imbuf>0, axis=2)  #np.ones(imbuf.shape[:2])
-        mask = np.bool8(mask)
-        # mask = mask & np.all(imbuf > 0, axis=2) & np.all(imbuf[:,:,], axis=2)
-        imbuf_mask = np.ndarray(shape=(np.int32(mask.sum()), imbuf.shape[2]), dtype=np.float64)
-        for i in range(0, imbuf.shape[2]):
-            band = imbuf[:, :, i]
-            imbuf_mask[:, i] = np.float64(band[mask])               # TODO HACK - check / 5000.  # 5000 is scale for MODIS / XCALIB
-            # imbuf_mask[:, 3] = imbuf_mask[:,  3]/2.
-            # wv3 bands
-            # if np.any(imbuf_mask<0):
-            #     print 'imbuf_mask < 0'
-            # print np.where(imbuf_mask<0)
-        # wv 3 channels
-        s = np.sum(imbuf_mask[:, [b_i, g_i, r_i, ir_i]], 1)  # NNB only sum r,g,b as ir confuses things in g_n
-        #  s = np.sum(imbuf_mask[:,:4], 1)   # ??? check this
-        cn = old_div(imbuf_mask, np.tile(s[:, None], (1, imbuf_mask.shape[1])))
-
-        ndvi = old_div((imbuf_mask[:, ir_i] - imbuf_mask[:, r_i]), (imbuf_mask[:, ir_i] + imbuf_mask[:, r_i]))
-        ir_rat = old_div(imbuf_mask[:, ir_i], imbuf_mask[:, r_i])
-        savi = old_div((1 + L) * (imbuf_mask[:, ir_i] - imbuf_mask[:, r_i]), (L + imbuf_mask[:, ir_i] + imbuf_mask[:, r_i]))
-        feat_dict = {}
-        if per_pixel:
-            fn = lambda x: x
-        else:
-            fn = lambda x: x.mean()
-            feat_dict['i_std'] = (old_div(s, imbuf_mask.shape[1])).std()
-            feat_dict['NDVI_std'] = ndvi.std()
-
-        feat_dict['R'] = fn(imbuf_mask[:, r_i])
-        feat_dict['G'] = fn(imbuf_mask[:, g_i])
-        feat_dict['B'] = fn(imbuf_mask[:, b_i])
-        feat_dict['IR'] = fn(imbuf_mask[:, ir_i])
-        feat_dict['r_n'] = fn(cn[:, r_i])
-        feat_dict['g_n'] = fn(cn[:, g_i])
-        feat_dict['b_n'] = fn(cn[:, b_i])
-        feat_dict['ir_n'] = fn(cn[:, ir_i])
-        feat_dict['NDVI'] = fn(ndvi)
-        feat_dict['SAVI'] = fn(savi)
-        feat_dict['ir_rat'] = fn(ir_rat)
-        feat_dict['i'] = fn((old_div(s, imbuf_mask.shape[1])))
-
-        return feat_dict
-
     # per_pixel = True, patch_fn = su.ImPlotFeatureExtractor.extract_patch_ms_features
-    def extract_all_features(self, per_pixel=False, patch_fn=extract_patch_ms_features):
+    def extract_all_features(self, per_pixel=False, patch_fn=extract_patch_ms_features_ex):
         # geotransform = ds.GetGeoTransform()
         # transform = osr.CoordinateTransformation(self.plot_feat_dict['spatial_ref'], gdal.osr.SpatialReference(self.image_reader.crs.to_string()))
         # transform = osr.CoordinateTransformation(gdal.osr.SpatialReference(self.plot_data_gdf.crs.to_wkt()),
@@ -1042,179 +1002,221 @@ class ImPlotFeatureExtractor(object):
         return self.im_plot_data_gdf
 
 
-    # this version goes with extract_patch_ms_features_ex
-    def get_feat_array_ex(self, y_data_key=None, feat_keys=None):
-        if self.im_plot_data_gdf is None or len(self.im_plot_data_gdf) == 0:
-            raise Exception('No features - run extract_all_features() first')
-
-        y = np.array([])
-        if y_data_key is not None:
-            y = self.im_plot_data_gdf[('data', y_data_key)]
-
-        if feat_keys is None:  # get all feats
-            feat_keys = self.im_plot_data_gdf['feats'].columns
-            X = self.im_plot_data_gdf['feats']
-        else:
-            X = self.im_plot_data_gdf['feats'][feat_keys]
-
-
-        logger.info('X NaN ttl: {0}'.format(np.isnan(X).sum()))
-        logger.info('X NaN feats: ' + str(feat_keys[np.any(np.isnan(X), axis=0)]))
-        logger.info('X inf ttl: {0}'.format((X == np.inf).sum()))
-        logger.info('X inf feats: ' + str(feat_keys[np.any((X == np.inf), axis=0)]))
-        return X, y, feat_keys
-
-
-    @staticmethod
-    def sscatter_plot_(im_feat_dict, x_feat_key='NDVI', y_feat_key='', class_key='', show_labels=True, show_class_labels=True,
-                     show_thumbnails=False, do_regress=True, xlabel=None, ylabel=None, xfn=lambda x: x, yfn=lambda y: y):
-        x = np.array([xfn(plot['feats'][x_feat_key]) for plot in list(im_feat_dict.values())])
-        if type(x[0]) is np.ndarray:        # this is pixel data and requires concat to flatten it
-            cfn = lambda x: np.hstack(x)[::5]
-            show_thumbnails = False
-        else:
-            cfn = lambda x: x
-
-        # if xfn is not None:
-        #     x = xfn(x)
-        y = np.array([yfn(plot[y_feat_key]) for plot in list(im_feat_dict.values())])
-        # if type(x[0]) is np.ndarray:
-        #     ycfn = lambda x: np.concatenate(x)
-        # else:
-        #     ycfn = lambda x: x
-
-        # if yfn is not None:
-        #     y = yfn(y)
-
-        if show_class_labels == True:
-            class_labels = np.array([plot[class_key] for plot in list(im_feat_dict.values())])
-        else:
-            class_labels = np.zeros(x.__len__())
-        if show_thumbnails == True:
-            thumbnails = np.array([plot['thumbnail'] for plot in list(im_feat_dict.values())])
-
-        if show_labels == True:
-            labels = np.array([plot['ID'] for plot in list(im_feat_dict.values())])
-
-        classes = np.unique(class_labels)
-        colours = ['r', 'm', 'b', 'g', 'y', 'k', 'o']
-
-        ylim = [np.min(cfn(y)), np.max(cfn(y))]
-        xlim = [np.min(cfn(x)), np.max(cfn(x))]
-        xd = np.diff(xlim)[0]
-        yd = np.diff(ylim)[0]
-
-        pylab.figure()
-        pylab.axis(np.concatenate([xlim, ylim]))
-        # pylab.hold('on')
-        ax = pylab.gca()
-        handles = np.zeros(classes.size).tolist()
-        #
-
-        for ci, (class_label, colour) in enumerate(zip(classes, colours[:classes.__len__()])):
-            class_idx = class_labels == class_label
-            if not show_thumbnails:
-                pylab.plot(cfn(x[class_idx]), cfn(y[class_idx]), colour + 'o', label=class_label, markeredgecolor=(0, 0, 0))
-
-            for xyi, (xx, yy) in enumerate(zip(x[class_idx], y[class_idx])):  # , np.array(plot_names)[class_idx]):
-                if type(xx) is np.ndarray:
-                    xx = xx[0]
-                if type(yy) is np.ndarray:
-                    yy = yy[0]
-                if show_labels:
-                    pylab.text(xx - .0015, yy - .0015, np.array(labels)[class_idx][xyi],
-                               fontdict={'size': 9, 'color': colour, 'weight': 'bold'})
-
-                if show_thumbnails:
-                    imbuf = np.array(thumbnails)[class_idx][xyi]
-                    band_idx = [0, 1, 2]
-                    if imbuf.shape[2] == 8:  # guess wv3
-                        band_idx = [4, 2, 1]
-
-                    ims = 20.
-                    extent = [xx - old_div(xd, (2 * ims)), xx + old_div(xd, (2 * ims)), yy - old_div(yd, (2 * ims)), yy + old_div(yd, (2 * ims))]
-                    #pylab.imshow(imbuf[:, :, :3], extent=extent, aspect='auto')  # zorder=-1,
-                    pylab.imshow(imbuf[:,:,band_idx], extent=extent, aspect='auto')  # zorder=-1,
-                    handles[ci] = ax.add_patch(
-                        patches.Rectangle((xx - old_div(xd, (2 * ims)), yy - old_div(yd, (2 * ims))), old_div(xd, ims), old_div(yd, ims), fill=False,
-                                          edgecolor=colour, linewidth=2.))
-                    # pylab.plot(mPixels[::step], dRawPixels[::step], color='k', marker='.', linestyle='', markersize=.5)
-            if do_regress and classes.__len__() > 1 and False:
-                (slope, intercept, r, p, stde) = stats.linregress(cfn(x[class_idx]), cfn(y[class_idx]))
-                pylab.text(xlim[0] + xd * 0.7, ylim[0] + yd * 0.05 * (ci + 2),
-                           '{1}: $R^2$ = {0:.2f}'.format(np.round(r ** 2, 2), classes[ci]),
-                           fontdict={'size': 10, 'color': colour})
-
-        if do_regress:
-            (slope, intercept, r, p, stde) = stats.linregress(cfn(x), cfn(y))
-            pylab.text((xlim[0] + xd * 0.7), (ylim[0] + yd * 0.05), '$R^2$ = {0:.2f}'.format(np.round(r ** 2, 2)),
-                       fontdict={'size': 12})
-            logger.info('R^2 = {0:.4f}'.format(r ** 2))
-            logger.info('P (slope=0) = {0:f}'.format(p))
-            logger.info('Slope = {0:.4f}'.format(slope))
-            logger.info('Std error of slope = {0:.4f}'.format(stde))
-            yhat = cfn(x)*slope + intercept
-            rmse = np.sqrt(np.mean((cfn(y) - yhat) ** 2))
-            logger.info('RMS error = {0:.4f}'.format(rmse))
-        else:
-            r = np.nan
-            rmse = np.nan
-
-        if xlabel is not None:
-            pylab.xlabel(xlabel, fontdict={'size': 12})
-        else:
-            pylab.xlabel(x_feat_key, fontdict={'size': 12})
-        if ylabel is not None:
-            pylab.ylabel(ylabel, fontdict={'size': 12})
-        else:
-            pylab.ylabel(y_feat_key, fontdict={'size': 12})
-        # pylab.ylabel(yf)
-        pylab.grid()
-        if classes.size > 0:
-            if show_thumbnails:
-                pylab.legend(handles, classes, fontsize=12)
-            else:
-                pylab.legend(classes, fontsize=12)
-        return r**2, rmse
-
-    @staticmethod
-    def sscatter_plot(im_feat_dict, x_feat_key='NDVI', y_feat_key='', class_key='', show_labels=True, show_class_labels=True,
-                     show_thumbnails=False, do_regress=True, xlabel=None, ylabel=None, xfn=lambda x: x, yfn=lambda y: y):
-        x = np.array([xfn(plot['feats'][x_feat_key]) for plot in list(im_feat_dict.values())])
-        y = np.array([yfn(plot[y_feat_key]) for plot in list(im_feat_dict.values())])
-
-        if show_class_labels == True:
-            class_labels = np.array([plot[class_key] for plot in list(im_feat_dict.values())])
-        else:
-            class_labels = None
-
-        if show_thumbnails == True:
-            thumbnails = np.array([plot['thumbnail'] for plot in list(im_feat_dict.values())])
-        else:
-            thumbnails = None
-
-        if show_labels == True:
-            labels = np.array([plot['ID'] for plot in list(im_feat_dict.values())])
-        else:
-            labels = None
-
-        if xlabel is None:
-            xlabel = x_feat_key
-        if ylabel is None:
-            ylabel = y_feat_key
-        # pylab.ylabel(yf)
-        return scatter_plot(x, y, class_labels=class_labels, labels=labels, thumbnails=thumbnails,
-                                                   do_regress=do_regress, xlabel=xlabel, ylabel=ylabel, xfn=xfn, yfn=yfn)
+    # # this version goes with extract_patch_ms_features_ex
+    # def get_feat_array_ex(self, y_data_key=None, feat_keys=None):
+    #     if self.im_plot_data_gdf is None or len(self.im_plot_data_gdf) == 0:
+    #         raise Exception('No features - run extract_all_features() first')
+    #
+    #     y = np.array([])
+    #     if y_data_key is not None:
+    #         y = self.im_plot_data_gdf[('data', y_data_key)]
+    #
+    #     if feat_keys is None:  # get all feats
+    #         feat_keys = self.im_plot_data_gdf['feats'].columns
+    #         X = self.im_plot_data_gdf['feats']
+    #     else:
+    #         X = self.im_plot_data_gdf['feats'][feat_keys]
+    #
+    #
+    #     logger.info('X NaN ttl: {0}'.format(np.isnan(X).sum()))
+    #     logger.info('X NaN feats: ' + str(feat_keys[np.any(np.isnan(X), axis=0)]))
+    #     logger.info('X inf ttl: {0}'.format((X == np.inf).sum()))
+    #     logger.info('X inf feats: ' + str(feat_keys[np.any((X == np.inf), axis=0)]))
+    #     return X, y, feat_keys
 
 
-    def scatter_plot(self, x_feat_key='NDVI', y_feat_key='', class_key='', show_labels=True, show_class_labels=True,
-                     show_thumbnails=False, do_regress=True, xlabel=None, ylabel=None, xfn=lambda x: x, yfn=lambda y: y):
-        return ImPlotFeatureExtractor.sscatter_plot(self.im_feat_dict, x_feat_key=x_feat_key, y_feat_key=y_feat_key, class_key=class_key, show_labels=show_labels, show_class_labels=show_class_labels,
-                     show_thumbnails=show_thumbnails, do_regress=do_regress, xlabel=xlabel, ylabel=ylabel, xfn=xfn, yfn=yfn)
+    # @staticmethod
+    # def sscatter_plot_(im_feat_dict, x_feat_key='NDVI', y_feat_key='', class_key='', show_labels=True, show_class_labels=True,
+    #                  show_thumbnails=False, do_regress=True, xlabel=None, ylabel=None, xfn=lambda x: x, yfn=lambda y: y):
+    #     x = np.array([xfn(plot['feats'][x_feat_key]) for plot in list(im_feat_dict.values())])
+    #     if type(x[0]) is np.ndarray:        # this is pixel data and requires concat to flatten it
+    #         cfn = lambda x: np.hstack(x)[::5]
+    #         show_thumbnails = False
+    #     else:
+    #         cfn = lambda x: x
+    #
+    #     # if xfn is not None:
+    #     #     x = xfn(x)
+    #     y = np.array([yfn(plot[y_feat_key]) for plot in list(im_feat_dict.values())])
+    #     # if type(x[0]) is np.ndarray:
+    #     #     ycfn = lambda x: np.concatenate(x)
+    #     # else:
+    #     #     ycfn = lambda x: x
+    #
+    #     # if yfn is not None:
+    #     #     y = yfn(y)
+    #
+    #     if show_class_labels == True:
+    #         class_labels = np.array([plot[class_key] for plot in list(im_feat_dict.values())])
+    #     else:
+    #         class_labels = np.zeros(x.__len__())
+    #     if show_thumbnails == True:
+    #         thumbnails = np.array([plot['thumbnail'] for plot in list(im_feat_dict.values())])
+    #
+    #     if show_labels == True:
+    #         labels = np.array([plot['ID'] for plot in list(im_feat_dict.values())])
+    #
+    #     classes = np.unique(class_labels)
+    #     colours = ['r', 'm', 'b', 'g', 'y', 'k', 'o']
+    #
+    #     ylim = [np.min(cfn(y)), np.max(cfn(y))]
+    #     xlim = [np.min(cfn(x)), np.max(cfn(x))]
+    #     xd = np.diff(xlim)[0]
+    #     yd = np.diff(ylim)[0]
+    #
+    #     pylab.figure()
+    #     pylab.axis(np.concatenate([xlim, ylim]))
+    #     # pylab.hold('on')
+    #     ax = pylab.gca()
+    #     handles = np.zeros(classes.size).tolist()
+    #     #
+    #
+    #     for ci, (class_label, colour) in enumerate(zip(classes, colours[:classes.__len__()])):
+    #         class_idx = class_labels == class_label
+    #         if not show_thumbnails:
+    #             pylab.plot(cfn(x[class_idx]), cfn(y[class_idx]), colour + 'o', label=class_label, markeredgecolor=(0, 0, 0))
+    #
+    #         for xyi, (xx, yy) in enumerate(zip(x[class_idx], y[class_idx])):  # , np.array(plot_names)[class_idx]):
+    #             if type(xx) is np.ndarray:
+    #                 xx = xx[0]
+    #             if type(yy) is np.ndarray:
+    #                 yy = yy[0]
+    #             if show_labels:
+    #                 pylab.text(xx - .0015, yy - .0015, np.array(labels)[class_idx][xyi],
+    #                            fontdict={'size': 9, 'color': colour, 'weight': 'bold'})
+    #
+    #             if show_thumbnails:
+    #                 imbuf = np.array(thumbnails)[class_idx][xyi]
+    #                 band_idx = [0, 1, 2]
+    #                 if imbuf.shape[2] == 8:  # guess wv3
+    #                     band_idx = [4, 2, 1]
+    #
+    #                 ims = 20.
+    #                 extent = [xx - old_div(xd, (2 * ims)), xx + old_div(xd, (2 * ims)), yy - old_div(yd, (2 * ims)), yy + old_div(yd, (2 * ims))]
+    #                 #pylab.imshow(imbuf[:, :, :3], extent=extent, aspect='auto')  # zorder=-1,
+    #                 pylab.imshow(imbuf[:,:,band_idx], extent=extent, aspect='auto')  # zorder=-1,
+    #                 handles[ci] = ax.add_patch(
+    #                     patches.Rectangle((xx - old_div(xd, (2 * ims)), yy - old_div(yd, (2 * ims))), old_div(xd, ims), old_div(yd, ims), fill=False,
+    #                                       edgecolor=colour, linewidth=2.))
+    #                 # pylab.plot(mPixels[::step], dRawPixels[::step], color='k', marker='.', linestyle='', markersize=.5)
+    #         if do_regress and classes.__len__() > 1 and False:
+    #             (slope, intercept, r, p, stde) = stats.linregress(cfn(x[class_idx]), cfn(y[class_idx]))
+    #             pylab.text(xlim[0] + xd * 0.7, ylim[0] + yd * 0.05 * (ci + 2),
+    #                        '{1}: $R^2$ = {0:.2f}'.format(np.round(r ** 2, 2), classes[ci]),
+    #                        fontdict={'size': 10, 'color': colour})
+    #
+    #     if do_regress:
+    #         (slope, intercept, r, p, stde) = stats.linregress(cfn(x), cfn(y))
+    #         pylab.text((xlim[0] + xd * 0.7), (ylim[0] + yd * 0.05), '$R^2$ = {0:.2f}'.format(np.round(r ** 2, 2)),
+    #                    fontdict={'size': 12})
+    #         logger.info('R^2 = {0:.4f}'.format(r ** 2))
+    #         logger.info('P (slope=0) = {0:f}'.format(p))
+    #         logger.info('Slope = {0:.4f}'.format(slope))
+    #         logger.info('Std error of slope = {0:.4f}'.format(stde))
+    #         yhat = cfn(x)*slope + intercept
+    #         rmse = np.sqrt(np.mean((cfn(y) - yhat) ** 2))
+    #         logger.info('RMS error = {0:.4f}'.format(rmse))
+    #     else:
+    #         r = np.nan
+    #         rmse = np.nan
+    #
+    #     if xlabel is not None:
+    #         pylab.xlabel(xlabel, fontdict={'size': 12})
+    #     else:
+    #         pylab.xlabel(x_feat_key, fontdict={'size': 12})
+    #     if ylabel is not None:
+    #         pylab.ylabel(ylabel, fontdict={'size': 12})
+    #     else:
+    #         pylab.ylabel(y_feat_key, fontdict={'size': 12})
+    #
+    #     pylab.grid()
+    #     if classes.size > 0:
+    #         if show_thumbnails:
+    #             pylab.legend(handles, classes, fontsize=12)
+    #         else:
+    #             pylab.legend(classes, fontsize=12)
+    #     return r**2, rmse
+    #
+    # @staticmethod
+    # def sscatter_plot(im_feat_dict, x_feat_key='NDVI', y_feat_key='', class_key='', show_labels=True, show_class_labels=True,
+    #                  show_thumbnails=False, do_regress=True, xlabel=None, ylabel=None, xfn=lambda x: x, yfn=lambda y: y):
+    #     x = np.array([xfn(plot['feats'][x_feat_key]) for plot in list(im_feat_dict.values())])
+    #     y = np.array([yfn(plot[y_feat_key]) for plot in list(im_feat_dict.values())])
+    #
+    #     if show_class_labels == True:
+    #         class_labels = np.array([plot[class_key] for plot in list(im_feat_dict.values())])
+    #     else:
+    #         class_labels = None
+    #
+    #     if show_thumbnails == True:
+    #         thumbnails = np.array([plot['thumbnail'] for plot in list(im_feat_dict.values())])
+    #     else:
+    #         thumbnails = None
+    #
+    #     if show_labels == True:
+    #         labels = np.array([plot['ID'] for plot in list(im_feat_dict.values())])
+    #     else:
+    #         labels = None
+    #
+    #     if xlabel is None:
+    #         xlabel = x_feat_key
+    #     if ylabel is None:
+    #         ylabel = y_feat_key
+    #     # pylab.ylabel(yf)
+    #     return scatter_plot(x, y, class_labels=class_labels, labels=labels, thumbnails=thumbnails,
+    #                                                do_regress=do_regress, xlabel=xlabel, ylabel=ylabel, xfn=xfn, yfn=yfn)
+    #
+    #
+    # def scatter_plot(self, x_feat_key='NDVI', y_feat_key='', class_key='', show_labels=True, show_class_labels=True,
+    #                  show_thumbnails=False, do_regress=True, xlabel=None, ylabel=None, xfn=lambda x: x, yfn=lambda y: y):
+    #     return ImPlotFeatureExtractor.sscatter_plot(self.im_feat_dict, x_feat_key=x_feat_key, y_feat_key=y_feat_key, class_key=class_key, show_labels=show_labels, show_class_labels=show_class_labels,
+    #                  show_thumbnails=show_thumbnails, do_regress=do_regress, xlabel=xlabel, ylabel=ylabel, xfn=xfn, yfn=yfn)
 
 class FeatureSelector(object):
     def __init__(self):
         return
+    @staticmethod
+    def forward_selection(feat_df, max_num_feats=0, model=linear_model.LinearRegression(),
+                          score_fn=lambda y, pred: -1*np.sqrt(metrics.mean_squared_error(y,pred)), cv=None):
+        # X, feat_keys_mod, y = self.get_feat_array(y_key=y_feat_key)
+        feat_keys = feat_df['feats'].columns
+        feat_list = feat_df['feats'].aslist()
+
+        if feat_keys is None:
+            feat_keys = [str(i) for i in range(0, X.shape[1])]
+        feat_list = X.transpose().tolist()
+        feat_dict = dict(list(zip(feat_keys, feat_list)))
+        if max_num_feats == 0:
+            max_num_feats = X.shape[1]
+        selected_feats = collections.OrderedDict()   # remember order items are added
+        selected_scores = []
+        available_feats = feat_dict
+
+        logger.info('Forward selection: ', end=' ')
+        while len(selected_feats) < max_num_feats:
+            best_score = -np.inf
+            best_feat = []
+            for feat_key, feat_vec in available_feats.items():
+                test_feats = list(selected_feats.values()) + [feat_vec]
+                scores, predicted = FeatureSelector.score_model(np.array(test_feats).transpose(), y, model=model, score_fn=score_fn, cv=cv, find_predicted=False)
+                score = scores['test_user'].mean()
+                if score > best_score:
+                    best_score = score
+                    best_feat = list(feat_vec)
+                    best_key = feat_key
+            selected_feats[best_key] = best_feat
+            selected_scores.append(best_score)
+            available_feats.pop(best_key)
+            logger.info(best_key + ', ', end=' ')
+        logger.info(' ')
+        selected_scores = np.array(selected_scores)
+        selected_feat_keys = list(selected_feats.keys())
+        best_selected_feat_keys = selected_feat_keys[:np.argmax(selected_scores) + 1]
+        logger.info('Best score: {0}'.format(selected_scores.max()))
+        logger.info('Num feats at best score: {0}'.format(np.argmax(selected_scores) + 1))
+        logger.info('Feat keys at best score: {0}'.format(best_selected_feat_keys))
+
+        return np.array(list(selected_feats.values())).transpose(), selected_scores, selected_feat_keys
 
     @staticmethod
     def forward_selection(X, y, feat_keys=None, max_num_feats=0, model=linear_model.LinearRegression(),
@@ -1324,66 +1326,6 @@ class FeatureSelector(object):
 
 
     # assumes X is 2D and scaled 0-1, clf is a trained classifier
-    @staticmethod
-    def plot_clf(clf, X, y, feat_keys=None, class_labels=None):
-        import matplotlib.pyplot as plt
-        from matplotlib.patches import Patch
-        from matplotlib.colors import ListedColormap
-
-        if X.shape[1] > 2:
-            raise Exception('X.shape[1] > 2')
-        if X.shape[1] > 2:
-            raise Exception('X.shape[1] > 2')
-        h = 0.002
-        x_min, x_max = X[:, 0].min() - .5, X[:, 0].max() + .5
-        y_min, y_max = X[:, 1].min() - .5, X[:, 1].max() + .5
-        xx, yy = np.meshgrid(np.arange(x_min, x_max, h),
-                             np.arange(y_min, y_max, h))
-
-        # just plot the dataset first
-        cm = plt.cm.Set2
-        plt.figure()
-        ax = plt.subplot(1, 1, 1)
-
-        # Plot the decision boundary. For that, we will assign a color to each
-        # point in the mesh [x_min, x_max]x[y_min, y_max].
-        # if hasattr(clf, "decision_function"):
-        #     Z = clf.decision_function(np.c_[xx.ravel(), yy.ravel()])
-        # else:
-        #     # Z = clf.predict_proba(np.c_[xx.ravel(), yy.ravel()])[:, 1]
-        Z = clf.predict(np.c_[xx.ravel(), yy.ravel()])
-
-        # Put the result into a color plot
-        Z = Z.reshape(xx.shape)
-        # ax.contourf(xx, yy, Z, cmap=cm, alpha=1, levels=[0,1,2,3,4,5])
-        ax.imshow(Z, extent=[x_min, x_max, y_min, y_max], origin='lower', cmap=cm, aspect='auto')
-
-        # Plot the training points
-        s = 100
-        colours = cm(np.linspace(0., 1., np.unique(y).size))  #make same colours as contourf
-        h = []
-        for i, class_id in enumerate(np.unique(y)):
-            class_idx = y == class_id
-            h.append(ax.scatter(X[class_idx, 0], X[class_idx, 1], color=colours[i], edgecolor='black', s=20))
-
-        # ax.scatter(X[::s, 0], X[::s, 1], c=y[::s], cmap=cm, edgecolor='black', s=15)
-        ax.set_xlim(xx.min(), xx.max())
-        ax.set_ylim(yy.min(), yy.max())
-        if feat_keys is not None:
-            ax.set_xlabel(feat_keys[0])
-            ax.set_ylabel(feat_keys[1])
-
-        # from matplotlib.lines import
-        # custom_lines = [Line2D([0], [0], color=cm(0.), lw=4),
-        #                 Line2D([0], [0], color=cm(.5), lw=4),
-        #                 Line2D([0], [0], color=cm(1.), lw=4)]
-
-        # fig, ax = plt.subplots()
-        # lines = ax.plot(data)
-        if class_labels is not None:
-            ax.legend(h, class_labels)
-        # ax.set_xticks(())
-        # ax.set_yticks(())
 
 
 # params: calib_plots from >1 data set
@@ -1393,264 +1335,10 @@ class FeatureSelector(object):
 #       a model spec i.e. feature indices and model type
 #       num calib plots to use
 
-class ModelCalibrationTest(object):
-    # def __init__(self, plot_featdict_list=[], y_key='', calib_featdict_list=[], feat_keys='', model_feat_keys=['r_n'], model=linear_model.LinearRegression()):
-    #     self.plot_data_list = plot_data_list
-    #     self.calib_data_list = calib_data_list
-    #     self.feat_keys = feat_keys
-    #     self.model_feat_idx = model_feat_idx
-    #     self.model = model
-    #     self.y = y
-    #     self.fitted_models = []
 
-    def __init__(self, plot_data_list=[], y=[], strata=None, calib_data_list=[], feat_keys='', model_feat_idx=[0], model=linear_model.LinearRegression):
-        self.plot_data_list = plot_data_list
-        self.calib_data_list = calib_data_list
-        self.feat_keys = feat_keys
-        self.model_feat_idx = model_feat_idx
-        self.model = model
-        self.y = y
-        self.fitted_models = []
-        self.strata = strata
-        self.model_scores_array = None
-        self.calib_scores_array = None
-
-    def BootStrapCalibration(self, fit_model, fit_plot_data, fit_calib_data, test_plot_data, test_calib_data,
-                                     n_bootstraps=10, n_calib_plots=10):
-        r2_model = np.zeros((n_bootstraps, 1))
-        rmse_model = np.zeros((n_bootstraps, 1))
-
-        r2_calib = np.zeros((n_bootstraps, self.model_feat_idx.__len__()))
-        rmse_calib = np.zeros((n_bootstraps, self.model_feat_idx.__len__()))
-        # TO DO: make a sub-function
-        # sample with bootstrapping the calib plots, fit calib models, apply to plot_data and test
-        for bi in range(0, n_bootstraps):
-            if self.strata is None:
-                calib_plot_idx = np.random.permutation(test_plot_data.__len__())[:n_calib_plots]
-            else:
-                calib_plot_idx = []
-                strata_list = np.unique(self.strata)
-                for strata_i in strata_list:
-                    strata_idx = np.int32(np.where(strata_i == self.strata)[0])
-                    calib_plot_idx += np.random.permutation(strata_idx)[
-                                      :np.round(old_div(n_calib_plots, strata_list.__len__()))].tolist()
-
-                calib_plot_idx = np.array(calib_plot_idx)
-            calib_feats = []
-            # loop through features in model_feat_idx and calibrate each one
-            calib_feats = np.zeros((test_calib_data.shape[0], self.model_feat_idx.__len__()))
-            for fi, feat_idx in enumerate(self.model_feat_idx):
-                calib_model = linear_model.LinearRegression()
-                calib_model.fit(test_calib_data[calib_plot_idx, feat_idx].reshape(-1, 1),
-                                fit_calib_data[calib_plot_idx, feat_idx].reshape(-1, 1))
-                calib_feat = calib_model.predict(test_plot_data[:, feat_idx].reshape(-1, 1))
-                r2_calib[bi, fi] = metrics.r2_score(fit_plot_data[:, feat_idx], calib_feat)
-                rmse_calib[bi, fi] = np.sqrt(
-                    metrics.mean_squared_error(fit_plot_data[:, feat_idx], calib_feat))
-                calib_feats[:, fi] = calib_feat.flatten()
-
-            # calib_feats = np.array(calib_feats).transpose()
-            predicted = fit_model.predict(calib_feats)
-            r2_model[bi] = metrics.r2_score(self.y, predicted)
-            rmse_model[bi] = np.sqrt(metrics.mean_squared_error(self.y, predicted))
-
-        model_scores = {'r2':r2_model, 'rmse': rmse_model}
-        calib_scores = {'r2':r2_calib, 'rmse': rmse_calib}
-        return model_scores, calib_scores
-
-    def TestCalibration(self, n_bootstraps=10, n_calib_plots=10):
-        np.set_printoptions(precision=4)
-        self.fitted_models = []
-        for plot_data in self.plot_data_list:
-            fit_model = self.model()
-            fit_model.fit(plot_data[:, self.model_feat_idx], self.y)
-            self.fitted_models.append(fit_model)
-
-        model_idx = list(range(0, self.fitted_models.__len__()))
-        # loop over different images/models to fit to
-        self.model_scores_array = np.zeros((self.fitted_models.__len__(), self.fitted_models.__len__()), dtype=object)
-        self.calib_scores_array = np.zeros((self.fitted_models.__len__(), self.fitted_models.__len__()), dtype=object)
-
-        for fmi in model_idx:
-            fit_model = self.fitted_models[fmi]
-            test_model_idx = np.setdiff1d(model_idx, fmi)
-            fit_calib_data = self.calib_data_list[fmi]
-            fit_plot_data = self.plot_data_list[fmi]
-            # loop over the remaining images/models to test calibration on
-            for tmi in test_model_idx:
-                test_calib_data = self.calib_data_list[tmi]
-                test_plot_data = self.plot_data_list[tmi]
-
-                model_scores, calib_scores = self.BootStrapCalibration(fit_model, fit_plot_data, fit_calib_data, test_plot_data,
-                                                           test_calib_data, n_bootstraps=n_bootstraps, n_calib_plots=n_calib_plots)
-                self.model_scores_array[fmi, tmi] = {'mean(r2)': model_scores['r2'].mean(), 'std(r2)': model_scores['r2'].std(),
-                                                'mean(rmse)': model_scores['rmse'].mean(), 'std(rmse)': model_scores['rmse'].std()}
-                self.calib_scores_array[fmi, tmi] = {'mean(r2)': calib_scores['r2'].mean(axis=0), 'std(r2)': calib_scores['r2'].std(axis=0),
-                                                'mean(rmse)': calib_scores['rmse'].mean(axis=0), 'std(rmse)': calib_scores['rmse'].std(axis=0)}
-                logger.info('Model scores (fit model {0}, calib model {1})'.format(fmi, tmi))
-                logger.info('mean(R^2): {0:.4f}'.format(model_scores['r2'].mean()))
-                logger.info('std(R^2): {0:.4f}'.format(model_scores['r2'].std()))
-                logger.info('mean(RMSE): {0:.4f}'.format(model_scores['rmse'].mean()))
-                logger.info('std(RMSE): {0:.4f}'.format(model_scores['rmse'].std()))
-                logger.info(' ')
-                logger.info('Calib scores (fit model {0}, calib model {1})'.format(fmi, tmi))
-                logger.info('mean(R^2): {0}'.format(calib_scores['r2'].mean(axis=0)))
-                logger.info('std(R^2): {0}'.format(calib_scores['r2'].std(axis=0)))
-                logger.info('mean(RMSE): {0}'.format(calib_scores['rmse'].mean(axis=0)))
-                logger.info('std(RMSE): {0}'.format(calib_scores['rmse'].std(axis=0)))
-                logger.info(' ')
-        return self.model_scores_array, self.calib_scores_array
-
-    def PrintScores(self):
-        for scores_array, label in zip([self.model_scores_array, self.calib_scores_array], ['Model', 'Calib']):
-            for key in ['mean(r2)', 'std(r2)', 'mean(rmse)', 'std(rmse)']:
-                logger.info('{0} {1}:'.format(label, key))
-                score_array = np.zeros(scores_array.shape)
-                for ri in range(scores_array.shape[0]):
-                    for ci in range(scores_array.shape[1]):
-                        if scores_array[ri, ci] is None:
-                            score_array[ri, ci] = 0.
-                        else:
-                            score_array[ri, ci] = scores_array[ri, ci][key]
-                logger.info(score_array)
-                overall_mean = np.diag(np.flipud(score_array)).mean()
-                logger.info('Overall mean({0} {1}): {2:0.4f}'.format(label, key, overall_mean))
-                logger.info(' ')
-
-        return
-
-
-class ModelCalibrationTestEx(object):
-    # def __init__(self, plot_featdict_list=[], y_key='', calib_featdict_list=[], feat_keys='', model_feat_keys=['r_n'], model=linear_model.LinearRegression()):
-    #     self.plot_data_list = plot_data_list
-    #     self.calib_data_list = calib_data_list
-    #     self.feat_keys = feat_keys
-    #     self.model_feat_idx = model_feat_idx
-    #     self.model = model
-    #     self.y = y
-    #     self.fitted_models = []
-
-    def __init__(self, plot_data_list=[], y=[], strata=None, calib_data_list=[], model=linear_model.LinearRegression):
-        self.plot_data_list = plot_data_list
-        self.calib_data_list = calib_data_list
-        self.model = model
-        self.y = y
-        self.fitted_models = []
-        self.strata = strata
-        self.model_scores_array = None
-        self.calib_scores_array = None
-
-    def BootStrapCalibration(self, fit_model, fit_plot_data, fit_calib_data, test_plot_data, test_calib_data,
-                                     n_bootstraps=10, n_calib_plots=10):
-        r2_model = np.zeros((n_bootstraps, 1))
-        rmse_model = np.zeros((n_bootstraps, 1))
-
-        r2_calib = np.zeros((n_bootstraps, test_calib_data.shape[1]))
-        rmse_calib = np.zeros((n_bootstraps, test_calib_data.shape[1]))
-        # TO DO: make a sub-function
-        # sample with bootstrapping the calib plots, fit calib models, apply to plot_data and test
-        for bi in range(0, n_bootstraps):
-            if self.strata is None:
-                calib_plot_idx = np.random.permutation(test_plot_data.__len__())[:n_calib_plots]
-            else:
-                calib_plot_idx = []
-                strata_list = np.unique(self.strata)
-                for strata_i in strata_list:
-                    strata_idx = np.int32(np.where(strata_i == self.strata)[0])
-                    calib_plot_idx += np.random.permutation(strata_idx)[
-                                      :np.round(old_div(n_calib_plots, strata_list.__len__()))].tolist()
-
-                calib_plot_idx = np.array(calib_plot_idx)
-            # test_plot_idx = np.setdiff1d(np.arange(0, len(self.y)), calib_plot_idx)   # exclude the calib plots
-            test_plot_idx = np.arange(0, len(self.y))   # include the calib plots
-            calib_feats = []
-            # loop through features in model_feat_idx and calibrate each one
-            # calib_feats = np.zeros((test_calib_data.shape[0], test_calib_data.shape[1]))
-            calib_feats = np.zeros((len(test_plot_idx), test_calib_data.shape[1]))
-            for fi in range(0, test_calib_data.shape[1]):
-                calib_model = linear_model.LinearRegression()
-                calib_model.fit(test_calib_data[calib_plot_idx, fi].reshape(-1, 1),
-                                fit_calib_data[calib_plot_idx, fi].reshape(-1, 1))
-
-                calib_feat = calib_model.predict(test_plot_data[test_plot_idx, fi].reshape(-1, 1))
-                r2_calib[bi, fi] = metrics.r2_score(fit_plot_data[test_plot_idx, fi], calib_feat)
-                rmse_calib[bi, fi] = np.sqrt(
-                    metrics.mean_squared_error(fit_plot_data[test_plot_idx, fi], calib_feat))
-                calib_feats[:, fi] = calib_feat.flatten()
-
-            # calib_feats = np.array(calib_feats).transpose()
-            predicted = fit_model.predict(calib_feats)
-            r2_model[bi] = metrics.r2_score(self.y[test_plot_idx], predicted)
-            rmse_model[bi] = np.sqrt(metrics.mean_squared_error(self.y[test_plot_idx], predicted))
-
-        model_scores = {'r2':r2_model, 'rmse': rmse_model}
-        calib_scores = {'r2':r2_calib, 'rmse': rmse_calib}
-        return model_scores, calib_scores
-
-    def TestCalibration(self, n_bootstraps=10, n_calib_plots=10):
-        np.set_printoptions(precision=4)
-        self.fitted_models = []
-        for plot_data in self.plot_data_list:
-            fit_model = self.model()
-            fit_model.fit(plot_data, self.y)
-            self.fitted_models.append(fit_model)
-
-        model_idx = list(range(0, self.fitted_models.__len__()))
-        # loop over different images/models to fit to
-        self.model_scores_array = np.zeros((self.fitted_models.__len__(), self.fitted_models.__len__()), dtype=object)
-        self.calib_scores_array = np.zeros((self.fitted_models.__len__(), self.fitted_models.__len__()), dtype=object)
-
-        for fmi in model_idx:
-            fit_model = self.fitted_models[fmi]
-            test_model_idx = np.setdiff1d(model_idx, fmi)
-            fit_calib_data = self.calib_data_list[fmi]
-            fit_plot_data = self.plot_data_list[fmi]
-            # loop over the remaining images/models to test calibration on
-            for tmi in test_model_idx:
-                test_calib_data = self.calib_data_list[tmi]
-                test_plot_data = self.plot_data_list[tmi]
-
-                model_scores, calib_scores = self.BootStrapCalibration(fit_model, fit_plot_data, fit_calib_data, test_plot_data,
-                                                           test_calib_data, n_bootstraps=n_bootstraps, n_calib_plots=n_calib_plots)
-                self.model_scores_array[fmi, tmi] = {'mean(r2)': model_scores['r2'].mean(), 'std(r2)': model_scores['r2'].std(),
-                                                'mean(rmse)': model_scores['rmse'].mean(), 'std(rmse)': model_scores['rmse'].std()}
-                self.calib_scores_array[fmi, tmi] = {'mean(r2)': calib_scores['r2'].mean(axis=0), 'std(r2)': calib_scores['r2'].std(axis=0),
-                                                'mean(rmse)': calib_scores['rmse'].mean(axis=0), 'std(rmse)': calib_scores['rmse'].std(axis=0)}
-                logger.info('Model scores (fit model {0}, calib model {1})'.format(fmi, tmi))
-                logger.info('mean(R^2): {0:.4f}'.format(model_scores['r2'].mean()))
-                logger.info('std(R^2): {0:.4f}'.format(model_scores['r2'].std()))
-                logger.info('mean(RMSE): {0:.4f}'.format(model_scores['rmse'].mean()))
-                logger.info('std(RMSE): {0:.4f}'.format(model_scores['rmse'].std()))
-                logger.info(' ')
-                logger.info('Calib scores (fit model {0}, calib model {1})'.format(fmi, tmi))
-                logger.info('mean(R^2): {0}'.format(calib_scores['r2'].mean(axis=0)))
-                logger.info('std(R^2): {0}'.format(calib_scores['r2'].std(axis=0)))
-                logger.info('mean(RMSE): {0}'.format(calib_scores['rmse'].mean(axis=0)))
-                logger.info('std(RMSE): {0}'.format(calib_scores['rmse'].std(axis=0)))
-                logger.info(' ')
-        return self.model_scores_array, self.calib_scores_array
-
-    def PrintScores(self):
-        for scores_array, label in zip([self.model_scores_array, self.calib_scores_array], ['Model', 'Calib']):
-            for key in ['mean(r2)', 'std(r2)', 'mean(rmse)', 'std(rmse)']:
-                logger.info('{0} {1}:'.format(label, key))
-                score_array = np.zeros(scores_array.shape)
-                for ri in range(scores_array.shape[0]):
-                    for ci in range(scores_array.shape[1]):
-                        if scores_array[ri, ci] is None or type(scores_array[ri, ci]) is int:
-                            score_array[ri, ci] = 0.
-                        else:
-                            score_array[ri, ci] = scores_array[ri, ci][key]
-                logger.info(score_array)
-                overall_mean = np.diag(np.flipud(score_array)).mean()
-                logger.info('Overall mean({0} {1}): {2:0.4f}'.format(label, key, overall_mean))
-                logger.info(' ')
-
-        return
-
-class AgcMap(object):
+class ApplyLinearModel(object):
     def __init__(self, in_file_name='', out_file_name='', model=linear_model.LinearRegression, model_keys=[],
-                 feat_ex_fn=ImPlotFeatureExtractor.extract_patch_ms_features_ex, num_bands=9, save_feats=False):
+                 feat_ex_fn=mdl.ImPlotFeatureExtractor.extract_patch_ms_features_ex, num_bands=9, save_feats=False):
         self.in_file_name = in_file_name
         self.out_file_name = out_file_name
         self.model = model
@@ -1677,7 +1365,7 @@ class AgcMap(object):
     #     '(NIR/Y)^2',
     # def ConstructFeatEx(self, model_keys=[], num_bands=9):
     @staticmethod
-    def ConstructFeatExFn(model_key='', pan_bands=None, band_dict=None):
+    def construct_feat_ex_fn(model_key='', pan_bands=None, band_dict=None):
         win_fn_list = []
         inner_str_list = []
         inner_fn_list = []
@@ -1736,16 +1424,16 @@ class AgcMap(object):
         return inner_str, win_fn, inner_fn
 
     @staticmethod
-    def ConstructFeatExFns(model_keys=[], num_b=9):
+    def construct_feat_ex_fns(model_keys=[], num_bands=9):
         import re
-        pan_bands, band_dict = ImPlotFeatureExtractor.get_band_info(num_bands)
+        pan_bands, band_dict = mdl.ImPlotFeatureExtractor.get_band_info(num_bands)
 
         win_fn_list = []
         inner_str_list = []
         inner_fn_list = []
         for model_key in model_keys:
             # find outer fn
-            inner_str, win_fn, inner_fn = AgcMap.ConstructFeatExFn(model_key, pan_bands=pan_bands, band_dict=band_dict)
+            inner_str, win_fn, inner_fn = ApplyLinearModel.construct_feat_ex_fn(model_key, pan_bands=pan_bands, band_dict=band_dict)
             win_fn_list.append(win_fn)
             inner_str_list.append(inner_str)
             inner_fn_list.append(inner_fn)
@@ -1753,21 +1441,21 @@ class AgcMap(object):
         return win_fn_list, inner_fn_list
 
     # @staticmethod
-    # def RollingWindow(a, window, step_size=1):
+    # def rolling_window(a, window, step_size=1):
     #     shape = a.shape[:-1] + (a.shape[-1] - window + 1 - step_size + 1, window)
     #     strides = a.strides + (a.strides[-1] * step_size,)
     #     return np.lib.stride_tricks.as_strided(a, shape=shape, strides=strides, writeable=False)
 
     @staticmethod
-    def RollingWindow(a, window, step_size=1):
+    def rolling_window(a, window, step_size=1):
         shape = a.shape[:-1] + (int(1 + (a.shape[-1] - window) / step_size), window)
         strides = a.strides[:-1] + (step_size * a.strides[-1], a.strides[-1])
         return np.lib.stride_tricks.as_strided(a, shape=shape, strides=strides, writeable=False)
 
-    def FeatEx(self, im_buf=[]):
+    def feat_ex(self, im_buf=[]):
         return
 
-    def Create(self, win_size=(1, 1), step_size=(1, 1)):
+    def create(self, win_size=(1, 1), step_size=(1, 1)):
         from rasterio.windows import Window
         with rasterio.Env():
             with rasterio.open(self.in_file_name, 'r') as in_ds:
@@ -1789,7 +1477,7 @@ class AgcMap(object):
                 # out_transform[4] = ['transform'][4] * step_size[1]
                 # to do: find geotransform based on out width/height
 
-                # self.win_fn_list, self.band_ratio_list = AgcMap.ConstructFeatExFns(self.model_keys, num_bands=in_ds.count)
+                # self.win_fn_list, self.band_ratio_list = AgcMap.construct_feat_ex_fns(self.model_keys, num_bands=in_ds.count)
 
                 with rasterio.open(self.out_file_name, 'w', **out_profile) as out_ds:
                     pan_bands, band_dict = ImPlotFeatureExtractor.get_band_info(in_ds.count)
@@ -1812,11 +1500,11 @@ class AgcMap(object):
                         out_win = Window(win_off[0], int(cy/step_size[0]) + win_off[1], out_size[0], 1)
                         # for i, (win_fn, band_ratio_fn) in enumerate(zip(self.win_fn_list, self.band_ratio_list)):
                         for i, model_key in enumerate(self.model_keys):
-                            inner_str, win_fn, band_ratio_fn = AgcMap.ConstructFeatExFn(model_key, pan_bands=pan_bands,
-                                                                                        band_dict=band_dict)
+                            inner_str, win_fn, band_ratio_fn = ApplyLinearModel.construct_feat_ex_fn(model_key, pan_bands=pan_bands,
+                                                                                                     band_dict=band_dict)
                             band_ratio = band_ratio_fn(pan, in_buf)
                             band_ratio[in_nan_mask] = np.nan           # to exclude from window stats/fns
-                            feat_buf = win_fn(AgcMap.RollingWindow(band_ratio, win_size[0], step_size=step_size[0])) * self.model.coef_[i]
+                            feat_buf = win_fn(ApplyLinearModel.rolling_window(band_ratio, win_size[0], step_size=step_size[0])) * self.model.coef_[i]
                             agc_buf += feat_buf
                             if i==0:
                                 first_feat_buf = feat_buf
@@ -1844,7 +1532,7 @@ class AgcMap(object):
                             # break
                     print(' ')
 
-    def PostProc(self):
+    def post_proc(self):
         from rasterio.windows import Window
         from rasterio import fill
         with rasterio.Env():

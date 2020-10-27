@@ -17,7 +17,7 @@ from collections import OrderedDict
 # from PIL import Image
 # from PIL import ImageDraw
 # sys.path.append("C:\Data\Development\Projects\PhD GeoInformatics\Code\Misc Tools")
-from modules import SpatialUtils as su
+from modules import modelling as su
 
 # |layerid=0|subset="Comment" LIKE 'H%'
 correctedShapeFileNames = [
@@ -205,7 +205,7 @@ for csGtFilename in csGtFilenames:
             plotCsGt[row['ID']] = row
 
 
-## Create output shapefile
+## create output shapefile
 # set up the shapefile driver
 
 driver = ogr.GetDriverByName("ESRI Shapefile")
@@ -324,12 +324,12 @@ if False:
         # create the WKT for the feature using Python string formatting
         wkt = "POINT(%f %f)" % (float(row['Longitude']), float(row['Latitude']))
 
-        # Create the point from the Well Known Txt
+        # create the point from the Well Known Txt
         point = ogr.CreateGeometryFromWkt(wkt)
 
         # Set the feature geometry using the point
         feature.SetGeometry(point)
-        # Create the feature in the layer (shapefile)
+        # create the feature in the layer (shapefile)
         layer.CreateFeature(feature)
         # Dereference the feature
         feature = None
