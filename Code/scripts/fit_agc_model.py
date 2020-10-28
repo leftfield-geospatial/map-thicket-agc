@@ -62,13 +62,8 @@ with rasterio.open(image_filename, 'r') as imr:
 im_plot_data_gdf.loc[im_plot_data_gdf['data']['Stratum'] == 'Degraded', ('data', 'Stratum')] = 'Severe'
 im_plot_data_gdf.loc[im_plot_data_gdf['data']['Stratum'] == 'Intact', ('data', 'Stratum')] = 'Pristine'
 
-# X = im_plot_data_gdf['feats'].to_numpy()
 
-# implot_feat_dict.pop('ST49')
-X, y, feat_keys = fex.get_feat_array_ex(y_data_key='AgcHa')
-
-# su.scatter_ds(im_plot_data_gdf, x_col=('feats','pan/R'), y_col=('data','AgcHa'), class_col=('data','Stratum'),
-#               xfn=lambda x: np.log10(x), do_regress=True)
+# make some scatter plots of features vs AGC
 pyplot.figure()
 mdl.scatter_ds(im_plot_data_gdf, x_col=('feats', 'pan/R'), y_col=('data', 'AgcHa'), class_col=('data', 'Stratum'),
                xfn=lambda x: np.log10(x), do_regress=True)
@@ -78,86 +73,68 @@ mdl.scatter_ds(im_plot_data_gdf, x_col=('feats', '(R/G)^2'), y_col=('data', 'Abc
 pyplot.figure()
 mdl.scatter_ds(im_plot_data_gdf, x_col=('feats', 'pan/R'), y_col=('data', 'AbcHa'), class_col=('data', 'Stratum'),
                xfn=lambda x: np.log10(x), do_regress=True, thumbnail_col=('data','thumbnail'), label_col=('data', 'ID'))
-# fex.scatter_plot(x_feat_key='pan/R', y_feat_key='AgcHa', class_key='Stratum', xfn=lambda x: np.log10(x), do_regress=True)
 
-
-# R^2 = 0.8306
-# P (slope=0) = 0.000000
-# Slope = -404187.9402
-# Std error of slope = 19458.2934
-# RMS error = 7976.5274
-# Out[8]: (0.83059870877446296, 7976.5274329637823)
-
-Xselected_feats, selected_scores, selected_keys = mdl.FeatureSelector.forward_selection(X, y, feat_keys=feat_keys, max_num_feats=41, cv=5,  #cv=X.shape[0] / 5
+# select best features for predicting AGC
+y = im_plot_data_gdf['data']['AgcHa']
+selected_feats_df, selected_scores =  mdl.FeatureSelector.forward_selection(im_plot_data_gdf['feats'], y, max_num_feats=50, cv=5,  #cv=X.shape[0] / 5
                                                                                         score_fn=lambda y,pred: -np.sqrt(metrics.mean_squared_error(y, pred)))
 
+# calculate scores of selected features with LOOCV
+selected_loocv_scores = []
+num_feats = range(0, len(selected_scores))
+for i in num_feats:
+    scores, predicted = mdl.FeatureSelector.score_model(selected_feats_df.to_numpy()[:, :i + 1], y, model=linear_model.LinearRegression(), find_predicted=True, cv=selected_feats_df.shape[0])
+    loocv_scores = {'R2': scores['R2_stacked'], 'RMSE': np.abs(scores['test_-RMSE']).mean()/1000., 'RMSE CI': np.percentile(np.abs(scores['test_-RMSE']), [5, 95])}
+    selected_loocv_scores.append(loocv_scores)
+    print('Scored model {0} of {1}'.format(i+1, len(selected_scores)))
 
-#------------------------------------------------------------------------------------------------------------------------
-# make plots of num feats vs r2 / RMSE
-r2 = np.zeros(selected_scores.__len__())
-rmse = np.zeros(selected_scores.__len__())
-rmse_ci = np.zeros((selected_scores.__len__(),2))
-num_feats = np.arange(1, len(selected_scores)+1)
-for i in range(0, selected_scores.__len__()):
-    scores, predicted = mdl.FeatureSelector.score_model(Xselected_feats[:, :i + 1], y, model=linear_model.LinearRegression(), find_predicted=True, cv=X.shape[0])
-    r2[i] = scores['R2_stacked']
-    rmse_v = np.abs(scores['test_user'])/1000.
-    rmse[i] = rmse_v.mean()
-    rmse_ci[i,:] = np.percentile(rmse_v, [5, 95])
-    print('.', end=' ')
-print(' ')
+selected_loocv_scores_df = pd.DataFrame(selected_loocv_scores)
 
-# fontSize = 12.
-# pyplot.rcParams.update({'font.size': fontSize})
-
-# plots for report
+# make plots of change in score as features are added to model for report
 fig = pyplot.figure()
 fig.set_size_inches(8, 6, forward=True)
 pyplot.subplot(2, 1, 1)
-pyplot.plot(num_feats, r2, 'k-')
+pyplot.plot(num_feats, selected_loocv_scores_df['R2'], 'k-')
 pyplot.xlabel('Number of features')
 pyplot.ylabel('$\mathit{R}^2$')
-# pyplot.grid()
 pyplot.tight_layout()
 pyplot.subplot(2, 1, 2)
-pyplot.plot(num_feats, rmse, 'k-')
+pyplot.plot(num_feats, selected_loocv_scores_df['RMSE'], 'k-')
 pyplot.xlabel('Number of features')
 pyplot.ylabel('RMSE (t C ha$^{-1}$)')
-# pyplot.grid()
 pyplot.tight_layout()
-fig.savefig(r'C:\Data\Development\Projects\PhD GeoInformatics\Docs\Funding\GEF5\Invoices, Timesheets and Reports\Final Report\AgcAccVsNumFeatsPy38Cv5.png', dpi=300)
+pyplot.show()
+pyplot.savefig(root_path.joinpath(r'Data\Outputs\Plots\AgcAccVsNumFeats1_Py38Cv5.png'), dpi=300)
 
 fig, ax1 = pyplot.subplots()
 fig.set_size_inches(8, 4, forward=True)
 color = 'tab:red'
 ax1.set_xlabel('Number of features')
 ax1.set_ylabel('$\mathit{R}^2$', color=color)  # we already handled the x-label with ax1
-ax1.plot(num_feats, r2, color=color)
+ax1.plot(num_feats, selected_loocv_scores_df['R2'], color=color)
 ax1.tick_params(axis='y', labelcolor=color)
-# pyplot.grid()
 ax2 = ax1.twinx()
 color = 'tab:blue'
 ax2.set_ylabel('-RMSE (t C ha$^{-1}$)', color=color)  # we already handled the x-label with ax1
-ax2.plot(num_feats, -rmse, color=color)
+ax2.plot(num_feats, -selected_loocv_scores_df['RMSE'], color=color)
 ax2.tick_params(axis='y', labelcolor=color)
-# pyplot.grid()
 fig.tight_layout()  # otherwise the right y-label is slightly clipped
 pyplot.show()
-fig.savefig(r'C:\Data\Development\Projects\PhD GeoInformatics\Docs\Funding\GEF5\Invoices, Timesheets and Reports\Final Report\AgcAccVsNumFeatsPy38Cv5.png', dpi=300)
+fig.savefig(root_path.joinpath(r'Data\Outputs\Plots\AgcAccVsNumFeats2_Py38Cv5.png'), dpi=300)
 
 #------------------------------------------------------------------------------------------------------------------------
 # report scatter plots for best and single feature models
 print('\nBest model scores:')
 best_model_idx = np.argmin(rmse)
-scores, predicted = mdl.FeatureSelector.score_model(Xselected_feats[:, :best_model_idx + 1], old_div(y, 1000), model=linear_model.LinearRegression(),
-                                                    find_predicted=True, cv=X.shape[0], print_scores=True)
+scores, predicted = mdl.FeatureSelector.score_model(selected_feats_df.iloc[:, :best_model_idx + 1], y/1000, model=linear_model.LinearRegression(),
+                                                    find_predicted=True, cv=selected_feats_df.shape[0], print_scores=True)
 
 print('\nBest model features:')
-for k in selected_keys[:best_model_idx+1]:
+for k in selected_feats_df.columns[:best_model_idx+1]:
     print(k)
 
 lm = linear_model.LinearRegression()
-lm.fit(Xselected_feats[:, :best_model_idx+1], old_div(y,1000))
+lm.fit(selected_feats_df.iloc[:, :best_model_idx+1], y/1000)
 for c in lm.coef_:
     print('{0:.4f}'.format(c))
 

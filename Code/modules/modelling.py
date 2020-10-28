@@ -24,6 +24,7 @@ import scipy.signal as signal
 from matplotlib import patches
 from sklearn import linear_model, metrics
 from sklearn.model_selection import cross_val_predict, cross_validate
+
 import collections
 from collections import OrderedDict
 from sklearn.preprocessing import PolynomialFeatures
@@ -44,6 +45,10 @@ import rasterio
 from rasterio.features import sieve
 from rasterio.windows import Window
 from rasterio.mask import raster_geometry_mask
+if sys.version_info.major == 3:
+    from sklearn.metrics import make_scorer
+else:
+    from sklearn.metrics.scorer import make_scorer
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -181,7 +186,7 @@ def scatter_ds(data, x_col=None, y_col=None, class_col=None, label_col=None, thu
     if do_regress:  # find and display regression error stats
         (slope, intercept, r, p, stde) = stats.linregress(x, y)
         scores, predicted = FeatureSelector.score_model(x[:,None], y[:,None], model=linear_model.LinearRegression(),
-                                                        find_predicted=True, cv=len(x), print_scores=True)
+                                                        find_predicted=True, cv=len(x), print_scores=False, score_fn=None)
 
         pylab.text((xlim[0] + xd * 0.7), (ylim[0] + yd * 0.05), '$R^2$ = {0:.2f}'.format(np.round(scores['R2_stacked'], 2)),
                    fontdict={'size': 12})
@@ -191,13 +196,13 @@ def scatter_ds(data, x_col=None, y_col=None, class_col=None, label_col=None, thu
         yhat = x * slope + intercept
         rmse = np.sqrt(np.mean((y - yhat) ** 2))
 
-        logger.info('RMSE = {0:.4f}'.format(rmse))
-        logger.info('LOOCV RMSE = {0:.4f}'.format(np.sqrt(-scores['test_user'].mean())))
-        logger.info('R^2  = {0:.4f}'.format(r ** 2))
-        logger.info('Stacked R^2  = {0:.4f}'.format(scores['R2_stacked']))
-        logger.info('P (slope=0) = {0:f}'.format(p))
-        logger.info('Slope = {0:.4f}'.format(slope))
-        logger.info('Std error of slope = {0:.4f}'.format(stde))
+        logger.info('RMSE: {0:.4f}'.format(rmse))
+        logger.info('RMSE LOOCV: {0:.4f}'.format(-scores['test_-RMSE'].mean()))
+        logger.info('R^2:  {0:.4f}'.format(r ** 2))
+        logger.info('R^2 stacked: {0:.4f}'.format(scores['R2_stacked']))
+        logger.info('P (slope=0): {0:.4f}'.format(p))
+        logger.info('Slope: {0:.4f}'.format(slope))
+        logger.info('Std error of slope: {0:.4f}'.format(stde))
     else:
         r = np.nan
         rmse = np.nan
@@ -947,7 +952,7 @@ class ImPlotFeatureExtractor(object):
                 continue
 
             # amend plot_mask to exclude NAN and -ve pixels
-            if patch_fn == self.extract_patch_clf_features:
+            if False: #patch_fn == self.extract_patch_clf_features:
                 plot_mask = plot_mask & np.all(~np.isnan(im_buf), axis=2)
             else:
                 plot_mask = plot_mask & np.all(im_buf > 0, axis=2) & np.all(~np.isnan(im_buf), axis=2)
@@ -1176,87 +1181,89 @@ class FeatureSelector(object):
     def __init__(self):
         return
     @staticmethod
-    def forward_selection(feat_df, max_num_feats=0, model=linear_model.LinearRegression(),
-                          score_fn=lambda y, pred: -1*np.sqrt(metrics.mean_squared_error(y,pred)), cv=None):
-        # X, feat_keys_mod, y = self.get_feat_array(y_key=y_feat_key)
-        feat_keys = feat_df['feats'].columns
-        feat_list = feat_df['feats'].aslist()
+    def forward_selection(feat_df, y, max_num_feats=0, model=linear_model.LinearRegression(),
+                          score_fn=None, cv=None):
 
-        if feat_keys is None:
-            feat_keys = [str(i) for i in range(0, X.shape[1])]
-        feat_list = X.transpose().tolist()
-        feat_dict = dict(list(zip(feat_keys, feat_list)))
         if max_num_feats == 0:
-            max_num_feats = X.shape[1]
-        selected_feats = collections.OrderedDict()   # remember order items are added
+            max_num_feats = feat_df.shape[1]
+        selected_feats_df = gpd.GeoDataFrame(index=feat_df.index)   # remember order items are added
         selected_scores = []
-        available_feats = feat_dict
+        available_feats_df = feat_df.copy()
 
-        logger.info('Forward selection: ', end=' ')
-        while len(selected_feats) < max_num_feats:
+        logger.info('Forward selection: ')
+        if score_fn is None:
+            logger.info('Using negative RMSE score')
+        else:
+            logger.info('Using user score')
+        while selected_feats_df.shape[1] < max_num_feats:
             best_score = -np.inf
             best_feat = []
-            for feat_key, feat_vec in available_feats.items():
-                test_feats = list(selected_feats.values()) + [feat_vec]
-                scores, predicted = FeatureSelector.score_model(np.array(test_feats).transpose(), y, model=model, score_fn=score_fn, cv=cv, find_predicted=False)
-                score = scores['test_user'].mean()
+            for feat_key, feat_vec in available_feats_df.iteritems():
+                test_feats_df = pd.concat((selected_feats_df, feat_vec), axis=1, ignore_index=False) # list(selected_feats.values()) + [feat_vec]
+                scores, predicted = FeatureSelector.score_model(test_feats_df, y, model=model,
+                                                                score_fn=score_fn, cv=cv, find_predicted=False)
+                if score_fn is None:
+                    score = scores['test_-RMSE'].mean()
+                else:
+                    score = scores['test_user'].mean()
+
                 if score > best_score:
                     best_score = score
                     best_feat = list(feat_vec)
                     best_key = feat_key
-            selected_feats[best_key] = best_feat
+            selected_feats_df[best_key] = best_feat
             selected_scores.append(best_score)
-            available_feats.pop(best_key)
-            logger.info(best_key + ', ', end=' ')
-        logger.info(' ')
+            available_feats_df.pop(best_key)
+            logger.info('Feature {0} of {1}: {2}'.format(selected_feats_df.shape[1], max_num_feats, best_key))
+        # logger.info(' ')
         selected_scores = np.array(selected_scores)
-        selected_feat_keys = list(selected_feats.keys())
+        selected_feat_keys = selected_feats_df.columns
         best_selected_feat_keys = selected_feat_keys[:np.argmax(selected_scores) + 1]
         logger.info('Best score: {0}'.format(selected_scores.max()))
         logger.info('Num feats at best score: {0}'.format(np.argmax(selected_scores) + 1))
         logger.info('Feat keys at best score: {0}'.format(best_selected_feat_keys))
 
-        return np.array(list(selected_feats.values())).transpose(), selected_scores, selected_feat_keys
+        return selected_feats_df, selected_scores
 
-    @staticmethod
-    def forward_selection(X, y, feat_keys=None, max_num_feats=0, model=linear_model.LinearRegression(),
-                          score_fn=lambda y, pred: -1*np.sqrt(metrics.mean_squared_error(y,pred)), cv=None):
-        # X, feat_keys_mod, y = self.get_feat_array(y_key=y_feat_key)
-        if feat_keys is None:
-            feat_keys = [str(i) for i in range(0, X.shape[1])]
-        feat_list = X.transpose().tolist()
-        feat_dict = dict(list(zip(feat_keys, feat_list)))
-        if max_num_feats == 0:
-            max_num_feats = X.shape[1]
-        selected_feats = collections.OrderedDict()   # remember order items are added
-        selected_scores = []
-        available_feats = feat_dict
-
-        logger.info('Forward selection: ', end=' ')
-        while len(selected_feats) < max_num_feats:
-            best_score = -np.inf
-            best_feat = []
-            for feat_key, feat_vec in available_feats.items():
-                test_feats = list(selected_feats.values()) + [feat_vec]
-                scores, predicted = FeatureSelector.score_model(np.array(test_feats).transpose(), y, model=model, score_fn=score_fn, cv=cv, find_predicted=False)
-                score = scores['test_user'].mean()
-                if score > best_score:
-                    best_score = score
-                    best_feat = list(feat_vec)
-                    best_key = feat_key
-            selected_feats[best_key] = best_feat
-            selected_scores.append(best_score)
-            available_feats.pop(best_key)
-            logger.info(best_key + ', ', end=' ')
-        logger.info(' ')
-        selected_scores = np.array(selected_scores)
-        selected_feat_keys = list(selected_feats.keys())
-        best_selected_feat_keys = selected_feat_keys[:np.argmax(selected_scores) + 1]
-        logger.info('Best score: {0}'.format(selected_scores.max()))
-        logger.info('Num feats at best score: {0}'.format(np.argmax(selected_scores) + 1))
-        logger.info('Feat keys at best score: {0}'.format(best_selected_feat_keys))
-
-        return np.array(list(selected_feats.values())).transpose(), selected_scores, selected_feat_keys
+    # @staticmethod
+    # def forward_selection(X, y, feat_keys=None, max_num_feats=0, model=linear_model.LinearRegression(),
+    #                       score_fn=lambda y, pred: -1*np.sqrt(metrics.mean_squared_error(y,pred)), cv=None):
+    #     # X, feat_keys_mod, y = self.get_feat_array(y_key=y_feat_key)
+    #     if feat_keys is None:
+    #         feat_keys = [str(i) for i in range(0, X.shape[1])]
+    #     feat_list = X.transpose().tolist()
+    #     feat_dict = dict(list(zip(feat_keys, feat_list)))
+    #     if max_num_feats == 0:
+    #         max_num_feats = X.shape[1]
+    #     selected_feats = collections.OrderedDict()   # remember order items are added
+    #     selected_scores = []
+    #     available_feats = feat_dict
+    #
+    #     logger.info('Forward selection: ', end=' ')
+    #     while len(selected_feats) < max_num_feats:
+    #         best_score = -np.inf
+    #         best_feat = []
+    #         for feat_key, feat_vec in available_feats.items():
+    #             test_feats = list(selected_feats.values()) + [feat_vec]
+    #             scores, predicted = FeatureSelector.score_model(np.array(test_feats).transpose(), y, model=model, score_fn=score_fn, cv=cv, find_predicted=False)
+    #             score = scores['test_user'].mean()
+    #             if score > best_score:
+    #                 best_score = score
+    #                 best_feat = list(feat_vec)
+    #                 best_key = feat_key
+    #         selected_feats[best_key] = best_feat
+    #         selected_scores.append(best_score)
+    #         available_feats.pop(best_key)
+    #         logger.info(best_key + ', ', end=' ')
+    #     logger.info(' ')
+    #     selected_scores = np.array(selected_scores)
+    #     selected_feat_keys = list(selected_feats.keys())
+    #     best_selected_feat_keys = selected_feat_keys[:np.argmax(selected_scores) + 1]
+    #     logger.info('Best score: {0}'.format(selected_scores.max()))
+    #     logger.info('Num feats at best score: {0}'.format(np.argmax(selected_scores) + 1))
+    #     logger.info('Feat keys at best score: {0}'.format(best_selected_feat_keys))
+    #
+    #     return np.array(list(selected_feats.values())).transpose(), selected_scores, selected_feat_keys
 
     @staticmethod
     def ranking(X, y, feat_keys=None, model=linear_model.LinearRegression(),
@@ -1293,27 +1300,28 @@ class FeatureSelector(object):
         # y = np.array([plot[y_feat_key] for plot in self.im_feat_dict.values()])
         # y = np.hstack([np.tile(plot[y_feat_key], plot[feat_keys[0]].size) for plot in self.im_feat_dict.values()])
         predicted = None
-        if sys.version_info.major == 3:
-            from sklearn.metrics import make_scorer
-        else:
-            from sklearn.metrics.scorer import make_scorer
         if cv is None:
-            cv = y.__len__()        # Leave one out
+            cv = len(y)        # Leave one out
 
-        scoring = {'R2': make_scorer(metrics.r2_score),
-                   '-RMSE': make_scorer(lambda y, pred: -np.sqrt(metrics.mean_squared_error(y, pred))),
-                   'user': make_scorer(score_fn)}
+        if score_fn is not None:
+            scoring = {#'R2': make_scorer(metrics.r2_score),        # R2 in cross validation is suspect
+                       '-RMSE': make_scorer(lambda y, pred: -np.sqrt(metrics.mean_squared_error(y, pred))),
+                       'user': make_scorer(score_fn)}
+        else:
+            scoring = {'-RMSE': make_scorer(lambda y, pred: -np.sqrt(metrics.mean_squared_error(y, pred)))}
+
         scores = cross_validate(model, X, y, scoring=scoring, cv=cv)
+
         if print_scores:
             rmse_ci = np.percentile(-scores['test_-RMSE'], [5, 95])
-            r2_ci = np.percentile(-scores['test_R2'], [5, 95])
-            logger.info('RMSE: {0:.4f} ({1:.4f})'.format(-scores['test_-RMSE'].mean(), scores['test_-RMSE'].std()))
-            logger.info('RMSE 5-95%: {0:.4f} - {1:.4f}'.format(rmse_ci[0], rmse_ci[1]))
-            logger.info('R2 (average over folds): {0:.4f} ({1:.4f})'.format(scores['test_R2'].mean(), scores['test_R2'].std()))
-            logger.info('R2 5-95%: {0:.4f} - {1:.4f}'.format(r2_ci[0], r2_ci[1]))
+            # r2_ci = np.percentile(-scores['test_R2'], [5, 95])
+            logger.info('RMSE mean: {0:.4f}, std: {1:.4f}, 5-95%: {2:.4f} - {3:.4f}'.format(-scores['test_-RMSE'].mean(),
+                    scores['test_-RMSE'].std(), rmse_ci[0], rmse_ci[1]))
+            # logger.info('R2 mean: {0:.4f}, std: {1:.4f}, 5-95%: {2:.4f} - {3:.4f}'.format(scores['test_R2'].mean(), scores['test_R2'].std(),
+            #                                                                               r2_ci[0], r2_ci[1]))
         if find_predicted:
             predicted = cross_val_predict(model, X, y, cv=cv)  #)
-            scores['R2_stacked'] = metrics.r2_score(y, predicted)   # DO NOT USE FOR VALIDATION
+            scores['R2_stacked'] = metrics.r2_score(y, predicted)   # Also suspect for validation, but better than cross validated R2
             if print_scores:
                 logger.info('R2 (stacked): {0:.4f}'.format(scores['R2_stacked']))
         return scores, predicted
@@ -1338,7 +1346,7 @@ class FeatureSelector(object):
 
 class ApplyLinearModel(object):
     def __init__(self, in_file_name='', out_file_name='', model=linear_model.LinearRegression, model_keys=[],
-                 feat_ex_fn=mdl.ImPlotFeatureExtractor.extract_patch_ms_features_ex, num_bands=9, save_feats=False):
+                 feat_ex_fn=ImPlotFeatureExtractor.extract_patch_ms_features_ex, num_bands=9, save_feats=False):
         self.in_file_name = in_file_name
         self.out_file_name = out_file_name
         self.model = model
