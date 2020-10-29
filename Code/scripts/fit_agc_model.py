@@ -50,7 +50,7 @@ mdl.scatter_ds(im_plot_data_gdf, x_col=('feats', 'pan/R'), y_col=('data', 'AbcHa
 
 # select best features for predicting AGC with linear regression
 y = im_plot_data_gdf['data']['AgcHa']
-selected_feats_df, selected_scores =  mdl.FeatureSelector.forward_selection(im_plot_data_gdf['feats'], y, max_num_feats=50, cv=5,  #cv=X.shape[0] / 5
+selected_feats_df, selected_scores =  mdl.FeatureSelector.forward_selection(im_plot_data_gdf['feats'], y, max_num_feats=25, cv=5,  #cv=X.shape[0] / 5
                                                                                         score_fn=None)
 
 # calculate scores of selected features with LOOCV
@@ -146,6 +146,7 @@ logger.info(np.array(best_single_feat_model.intercept_))
 #  - why does FS perform worse in py 3.8 vs 2.7
 #  - entropy vs nanentropy
 #  - can we get around duplication feature ex fn in ApplyLinearModel
+#  - docs, boilerplate, license
 
 if False:
     from sklearn.kernel_ridge import KernelRidge

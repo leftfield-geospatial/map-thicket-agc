@@ -17,7 +17,8 @@ import gdal
 import ogr
 import numpy as np
 import osr
-import pylab
+import matplotlib.pyplot as pyplot
+from enum import Enum
 from rasterio.rio.options import nodata_opt
 from scipy import stats as stats
 import scipy.signal as signal
@@ -28,13 +29,10 @@ from sklearn.model_selection import cross_val_predict, cross_validate
 import collections
 from collections import OrderedDict
 from sklearn.preprocessing import PolynomialFeatures
-# from pandas import DataFrame as pd
 from skimage.feature import greycomatrix, greycoprops
 from skimage import data
-import matplotlib.pyplot as pyplot
 import geopandas as gpd, pandas as pd
 
-# Python Imaging Library imports
 from PIL import Image
 from PIL import ImageDraw
 import os
@@ -45,6 +43,7 @@ import rasterio
 from rasterio.features import sieve
 from rasterio.windows import Window
 from rasterio.mask import raster_geometry_mask
+
 if sys.version_info.major == 3:
     from sklearn.metrics import make_scorer
 else:
@@ -52,7 +51,6 @@ else:
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
-
 
 def nanentropy(x, axis=None):
     """
@@ -125,26 +123,6 @@ def scatter_y_actual_vs_pred(y, pred, scores, xlabel='Measured AGC (t C ha$^{-1}
 
 def scatter_ds(data, x_col=None, y_col=None, class_col=None, label_col=None, thumbnail_col=None, do_regress=True,
                x_label=None, y_label=None, xfn=lambda x: x, yfn=lambda y: y):
-    """
-
-    Parameters
-    ----------
-    data
-    x_col
-    y_col
-    class_col
-    label_col
-    thumbnail_col
-    do_regress
-    x_label
-    y_label
-    xfn
-    yfn
-
-    Returns
-    -------
-
-    """
     ims = 20.       # scale factor for thumbnails
     if x_col is None:
         x_col = data.columns[0]
@@ -182,13 +160,13 @@ def scatter_ds(data, x_col=None, y_col=None, class_col=None, label_col=None, thu
     for class_i, (class_label, class_data) in enumerate(data.groupby(by=class_col)):
         colour = colours[class_i]
         if thumbnail_col is None:
-            pylab.plot(xfn(class_data[x_col]), yfn(class_data[y_col]), markerfacecolor=colour, marker='.', label=class_label, linestyle='None',
+            pyplot.plot(xfn(class_data[x_col]), yfn(class_data[y_col]), markerfacecolor=colour, marker='.', label=class_label, linestyle='None',
                        markeredgecolor=colour, markersize=5)
         for rowi, row in class_data.iterrows():
             xx = xfn(row[x_col])
             yy = yfn(row[y_col])
             if label_col is not None:   # add a text label for each point
-                pylab.text(xx - .0015, yy - .0015, row[label_col],
+                pyplot.text(xx - .0015, yy - .0015, row[label_col],
                            fontdict={'size': 9, 'color': colour, 'weight': 'bold'})
 
             if thumbnail_col is not None:   # add a thumbnail for each point
@@ -209,7 +187,7 @@ def scatter_ds(data, x_col=None, y_col=None, class_col=None, label_col=None, thu
         scores, predicted = FeatureSelector.score_model(x[:,None], y[:,None], model=linear_model.LinearRegression(),
                                                         find_predicted=True, cv=len(x), print_scores=False, score_fn=None)
 
-        pylab.text((xlim[0] + xd * 0.7), (ylim[0] + yd * 0.05), '$R^2$ = {0:.2f}'.format(np.round(scores['R2_stacked'], 2)),
+        pyplot.text((xlim[0] + xd * 0.7), (ylim[0] + yd * 0.05), '$R^2$ = {0:.2f}'.format(np.round(scores['R2_stacked'], 2)),
                    fontdict={'size': 12})
         yr = np.array(xlim)*slope + intercept
         pyplot.plot(xlim, yr, 'k--', lw=2, zorder=-1)
@@ -231,522 +209,20 @@ def scatter_ds(data, x_col=None, y_col=None, class_col=None, label_col=None, thu
     if x_label is not None:
         pyplot.xlabel(x_label, fontdict={'size': 12})
     else:
-        pylab.xlabel(x_col[-1], fontdict={'size': 12})
+        pyplot.xlabel(x_col[-1], fontdict={'size': 12})
 
     if y_label is not None:
         pyplot.ylabel(y_label, fontdict={'size': 12})
     else:
-        pylab.ylabel(y_col[-1], fontdict={'size': 12})
+        pyplot.ylabel(y_col[-1], fontdict={'size': 12})
 
     if n_classes > 1:
         if not thumbnail_col is None:
-            pylab.legend(handles, classes, fontsize=12)
+            pyplot.legend(handles, classes, fontsize=12)
         else:
-            pylab.legend(classes, fontsize=12)
-    pylab.show()
+            pyplot.legend(classes, fontsize=12)
+    pyplot.show()
     return r ** 2, rmse
-
-def scatter(x, y, class_labels=None, labels=None, thumbnails=None, do_regress=True,
-               x_label=None, y_label=None, xfn=lambda x: x, yfn=lambda y: y):
-    """
-
-    Parameters
-    ----------
-    data
-    x_col
-    y_col
-    class_col
-    label_col
-    thumbnail_col
-    do_regress
-    x_label
-    y_label
-    xfn
-    yfn
-
-    Returns
-    -------
-
-    """
-    ims = 20.       # scale factor for thumbnails
-
-    x = xfn(x)
-    y = yfn(y)
-
-    if class_labels is None:
-        class_labels = pd.DataFrame({'class_col':np.zeros((x.shape[0],1))})
-        class_col = 'class_col'
-
-    # TO DO: either remove thumbnail option or refactor
-    # TO DO: sort classes
-    # if 'Intact' in classes and 'Moderate' in classes and 'Degraded' in classes and classes.size==3:
-    #     classes = np.array(['Degraded', 'Moderate', 'Intact'])
-    classes = np.unique(class_labels)   # np.array([class_name for class_name, class_group in class_labels.groupby(by=class_col)])
-    n_classes =  len(classes)
-    if n_classes == 1:
-        colours = [(0., 0., 0.)]
-    else:
-        colours = ['g', 'tab:orange', 'r', 'b', 'y', 'k', 'm']
-
-    xlim = [x.min(), x.max()]
-    ylim = [y.min(), y.max()]
-    xd = np.diff(xlim)[0]
-    yd = np.diff(ylim)[0]
-
-    pyplot.axis('tight')
-    pyplot.axis(xlim + ylim)
-    ax = pyplot.gca()
-    handles = [0] * n_classes
-
-    # for class_i, (class_label, class_data) in enumerate(class_labels.groupby(by=class_col)):
-    for class_i, class_label in enumerate(classes):
-        class_idx = class_labels == class_label
-        colour = colours[class_i]
-        y_i = y[class_idx]
-        x_i = x[class_idx]
-        label_i = labels[class_idx]
-
-        if thumbnails is None:
-            pylab.plot(x_i, y_i, markerfacecolor=colour, marker='.', label=class_label, linestyle='None',
-                       markeredgecolor=colour)
-        for rowi, row in class_data.iterrows():
-            xx = xfn(row[x_col])
-            yy = yfn(row[y_col])
-            if label_col is not None:   # add a text label for each point
-                pylab.text(xx - .0015, yy - .0015, row[label_col],
-                           fontdict={'size': 9, 'color': colour, 'weight': 'bold'})
-
-            if thumbnail_col is not None:   # add a thumbnail for each point
-                imbuf = np.array(row[thumbnail_col])
-                band_idx = [0, 1, 2]
-                if imbuf.shape[2] == 8:  # wv3
-                    band_idx = [4, 2, 1]
-                elif imbuf.shape[2] >= 8:  # wv3 + pan
-                    band_idx = [5, 3, 2]
-
-                extent = [xx - xd/(2 * ims), xx + xd/(2 * ims), yy - yd/(2 * ims), yy + yd/(2 * ims)]
-                pyplot.imshow(imbuf[:, :, band_idx], extent=extent, aspect='auto')
-                handles[class_i] = ax.add_patch(patches.Rectangle(extent[0], extent[2], xd/ims, yd/ims,
-                                                fill=False, edgecolor=colour, linewidth=2.))
-
-    if do_regress:  # find and display regression error stats
-        (slope, intercept, r, p, stde) = stats.linregress(x, y)
-        scores, predicted = FeatureSelector.score_model(x[:,None], y[:,None], model=linear_model.LinearRegression(),
-                                                        find_predicted=True, cv=len(x), print_scores=True)
-
-        pylab.text((xlim[0] + xd * 0.7), (ylim[0] + yd * 0.05), '$R^2$ = {0:.2f}'.format(np.round(scores['R2_stacked'], 2)),
-                   fontdict={'size': 12})
-        yr = np.array(xlim)*slope + intercept
-        pyplot.plot(xlim, yr, 'k--', lw=2, zorder=-1)
-
-        yhat = x * slope + intercept
-        rmse = np.sqrt(np.mean((y - yhat) ** 2))
-
-        logger.info('RMSE = {0:.4f}'.format(rmse))
-        logger.info('LOOCV RMSE = {0:.4f}'.format(np.sqrt(-scores['test_user'].mean())))
-        logger.info('R^2  = {0:.4f}'.format(r ** 2))
-        logger.info('Stacked R^2  = {0:.4f}'.format(scores['R2_stacked']))
-        logger.info('P (slope=0) = {0:f}'.format(p))
-        logger.info('Slope = {0:.4f}'.format(slope))
-        logger.info('Std error of slope = {0:.4f}'.format(stde))
-    else:
-        r = np.nan
-        rmse = np.nan
-
-    if x_label is not None:
-        pyplot.xlabel(x_label, fontdict={'size': 12})
-    else:
-        pylab.xlabel(x_col, fontdict={'size': 12})
-
-    if y_label is not None:
-        pyplot.ylabel(y_label, fontdict={'size': 12})
-    else:
-        pylab.xlabel(y_col, fontdict={'size': 12})
-
-    if n_classes > 1:
-        if not thumbnail_col is None:
-            pylab.legend(handles, classes, fontsize=12)
-        else:
-            pylab.legend(classes, fontsize=12)
-    return r ** 2, rmse
-
-def scatter_plot(x, y, class_labels=None, labels=None, thumbnails=None, do_regress=True, xlabel=None, ylabel=None,
-                 xfn=lambda x: x, yfn=lambda y: y):
-    # x = np.array([xfn(plot[x_feat_key]) for plot in im_feat_dict.values()])
-    if type(x[0]) is np.ndarray:  # this is pixel data and requires concat to flatten it
-        cfn = lambda x: np.hstack(x)[::5]
-        thumbnails = None
-    else:
-        cfn = lambda x: x
-
-    # if xfn is not None:
-    #     x = xfn(x)
-    # y = np.array([yfn(plot[y_feat_key]) for plot in im_feat_dict.values()])
-    # if type(x[0]) is np.ndarray:
-    #     ycfn = lambda x: np.concatenate(x)
-    # else:
-    #     ycfn = lambda x: x
-
-    # if yfn is not None:
-    #     y = yfn(y)
-
-    # if show_class_labels == True:
-    #     class_labels = np.array([plot[class_key] for plot in im_feat_dict.values()])
-    # else:
-    #     class_labels = np.zeros(x.__len__())
-    # if show_thumbnails == True:
-    #     thumbnails = np.array([plot['thumbnail'] for plot in im_feat_dict.values()])
-    #
-    # if show_labels == True:
-    #     labels = np.array([plot['ID'] for plot in im_feat_dict.values()])
-    if class_labels is None:
-        class_labels = np.zeros(x.__len__())
-    classes = np.unique(class_labels)
-    if 'Intact' in classes and 'Moderate' in classes and 'Degraded' in classes and classes.size==3:
-        classes = np.array(['Degraded', 'Moderate', 'Intact'])
-
-    if classes.__len__() == 1:
-        # colours = [u'#1f77b4']
-        colours = [(0., 0., 0.)]
-    else:
-        # colours = ['r', 'm', 'b', 'g', 'y', 'k', 'o']
-        colours = ['r', 'tab:orange', 'g', 'b', 'y', 'k', 'm']
-
-    ylim = [np.min(cfn(y)), np.max(cfn(y))]
-    xlim = [np.min(cfn(x)), np.max(cfn(x))]
-    xd = np.diff(xlim)[0]
-    yd = np.diff(ylim)[0]
-
-    # pylab.figure()
-    pylab.axis('tight')
-    pylab.axis(np.concatenate([xlim, ylim]))
-    # pylab.hold('on')
-    ax = pylab.gca()
-    handles = np.zeros(classes.size).tolist()
-    #
-
-    for ci, (class_label, colour) in enumerate(zip(classes, colours[:classes.__len__()])):
-        class_idx = class_labels == class_label
-        if thumbnails is None:
-            pylab.plot(cfn(x[class_idx]), cfn(y[class_idx]), markerfacecolor=colour, marker='.', label=class_label, linestyle='None',
-                       markeredgecolor=colour)
-
-        for xyi, (xx, yy) in enumerate(zip(x[class_idx], y[class_idx])):  # , np.array(plot_names)[class_idx]):
-            if type(xx) is np.ndarray:
-                xx = xx[0]
-            if type(yy) is np.ndarray:
-                yy = yy[0]
-            if not labels is None:
-                pylab.text(xx - .0015, yy - .0015, np.array(labels)[class_idx][xyi],
-                           fontdict={'size': 9, 'color': colour, 'weight': 'bold'})
-
-            if not thumbnails is None:
-                imbuf = np.array(thumbnails)[class_idx][xyi]
-                band_idx = [0, 1, 2]
-                if imbuf.shape[2] == 8:  # guess wv3
-                    band_idx = [4, 2, 1]
-
-                ims = 20.
-                extent = [xx - old_div(xd, (2 * ims)), xx + old_div(xd, (2 * ims)), yy - old_div(yd, (2 * ims)), yy + old_div(yd, (2 * ims))]
-                # pylab.imshow(imbuf[:, :, :3], extent=extent, aspect='auto')  # zorder=-1,
-                pylab.imshow(imbuf[:, :, band_idx], extent=extent, aspect='auto')  # zorder=-1,
-                handles[ci] = ax.add_patch(
-                    patches.Rectangle((xx - old_div(xd, (2 * ims)), yy - old_div(yd, (2 * ims))), old_div(xd, ims), old_div(yd, ims), fill=False,
-                                      edgecolor=colour, linewidth=2.))
-                # pylab.plot(mPixels[::step], dRawPixels[::step], color='k', marker='.', linestyle='', markersize=.5)
-        if do_regress and classes.__len__() > 1 and False:
-            (slope, intercept, r, p, stde) = stats.linregress(cfn(x[class_idx]), cfn(y[class_idx]))
-            pylab.text(xlim[0] + xd * 0.7, ylim[0] + yd * 0.05 * (ci + 2),
-                       '{1}: $R^2$ = {0:.2f}'.format(np.round(r ** 2, 2), classes[ci]),
-                       fontdict={'size': 10, 'color': colour})
-
-
-    if do_regress:
-        (slope, intercept, r, p, stde) = stats.linregress(cfn(x), cfn(y))
-        scores, predicted = FeatureSelector.score_model(cfn(x)[:,None], cfn(y)[:,None], model=linear_model.LinearRegression(), find_predicted=True, cv=len(x), print_scores=True)
-        r2_stacked = scores['R2_stacked']
-        rmse = np.abs(scores['test_user']).mean()
-
-        pylab.text((xlim[0] + xd * 0.7), (ylim[0] + yd * 0.05), '$R^2$ = {0:.2f}'.format(np.round(scores['R2_stacked'], 2)),
-                   fontdict={'size': 12})
-        logger.info('RMSE^2 = {0:.4f}'.format(rmse))
-        logger.info('R^2 = {0:.4f}'.format(r ** 2))
-        logger.info('P (slope=0) = {0:f}'.format(p))
-        logger.info('Slope = {0:.4f}'.format(slope))
-        logger.info('Std error of slope = {0:.4f}'.format(stde))
-        yhat = cfn(x) * slope + intercept
-        rmse = np.sqrt(np.mean((cfn(y) - yhat) ** 2))
-        logger.info('RMS error = {0:.4f}'.format(rmse))
-
-        yr = [0, 0]
-        yr[0] = xlim[0]*slope + intercept
-        yr[1] = xlim[1]*slope + intercept
-        pylab.plot(xlim, yr, 'k--', lw=2, zorder=-1)
-    else:
-        r = np.nan
-        rmse = np.nan
-
-    if xlabel is not None:
-        pylab.xlabel(xlabel, fontdict={'size': 12})
-    # else:
-    #     pylab.xlabel(x_feat_key, fontdict={'size': 12})
-    if ylabel is not None:
-        pylab.ylabel(ylabel, fontdict={'size': 12})
-    # else:
-    #     pylab.ylabel(y_feat_key, fontdict={'size': 12})
-    # pylab.ylabel(yf)
-    # pylab.grid()
-    if classes.size > 1:
-        if not thumbnails is None:
-            pylab.legend(handles, classes, fontsize=12)
-        else:
-            pylab.legend(classes, fontsize=12)
-    return r ** 2, rmse
-
-
-    @staticmethod
-    def plot_clf(clf, X, y, feat_keys=None, class_labels=None):
-        import matplotlib.pyplot as plt
-        from matplotlib.patches import Patch
-        from matplotlib.colors import ListedColormap
-
-        if X.shape[1] > 2:
-            raise Exception('X.shape[1] > 2')
-        if X.shape[1] > 2:
-            raise Exception('X.shape[1] > 2')
-        h = 0.002
-        x_min, x_max = X[:, 0].min() - .5, X[:, 0].max() + .5
-        y_min, y_max = X[:, 1].min() - .5, X[:, 1].max() + .5
-        xx, yy = np.meshgrid(np.arange(x_min, x_max, h),
-                             np.arange(y_min, y_max, h))
-
-        # just plot the dataset first
-        cm = plt.cm.Set2
-        plt.figure()
-        ax = plt.subplot(1, 1, 1)
-
-        # Plot the decision boundary. For that, we will assign a color to each
-        # point in the mesh [x_min, x_max]x[y_min, y_max].
-        # if hasattr(clf, "decision_function"):
-        #     Z = clf.decision_function(np.c_[xx.ravel(), yy.ravel()])
-        # else:
-        #     # Z = clf.predict_proba(np.c_[xx.ravel(), yy.ravel()])[:, 1]
-        Z = clf.predict(np.c_[xx.ravel(), yy.ravel()])
-
-        # Put the result into a color plot
-        Z = Z.reshape(xx.shape)
-        # ax.contourf(xx, yy, Z, cmap=cm, alpha=1, levels=[0,1,2,3,4,5])
-        ax.imshow(Z, extent=[x_min, x_max, y_min, y_max], origin='lower', cmap=cm, aspect='auto')
-
-        # Plot the training points
-        s = 100
-        colours = cm(np.linspace(0., 1., np.unique(y).size))  #make same colours as contourf
-        h = []
-        for i, class_id in enumerate(np.unique(y)):
-            class_idx = y == class_id
-            h.append(ax.scatter(X[class_idx, 0], X[class_idx, 1], color=colours[i], edgecolor='black', s=20))
-
-        # ax.scatter(X[::s, 0], X[::s, 1], c=y[::s], cmap=cm, edgecolor='black', s=15)
-        ax.set_xlim(xx.min(), xx.max())
-        ax.set_ylim(yy.min(), yy.max())
-        if feat_keys is not None:
-            ax.set_xlabel(feat_keys[0])
-            ax.set_ylabel(feat_keys[1])
-
-        # from matplotlib.lines import
-        # custom_lines = [Line2D([0], [0], color=cm(0.), lw=4),
-        #                 Line2D([0], [0], color=cm(.5), lw=4),
-        #                 Line2D([0], [0], color=cm(1.), lw=4)]
-
-        # fig, ax = plt.subplots()
-        # lines = ax.plot(data)
-        if class_labels is not None:
-            ax.legend(h, class_labels)
-        # ax.set_xticks(())
-        # ax.set_yticks(())
-
-# class GdalImageReader(object):
-#     def __init__(self, file_name):
-#         self.file_name = file_name
-#         if not os.path.exists(file_name):
-#             raise Exception("File does not exist: {0}".format(file_name))
-#         self.ds = None
-#         self.__open()
-#
-#     def __open(self):
-#         self.ds = gdal.OpenEx(self.file_name, gdal.OF_RASTER)
-#         if self.ds is None:
-#             raise Exception("Could not open {0}".format(self.file_name))
-#
-#         logger.info('Driver: {0}'.format(self.ds.GetDriver().LongName))
-#         self.width = self.ds.RasterXSize
-#         self.height = self.ds.RasterYSize
-#         self.num_bands = self.ds.RasterCount
-#         logger.info('Size: {0} x {1} x {2} (width x height x bands)'.format(self.ds.RasterXSize, self.ds.RasterYSize, self.ds.RasterCount))
-#         logger.info('Projection: {0}'.format(self.ds.GetProjection()))
-#         self.spatial_ref = osr.SpatialReference(self.ds.GetProjection())
-#         self.geotransform = self.ds.GetGeoTransform()
-#         if not self.geotransform is None:
-#             self.origin = np.array([self.geotransform[0], self.geotransform[3]])
-#             logger.info('Origin = ({0}, {1})'.format(self.geotransform[0], self.geotransform[3]))
-#             logger.info('Pixel Size =  = ({0}, {1})'.format(self.geotransform[0], self.geotransform[3]))
-#             logger.info('Pixel Size = ({0}, {1})'.format(self.geotransform[1], self.geotransform[5]))
-#             self.pixel_size = np.array([self.geotransform[1], self.geotransform[5]])
-#         else:
-#             self.origin = np.array([0, 0])
-#             self.pixel_size = np.array([1, 1])
-#         self.gdal_dtype = self.ds.GetRasterBand(1).DataType
-#         if self.gdal_dtype == gdal.GDT_UInt16:
-#             self.dtype = np.uint16
-#         elif self.gdal_dtype == gdal.GDT_Int16:
-#             self.dtype = np.int16
-#         if self.gdal_dtype == gdal.GDT_Float32:
-#             self.dtype = np.float32
-#         elif self.gdal_dtype == gdal.GDT_Float64:
-#             self.dtype = np.float64
-#         else:
-#             self.dtype = np.float32
-#
-#         self.block_size = self.ds.GetRasterBand(1).GetBlockSize()
-#         self.image_array = None
-#
-#     def cleanup(self):
-#         self.image_array = None
-#         self.ds = None
-#
-#     def __exit__(self, exc_type, exc_val, exc_tb):
-#         self.cleanup()
-#     def __del__(self):
-#         self.cleanup()
-#
-#     def world_to_pixel(self, x, y):
-#         row = old_div((y - self.origin[1]),self.pixel_size[1])     # row
-#         col =  old_div((x - self.origin[0]),self.pixel_size[0])    # col
-#         return (col, row)
-#
-#     def pixel_to_world(self, col, row):
-#         y = row * self.pixel_size[1] + self.origin[1]
-#         x = col * self.pixel_size[0] + self.origin[0]
-#         return (col, row)
-#
-#     def read_image(self):
-#         # the below orders pixels by band, row, col but we want band as last dimension
-#         # self.image_array = self.ds.ReadAsArray(buf_type=self.gdal_dtype)
-#         self.image_array = self.read_image_roi()
-#         return self.image_array
-#
-#     def read_image_roi(self, col_range=None, row_range=None, band_range=None):
-#         if row_range is None:
-#             row_range = [0, self.height]
-#         if col_range is None:
-#             col_range = [0, self.width]
-#         if band_range is None:
-#             band_range = [0, self.num_bands]
-#
-#         # check ranges
-#         for drange, drange_max in zip([row_range, col_range, band_range], [self.height, self.width, self.num_bands]):
-#             drange[0] = np.maximum(0, drange[0])
-#             drange[1] = np.minimum(drange_max, drange[1])
-#
-#         image_roi = np.zeros((np.diff(row_range)[0], np.diff(col_range)[0], np.diff(band_range)[0]), dtype=self.dtype)
-#         for bi in range(band_range[0], band_range[1]):
-#             image_roi[:, :, bi] = self.ds.GetRasterBand(bi + 1).ReadAsArray(int(col_range[0]), int(row_range[0]), int(np.diff(col_range)[0]),
-#                                                                  int(np.diff(row_range)[0]), buf_type=self.gdal_dtype)
-#         return image_roi
-
-class GdalVectorReader(object):
-    def __init__(self, file_name):
-        self.file_name = file_name
-        if not os.path.exists(file_name):
-            raise Exception("File does not exist: {0}".format(file_name))
-        self.ds = None
-        self.__open()
-
-    def __open(self):
-        self.ds = gdal.OpenEx(self.file_name, gdal.OF_VECTOR)
-        if self.ds is None:
-            raise Exception("Could not open {0}".format(self.file_name))
-        self.num_layers = self.ds.GetLayerCount()
-        self.layer_dict = {}
-
-    def cleanup(self):
-        self.layer_dict = None
-        self.ds = None
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        self.cleanup()
-
-    def __del__(self):
-        self.cleanup()
-
-    def read(self, id_field = None):
-        self.ds.ResetReading()
-        for li in range(0, self.num_layers):
-            layer = self.ds.GetLayerByIndex(li)
-            # self.layers.append(layer)
-            layer.ResetReading()
-            feat_defn = layer.GetLayerDefn()
-            feat_dict = {}
-            logger.info('Reading feats in layer: {0}'.format(layer.GetName()))
-            for feati, feat in enumerate(layer):
-                # print '.',
-                fdict = {}
-                for fieldi in range(feat_defn.GetFieldCount()):
-                    field_defn = feat_defn.GetFieldDefn(fieldi)
-                    fdict[field_defn.GetName()] = feat.GetField(fieldi)
-
-                    # find id field if it exists otherwise set to feature index
-                    if id_field is None:
-                        idFields = ['id', 'ID', 'Id', 'Name', 'name']
-                        id = None
-                        for idField in idFields:
-                            if idField in list(fdict.keys()):
-                                id = fdict[idField]
-                                break
-                    else:
-                        id = fdict[id_field]
-
-                    if id is None:
-                        id = str(feati)
-                        fdict['ID'] = id
-
-                    if False:
-                        id = fdict['ID']
-                        if id[0] == 'S' or id[:3] == 'TCH':
-                            fdict['DegrClass'] = 'Severe'
-                        elif id[0] == 'M':
-                            fdict['DegrClass'] = 'Moderate'
-                        elif id[0] == 'P' or id[:3] == 'INT':
-                            fdict['DegrClass'] = 'Pristine'
-                        else:
-                            fdict['DegrClass'] = '?'
-
-                geom = feat.GetGeometryRef()
-                fdict['geom'] = geom.Clone()
-                if geom is not None and (geom.GetGeometryType() == ogr.wkbPolygon):
-                    logger.info("%s Polygon with %d points"  % (id, geom.GetGeometryRef(0).GetPointCount()))
-                    fdict['points'] = geom.GetGeometryRef(0).GetPoints()[:-1]
-                    # pixCnr = []
-                    # for point in f['points']:
-                    #     pixCnr.append(World2Pixel(geotransform, point[0], point[1]))
-                elif geom is not None and (geom.GetGeometryType() == ogr.wkbPoint or geom.GetGeometryType() == ogr.wkbPoint25D or geom.GetGeometryType() == ogr.wkbPointZM):
-                    logger.info("%s Point (%.6f, %.6f)" % (id, geom.GetX(), geom.GetY()))
-                    fdict['X'] = geom.GetX()
-                    fdict['Y'] = geom.GetY()
-                    if False:    #'GNSS_Heigh' in fdict.keys():
-                        fdict['Z'] = fdict['GNSS_Heigh']  # ? - should be able to get this from geom
-                    else:
-                        fdict['Z'] = geom.GetZ()  # this has been xformed from elippsoidal to Sa Geoid 2010
-                    # f['ID'] = f['Datafile'][:-4] + str(f['Point_ID'])
-                else:
-                    logger.warning("Unknown geometry")
-                feat_dict[id] = fdict
-                # print ' '
-
-            self.layer_dict[layer.GetName()]={'feat_dict':feat_dict, 'spatial_ref':layer.GetSpatialRef()}
-        return self.layer_dict
-
-from enum import Enum
 
 class GroundClass(Enum):
     Ground = 1
@@ -1091,17 +567,17 @@ class ImPlotFeatureExtractor(object):
     #     xd = np.diff(xlim)[0]
     #     yd = np.diff(ylim)[0]
     #
-    #     pylab.figure()
-    #     pylab.axis(np.concatenate([xlim, ylim]))
-    #     # pylab.hold('on')
-    #     ax = pylab.gca()
+    #     pyplot.figure()
+    #     pyplot.axis(np.concatenate([xlim, ylim]))
+    #     # pyplot.hold('on')
+    #     ax = pyplot.gca()
     #     handles = np.zeros(classes.size).tolist()
     #     #
     #
     #     for ci, (class_label, colour) in enumerate(zip(classes, colours[:classes.__len__()])):
     #         class_idx = class_labels == class_label
     #         if not show_thumbnails:
-    #             pylab.plot(cfn(x[class_idx]), cfn(y[class_idx]), colour + 'o', label=class_label, markeredgecolor=(0, 0, 0))
+    #             pyplot.plot(cfn(x[class_idx]), cfn(y[class_idx]), colour + 'o', label=class_label, markeredgecolor=(0, 0, 0))
     #
     #         for xyi, (xx, yy) in enumerate(zip(x[class_idx], y[class_idx])):  # , np.array(plot_names)[class_idx]):
     #             if type(xx) is np.ndarray:
@@ -1109,7 +585,7 @@ class ImPlotFeatureExtractor(object):
     #             if type(yy) is np.ndarray:
     #                 yy = yy[0]
     #             if show_labels:
-    #                 pylab.text(xx - .0015, yy - .0015, np.array(labels)[class_idx][xyi],
+    #                 pyplot.text(xx - .0015, yy - .0015, np.array(labels)[class_idx][xyi],
     #                            fontdict={'size': 9, 'color': colour, 'weight': 'bold'})
     #
     #             if show_thumbnails:
@@ -1120,21 +596,21 @@ class ImPlotFeatureExtractor(object):
     #
     #                 ims = 20.
     #                 extent = [xx - old_div(xd, (2 * ims)), xx + old_div(xd, (2 * ims)), yy - old_div(yd, (2 * ims)), yy + old_div(yd, (2 * ims))]
-    #                 #pylab.imshow(imbuf[:, :, :3], extent=extent, aspect='auto')  # zorder=-1,
-    #                 pylab.imshow(imbuf[:,:,band_idx], extent=extent, aspect='auto')  # zorder=-1,
+    #                 #pyplot.imshow(imbuf[:, :, :3], extent=extent, aspect='auto')  # zorder=-1,
+    #                 pyplot.imshow(imbuf[:,:,band_idx], extent=extent, aspect='auto')  # zorder=-1,
     #                 handles[ci] = ax.add_patch(
     #                     patches.Rectangle((xx - old_div(xd, (2 * ims)), yy - old_div(yd, (2 * ims))), old_div(xd, ims), old_div(yd, ims), fill=False,
     #                                       edgecolor=colour, linewidth=2.))
-    #                 # pylab.plot(mPixels[::step], dRawPixels[::step], color='k', marker='.', linestyle='', markersize=.5)
+    #                 # pyplot.plot(mPixels[::step], dRawPixels[::step], color='k', marker='.', linestyle='', markersize=.5)
     #         if do_regress and classes.__len__() > 1 and False:
     #             (slope, intercept, r, p, stde) = stats.linregress(cfn(x[class_idx]), cfn(y[class_idx]))
-    #             pylab.text(xlim[0] + xd * 0.7, ylim[0] + yd * 0.05 * (ci + 2),
+    #             pyplot.text(xlim[0] + xd * 0.7, ylim[0] + yd * 0.05 * (ci + 2),
     #                        '{1}: $R^2$ = {0:.2f}'.format(np.round(r ** 2, 2), classes[ci]),
     #                        fontdict={'size': 10, 'color': colour})
     #
     #     if do_regress:
     #         (slope, intercept, r, p, stde) = stats.linregress(cfn(x), cfn(y))
-    #         pylab.text((xlim[0] + xd * 0.7), (ylim[0] + yd * 0.05), '$R^2$ = {0:.2f}'.format(np.round(r ** 2, 2)),
+    #         pyplot.text((xlim[0] + xd * 0.7), (ylim[0] + yd * 0.05), '$R^2$ = {0:.2f}'.format(np.round(r ** 2, 2)),
     #                    fontdict={'size': 12})
     #         logger.info('R^2 = {0:.4f}'.format(r ** 2))
     #         logger.info('P (slope=0) = {0:f}'.format(p))
@@ -1148,20 +624,20 @@ class ImPlotFeatureExtractor(object):
     #         rmse = np.nan
     #
     #     if xlabel is not None:
-    #         pylab.xlabel(xlabel, fontdict={'size': 12})
+    #         pyplot.xlabel(xlabel, fontdict={'size': 12})
     #     else:
-    #         pylab.xlabel(x_feat_key, fontdict={'size': 12})
+    #         pyplot.xlabel(x_feat_key, fontdict={'size': 12})
     #     if ylabel is not None:
-    #         pylab.ylabel(ylabel, fontdict={'size': 12})
+    #         pyplot.ylabel(ylabel, fontdict={'size': 12})
     #     else:
-    #         pylab.ylabel(y_feat_key, fontdict={'size': 12})
+    #         pyplot.ylabel(y_feat_key, fontdict={'size': 12})
     #
-    #     pylab.grid()
+    #     pyplot.grid()
     #     if classes.size > 0:
     #         if show_thumbnails:
-    #             pylab.legend(handles, classes, fontsize=12)
+    #             pyplot.legend(handles, classes, fontsize=12)
     #         else:
-    #             pylab.legend(classes, fontsize=12)
+    #             pyplot.legend(classes, fontsize=12)
     #     return r**2, rmse
     #
     # @staticmethod
@@ -1189,7 +665,7 @@ class ImPlotFeatureExtractor(object):
     #         xlabel = x_feat_key
     #     if ylabel is None:
     #         ylabel = y_feat_key
-    #     # pylab.ylabel(yf)
+    #     # pyplot.ylabel(yf)
     #     return scatter_plot(x, y, class_labels=class_labels, labels=labels, thumbnails=thumbnails,
     #                                                do_regress=do_regress, xlabel=xlabel, ylabel=ylabel, xfn=xfn, yfn=yfn)
     #
@@ -1225,7 +701,7 @@ class FeatureSelector(object):
                 scores, predicted = FeatureSelector.score_model(test_feats_df, y, model=model,
                                                                 score_fn=score_fn, cv=cv, find_predicted=False)
                 if score_fn is None:
-                    score = scores['test_-RMSE'].mean()
+                    score = -np.sqrt((scores['test_-RMSE']**2).mean())       # NB not mean(sum(RMSE))
                 else:
                     score = scores['test_user'].mean()
 
