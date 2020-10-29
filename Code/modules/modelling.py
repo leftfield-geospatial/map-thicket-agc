@@ -102,6 +102,27 @@ def entropy(x, along_axis=None):
     # compute Shannon entropy in bits
     return -np.sum(p * np.log2(p))
 
+
+def scatter_y_actual_vs_pred(y, pred, scores, xlabel='Measured AGC (t C ha$^{-1}$)', ylabel='Predicted AGC (t C ha$^{-1}$)'):
+    df = pd.DataFrame({xlabel: y, ylabel: pred})
+    scatter_ds(df, do_regress=False)
+    # scatter_plot(y, pred, xlabel=xlabel, ylabel=ylabel, do_regress = False)
+
+    mn = np.min([y, pred])
+    mx = np.max([y, pred])
+    h, = pyplot.plot([0, mx], [0, mx], 'k--', lw=2, zorder=-1, label='1:1')
+    pyplot.xlim(0, mx)
+    pyplot.ylim(0, mx)
+    pyplot.text(26, 5, str.format('$R^2$ = {0:.2f}', scores['R2_stacked']),
+               fontdict={'size': 11})
+    pyplot.text(26, 2, str.format('RMSE = {0:.2f} t C ha{1}',np.abs(scores['test_-RMSE']).mean(),'$^{-1}$'),
+               fontdict={'size': 11})
+    pyplot.show()
+    pyplot.tight_layout()
+    pyplot.legend([h], ['1:1'], frameon=False)
+    pyplot.pause(0.1)
+
+
 def scatter_ds(data, x_col=None, y_col=None, class_col=None, label_col=None, thumbnail_col=None, do_regress=True,
                x_label=None, y_label=None, xfn=lambda x: x, yfn=lambda y: y):
     """
@@ -222,6 +243,7 @@ def scatter_ds(data, x_col=None, y_col=None, class_col=None, label_col=None, thu
             pylab.legend(handles, classes, fontsize=12)
         else:
             pylab.legend(classes, fontsize=12)
+    pylab.show()
     return r ** 2, rmse
 
 def scatter(x, y, class_labels=None, labels=None, thumbnails=None, do_regress=True,
@@ -1293,7 +1315,7 @@ class FeatureSelector(object):
         return feat_scores
 
     @staticmethod
-    def score_model(X, y, model=linear_model.LinearRegression(), score_fn=lambda y, pred: -1*np.sqrt(metrics.mean_squared_error(y,pred)),
+    def score_model(X, y, model=linear_model.LinearRegression(), score_fn=None,
                     cv=None, find_predicted=True, print_scores=False):
 
         # X = np.array(feat_list).transpose()

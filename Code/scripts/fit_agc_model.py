@@ -9,6 +9,9 @@ from modules import modelling as mdl
 from matplotlib import pyplot
 import logging
 
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+
 if '__file__' in globals():
     root_path = pathlib.Path(__file__).absolute().parents[2]
 else:
@@ -17,31 +20,6 @@ else:
 sys.path.append(str(root_path.joinpath('Code')))
 logging.basicConfig(format='%(levelname)s %(name)s: %(message)s')
 
-from sklearn import metrics
-
-# reload(su)
-
-def scatter_y_pred(y, pred, scores):
-    import matplotlib.pyplot as plt
-    mdl.scatter_plot(y, pred, xlabel='Measured AGC (t C ha$^{-1}$)', ylabel='Predicted AGC (t C ha$^{-1}$)', do_regress = False)
-    # fig, ax = pyplot.subplots()
-    # pyplot.plot(y, pred, 'o')
-    mn = np.min([y, pred])
-    mx = np.max([y, pred])
-    h, = plt.plot([0, mx], [0, mx], 'k--', lw=2, zorder=-1, label='1:1')
-    # ax.set_xlabel('Measured AGC (tC/ha)')
-    # ax.set_ylabel('Estimated AGC (tC/ha)')
-    pyplot.xlim(0, mx)
-    pyplot.ylim(0, mx)
-    # pyplot.grid()
-    pyplot.text(26, 5, str.format('$R^2$ = {0:.2f}', scores['R2_stacked']),
-               fontdict={'size': 11})
-    pyplot.text(26, 2, str.format('RMSE = {0:.2f} t C ha{1}',np.abs(scores['test_user']).mean(),'$^{-1}$'),
-               fontdict={'size': 11})
-    pyplot.show()
-    pyplot.tight_layout()
-    pyplot.legend([h], ['1:1'], frameon=False)
-
 #--------------------------------------------------------------------------------------------------------------
 # WV3 im analysis
 plot_agc_shapefile_name = root_path.joinpath(r'Data\Outputs\Geospatial\GEF Plot Polygons with AGC v2.shp')
@@ -49,10 +27,6 @@ image_filename = r"D:\OneDrive\GEF Essentials\Source Images\WorldView3 Oct 2017\
 
 plot_agc_gdf = gpd.GeoDataFrame.from_file(plot_agc_shapefile_name)
 
-
-# vr = su.GdalVectorReader(plot_agc_shapefile_name)
-# ld = vr.read()
-# imr = su.GdalImageReader(imageFile)
 with rasterio.open(image_filename, 'r') as imr:
     fex = mdl.ImPlotFeatureExtractor(image_reader=imr, plot_data_gdf=plot_agc_gdf)
     im_plot_data_gdf = fex.extract_all_features(patch_fn=mdl.ImPlotFeatureExtractor.extract_patch_ms_features_ex)
@@ -63,7 +37,7 @@ im_plot_data_gdf.loc[im_plot_data_gdf['data']['Stratum'] == 'Degraded', ('data',
 im_plot_data_gdf.loc[im_plot_data_gdf['data']['Stratum'] == 'Intact', ('data', 'Stratum')] = 'Pristine'
 
 
-# make some scatter plots of features vs AGC
+# make some scatter plots of features vs AGC/ABC
 pyplot.figure()
 mdl.scatter_ds(im_plot_data_gdf, x_col=('feats', 'pan/R'), y_col=('data', 'AgcHa'), class_col=('data', 'Stratum'),
                xfn=lambda x: np.log10(x), do_regress=True)
@@ -74,10 +48,10 @@ pyplot.figure()
 mdl.scatter_ds(im_plot_data_gdf, x_col=('feats', 'pan/R'), y_col=('data', 'AbcHa'), class_col=('data', 'Stratum'),
                xfn=lambda x: np.log10(x), do_regress=True, thumbnail_col=('data','thumbnail'), label_col=('data', 'ID'))
 
-# select best features for predicting AGC
+# select best features for predicting AGC with linear regression
 y = im_plot_data_gdf['data']['AgcHa']
 selected_feats_df, selected_scores =  mdl.FeatureSelector.forward_selection(im_plot_data_gdf['feats'], y, max_num_feats=50, cv=5,  #cv=X.shape[0] / 5
-                                                                                        score_fn=lambda y,pred: -np.sqrt(metrics.mean_squared_error(y, pred)))
+                                                                                        score_fn=None)
 
 # calculate scores of selected features with LOOCV
 selected_loocv_scores = []
@@ -103,7 +77,7 @@ pyplot.plot(num_feats, selected_loocv_scores_df['RMSE'], 'k-')
 pyplot.xlabel('Number of features')
 pyplot.ylabel('RMSE (t C ha$^{-1}$)')
 pyplot.tight_layout()
-pyplot.show()
+pyplot.pause(.1)
 pyplot.savefig(root_path.joinpath(r'Data\Outputs\Plots\AgcAccVsNumFeats1_Py38Cv5.png'), dpi=300)
 
 fig, ax1 = pyplot.subplots()
@@ -119,39 +93,59 @@ ax2.set_ylabel('-RMSE (t C ha$^{-1}$)', color=color)  # we already handled the x
 ax2.plot(num_feats, -selected_loocv_scores_df['RMSE'], color=color)
 ax2.tick_params(axis='y', labelcolor=color)
 fig.tight_layout()  # otherwise the right y-label is slightly clipped
-pyplot.show()
+pyplot.pause(.1)
 fig.savefig(root_path.joinpath(r'Data\Outputs\Plots\AgcAccVsNumFeats2_Py38Cv5.png'), dpi=300)
 
 #------------------------------------------------------------------------------------------------------------------------
-# report scatter plots for best and single feature models
-print('\nBest model scores:')
-best_model_idx = np.argmin(rmse)
+# Fit best multiple and single feature models, generate acccuracy stats and plots
+# multiple feat model
+logger.info('Multi feat model scores:')
+best_model_idx = np.argmin(selected_loocv_scores_df['RMSE'])
 scores, predicted = mdl.FeatureSelector.score_model(selected_feats_df.iloc[:, :best_model_idx + 1], y/1000, model=linear_model.LinearRegression(),
                                                     find_predicted=True, cv=selected_feats_df.shape[0], print_scores=True)
+logger.info('Multi feat model features:')
+logger.info(selected_feats_df.columns[:best_model_idx+1].to_numpy())
 
-print('\nBest model features:')
-for k in selected_feats_df.columns[:best_model_idx+1]:
-    print(k)
+fig = pyplot.figure()
+fig.set_size_inches(5, 4, forward=True)
+mdl.scatter_y_actual_vs_pred(y/1000., predicted, scores)
+fig.savefig(root_path.joinpath(r'Data\Outputs\Plots\MeasVsPredAgcMultiFeatModel.png'), dpi=300)
 
-lm = linear_model.LinearRegression()
-lm.fit(selected_feats_df.iloc[:, :best_model_idx+1], y/1000)
-for c in lm.coef_:
-    print('{0:.4f}'.format(c))
+# fitting
+best_multi_feat_model = linear_model.LinearRegression()
+best_multi_feat_model.fit(selected_feats_df.iloc[:, :best_model_idx+1], y/1000)
+logger.info('Multi feat model coefficients:')
+logger.info(np.array(best_multi_feat_model.coef_))
+logger.info('Multi feat model intercept:')
+logger.info(np.array(best_multi_feat_model.intercept_))
 
-if False:   # write out models to files
-    import joblib
-    import pickle
-    lm = linear_model.LinearRegression()
-    lm.fit(Xselected_feats[:, :best_model_idx + 1], old_div(y, 1000))
-    joblib.dump([lm, selected_keys[:best_model_idx + 1]], r'C:\Data\Development\Projects\PhD GeoInformatics\Docs\Funding\GEF5\Invoices, Timesheets and Reports\Final Report\bestModelPy38Cv5v1.joblib')
-    pickle.dump([lm, selected_keys[:best_model_idx + 1]], open(r'C:\Data\Development\Projects\PhD GeoInformatics\Docs\Funding\GEF5\Invoices, Timesheets and Reports\Final Report\bestModelPy38Cv5v1.pickle', 'wb'))
+# single feat model
+logger.info('Single feat model scores:')
+best_model_idx = np.argmin(selected_loocv_scores_df['RMSE'])
+scores, predicted = mdl.FeatureSelector.score_model(selected_feats_df.iloc[:, :1], y/1000, model=linear_model.LinearRegression(),
+                                                    find_predicted=True, cv=selected_feats_df.shape[0], print_scores=True)
 
-    lm = linear_model.LinearRegression()
-    lm.fit(Xselected_feats[:, :1], old_div(y, 1000))
-    joblib.dump([lm, selected_keys[:1]], r'C:\Data\Development\Projects\PhD GeoInformatics\Docs\Funding\GEF5\Invoices, Timesheets and Reports\Final Report\bestSingleTermModelPy38Cv5v1.joblib')
-    pickle.dump([lm, selected_keys[:1]], open(r'C:\Data\Development\Projects\PhD GeoInformatics\Docs\Funding\GEF5\Invoices, Timesheets and Reports\Final Report\bestSingleTermModelPy38Cv5v1.pickle', 'wb'))
+logger.info('Single feat model features:')
+logger.info(selected_feats_df.columns[:1].to_numpy())
 
-    # print
+fig = pyplot.figure()
+fig.set_size_inches(5, 4, forward=True)
+mdl.scatter_y_actual_vs_pred(y/1000., predicted, scores)
+fig.savefig(root_path.joinpath(r'Data\Outputs\Plots\MeasVsPredAgcSingleFeatModel.png'), dpi=300)
+
+# fitting
+best_single_feat_model = linear_model.LinearRegression(fit_intercept=True)
+best_single_feat_model.fit(selected_feats_df.iloc[:, :1], y/1000)
+logger.info('Single feat model coefficient:')
+logger.info(np.array(best_single_feat_model.coef_))
+logger.info('Single feat model intercept:')
+logger.info(np.array(best_single_feat_model.intercept_))
+
+
+# TODO: - check why CV RMSE is better than RMSE on full training set,
+#  - why does FS perform worse in py 3.8 vs 2.7
+#  - entropy vs nanentropy
+#  - can we get around duplication feature ex fn in ApplyLinearModel
 
 if False:
     from sklearn.kernel_ridge import KernelRidge
