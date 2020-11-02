@@ -85,22 +85,6 @@ def nanentropy(x, axis=None):
         return e
 
 
-def entropy(x, along_axis=None):
-    """
-    x is assumed to be an (nsignals, nsamples) array containing integers between
-    0 and n_unique_vals
-    """
-    # quantise x
-    nbins = 100
-    x = x.flatten()
-    x = x-x.min()
-    x = np.int32(np.round(old_div((nbins*x),x.max())))
-
-    p = np.array([old_div(np.size(x[x == i]), (1.0 * x.size)) for i in np.unique(x)])
-    # compute Shannon entropy in bits
-    return -np.sum(p * np.log2(p))
-
-
 def scatter_y_actual_vs_pred(y, pred, scores, xlabel='Measured AGC (t C ha$^{-1}$)', ylabel='Predicted AGC (t C ha$^{-1}$)'):
     df = pd.DataFrame({xlabel: y, ylabel: pred})
     scatter_ds(df, do_regress=False)
@@ -230,8 +214,65 @@ class GroundClass(Enum):
     LPlant = 3
     Shadow = 4
 
+class PatchFeatureExtractor():
+
+    def __init__(self, num_bands=9):
+        self.pan_bands, self.band_dict = ImageFeatureExtractor.get_band_info(num_bands)
+        # self.feat_keys = []
+        self.fn_dict = {}
+        return
+
+
+    def generate_fn_dict(self):
+        if len(self.fn_dict) > 0:
+            return
+
+        # inner band ratios
+        self.inner_dict = OrderedDict()
+        self.inner_dict['pan/1'] = lambda pan, bands: pan
+        # self.inner_dict['1/pan'] = lambda pan, bands: 1/pan   # TO DO check = does log10 invalidate?
+        for num_key in list(self.band_dict.keys()):
+            self.inner_dict['{0}/pan'.format(num_key)] = lambda pan, bands, num_key=num_key: bands[self.band_dict[num_key], :, :] / pan
+            self.inner_dict['pan/{0}'.format(num_key)] = lambda pan, bands, num_key=num_key: pan / bands[self.band_dict[num_key], :, :]
+            self.inner_dict['{0}/1'.format(num_key)] = lambda pan, bands, num_key=num_key: bands[self.band_dict[num_key], :, :]
+            # self.inner_dict['1/{0}'.format(num_key)] = lambda pan, bands, num_key=num_key: 1/bands[self.band_dict[num_key], :, :] # TO DO check = does log10 invalidate?
+            for den_key in list(self.band_dict.keys()):
+                if not num_key == den_key:
+                    self.inner_dict['{0}/{1}'.format(num_key, den_key)] = lambda pan, bands, num_key=num_key, den_key=den_key: bands[self.band_dict[num_key], :, :] / bands[self.band_dict[den_key], :, :]
+
+        # inner veg indices
+        SAVI_L = 0.05
+        # these vals for MODIS from https://en.wikipedia.org/wiki/Enhanced_vegetation_index
+        # L = 1.; C1 = 6; C2 = 7.5; G = 2.5
+        nir_keys = [key for key in list(self.band_dict.keys()) if ('NIR' in key) or ('RE' in key)]
+        for nir_key in nir_keys:
+            post_fix = '' if nir_key == 'NIR' else '_{0}'.format(nir_key)
+            self.inner_dict['NDVI' + post_fix] = lambda pan, bands, nir_key=nir_key: (bands[self.band_dict[nir_key], :, :] - bands[self.band_dict['R'], :, :]) / \
+                                          (bands[self.band_dict[nir_key], :, :] + bands[self.band_dict['R'], :, :])
+            self.inner_dict['SAVI' + post_fix] = lambda pan, bands, nir_key=nir_key: (1 + SAVI_L) * (bands[self.band_dict[nir_key], :, :] - bands[self.band_dict['R'], :, :]) / \
+                                          (SAVI_L + bands[self.band_dict[nir_key], :, :] + bands[self.band_dict['R'], :, :])
+
+        self.win_dict = OrderedDict({'mean': np.mean, 'std': np.std, 'entropy': nanentropy})
+        self.scale_dict = OrderedDict({'log': np.log10, 'sqr': lambda x: np.power(x, 2), 'sqrt': np.sqrt})
+        # mean, std, entropy
+        for inner_key, inner_fn in self.inner_dict.items():
+            for win_key, win_fn in self.win_dict.items():
+                fn_key = '({0}({1}))'.format(win_key, inner_key)
+                fn = lambda pan, bands, win_fn=win_fn, inner_fn=inner_fn: win_fn(inner_fn(pan, bands))
+                self.fn_dict[fn_key] = fn
+                if win_key == 'mean':
+                    for scale_key, scale_fn in self.scale_dict.items():
+                        fn_key = '{0}({1}({2}))'.format(scale_key, win_key, inner_key)
+                        fn = lambda pan, bands, scale_fn=scale_fn, win_fn=win_fn, inner_fn=inner_fn: scale_fn(win_fn(inner_fn(pan, bands)))
+                        self.fn_dict[fn_key] = fn
+
+        # **2, sqrt, log (with x and 1/x feats - do we need both **2 and sqrt?)
+
+
+
+
 # class to extract features from polygons in an raster
-class ImPlotFeatureExtractor(object):
+class ImageFeatureExtractor(object):
     def __init__(self, image_reader=rasterio.io.DatasetReader, plot_feat_dict={}, plot_data_gdf=gpd.GeoDataFrame()):
         ''' Class
         Parameters
@@ -271,7 +312,7 @@ class ImPlotFeatureExtractor(object):
         feat_dict = OrderedDict()
 
         # note that ms bands have been scaled and likely will not sum back to approx pan, so it is better to use the actual pan
-        pan_bands, band_dict = ImPlotFeatureExtractor.get_band_info(imbuf.shape[2])
+        pan_bands, band_dict = ImageFeatureExtractor.get_band_info(imbuf.shape[2])
 
         if mask is None:
             mask = np.all(imbuf>0, axis=2)  #np.ones(imbuf.shape[:2])
@@ -364,11 +405,11 @@ class ImPlotFeatureExtractor(object):
                 for feat_key, feat_vect in poly_feat_dict.items():
                     plot_feat_dict[feat_key] = feat_vect.mean()
                     # note: here some fns are applied to per plot feats and not to per pixel feats (based on theory that only band ratios are necessary/valid per pixel)
-                    plot_feat_dict['({0})^2'.format(feat_key)] = feat_vect.mean()**2
+                    plot_feat_dict['({0})^2'.format(feat_key)] = (feat_vect.mean()**2)
 
                     if include_texture:
                         plot_feat_dict['Std({0})'.format(feat_key)] = feat_vect.std()
-                        plot_feat_dict['Entropy({0})'.format(feat_key)] = entropy(feat_vect)
+                        plot_feat_dict['Entropy({0})'.format(feat_key)] = nanentropy(feat_vect)
 
                     if ('VI' in feat_key) or ('ND' in feat_key):        # avoid -ve logs / sqrts
                         plot_feat_dict['1+Log({0})'.format(feat_key)] = np.log10(1. + feat_vect.mean())
@@ -504,177 +545,6 @@ class ImPlotFeatureExtractor(object):
 
         return self.im_plot_data_gdf
 
-
-    # # this version goes with extract_patch_ms_features_ex
-    # def get_feat_array_ex(self, y_data_key=None, feat_keys=None):
-    #     if self.im_plot_data_gdf is None or len(self.im_plot_data_gdf) == 0:
-    #         raise Exception('No features - run extract_all_features() first')
-    #
-    #     y = np.array([])
-    #     if y_data_key is not None:
-    #         y = self.im_plot_data_gdf[('data', y_data_key)]
-    #
-    #     if feat_keys is None:  # get all feats
-    #         feat_keys = self.im_plot_data_gdf['feats'].columns
-    #         X = self.im_plot_data_gdf['feats']
-    #     else:
-    #         X = self.im_plot_data_gdf['feats'][feat_keys]
-    #
-    #
-    #     logger.info('X NaN ttl: {0}'.format(np.isnan(X).sum()))
-    #     logger.info('X NaN feats: ' + str(feat_keys[np.any(np.isnan(X), axis=0)]))
-    #     logger.info('X inf ttl: {0}'.format((X == np.inf).sum()))
-    #     logger.info('X inf feats: ' + str(feat_keys[np.any((X == np.inf), axis=0)]))
-    #     return X, y, feat_keys
-
-
-    # @staticmethod
-    # def sscatter_plot_(im_feat_dict, x_feat_key='NDVI', y_feat_key='', class_key='', show_labels=True, show_class_labels=True,
-    #                  show_thumbnails=False, do_regress=True, xlabel=None, ylabel=None, xfn=lambda x: x, yfn=lambda y: y):
-    #     x = np.array([xfn(plot['feats'][x_feat_key]) for plot in list(im_feat_dict.values())])
-    #     if type(x[0]) is np.ndarray:        # this is pixel data and requires concat to flatten it
-    #         cfn = lambda x: np.hstack(x)[::5]
-    #         show_thumbnails = False
-    #     else:
-    #         cfn = lambda x: x
-    #
-    #     # if xfn is not None:
-    #     #     x = xfn(x)
-    #     y = np.array([yfn(plot[y_feat_key]) for plot in list(im_feat_dict.values())])
-    #     # if type(x[0]) is np.ndarray:
-    #     #     ycfn = lambda x: np.concatenate(x)
-    #     # else:
-    #     #     ycfn = lambda x: x
-    #
-    #     # if yfn is not None:
-    #     #     y = yfn(y)
-    #
-    #     if show_class_labels == True:
-    #         class_labels = np.array([plot[class_key] for plot in list(im_feat_dict.values())])
-    #     else:
-    #         class_labels = np.zeros(x.__len__())
-    #     if show_thumbnails == True:
-    #         thumbnails = np.array([plot['thumbnail'] for plot in list(im_feat_dict.values())])
-    #
-    #     if show_labels == True:
-    #         labels = np.array([plot['ID'] for plot in list(im_feat_dict.values())])
-    #
-    #     classes = np.unique(class_labels)
-    #     colours = ['r', 'm', 'b', 'g', 'y', 'k', 'o']
-    #
-    #     ylim = [np.min(cfn(y)), np.max(cfn(y))]
-    #     xlim = [np.min(cfn(x)), np.max(cfn(x))]
-    #     xd = np.diff(xlim)[0]
-    #     yd = np.diff(ylim)[0]
-    #
-    #     pyplot.figure()
-    #     pyplot.axis(np.concatenate([xlim, ylim]))
-    #     # pyplot.hold('on')
-    #     ax = pyplot.gca()
-    #     handles = np.zeros(classes.size).tolist()
-    #     #
-    #
-    #     for ci, (class_label, colour) in enumerate(zip(classes, colours[:classes.__len__()])):
-    #         class_idx = class_labels == class_label
-    #         if not show_thumbnails:
-    #             pyplot.plot(cfn(x[class_idx]), cfn(y[class_idx]), colour + 'o', label=class_label, markeredgecolor=(0, 0, 0))
-    #
-    #         for xyi, (xx, yy) in enumerate(zip(x[class_idx], y[class_idx])):  # , np.array(plot_names)[class_idx]):
-    #             if type(xx) is np.ndarray:
-    #                 xx = xx[0]
-    #             if type(yy) is np.ndarray:
-    #                 yy = yy[0]
-    #             if show_labels:
-    #                 pyplot.text(xx - .0015, yy - .0015, np.array(labels)[class_idx][xyi],
-    #                            fontdict={'size': 9, 'color': colour, 'weight': 'bold'})
-    #
-    #             if show_thumbnails:
-    #                 imbuf = np.array(thumbnails)[class_idx][xyi]
-    #                 band_idx = [0, 1, 2]
-    #                 if imbuf.shape[2] == 8:  # guess wv3
-    #                     band_idx = [4, 2, 1]
-    #
-    #                 ims = 20.
-    #                 extent = [xx - old_div(xd, (2 * ims)), xx + old_div(xd, (2 * ims)), yy - old_div(yd, (2 * ims)), yy + old_div(yd, (2 * ims))]
-    #                 #pyplot.imshow(imbuf[:, :, :3], extent=extent, aspect='auto')  # zorder=-1,
-    #                 pyplot.imshow(imbuf[:,:,band_idx], extent=extent, aspect='auto')  # zorder=-1,
-    #                 handles[ci] = ax.add_patch(
-    #                     patches.Rectangle((xx - old_div(xd, (2 * ims)), yy - old_div(yd, (2 * ims))), old_div(xd, ims), old_div(yd, ims), fill=False,
-    #                                       edgecolor=colour, linewidth=2.))
-    #                 # pyplot.plot(mPixels[::step], dRawPixels[::step], color='k', marker='.', linestyle='', markersize=.5)
-    #         if do_regress and classes.__len__() > 1 and False:
-    #             (slope, intercept, r, p, stde) = stats.linregress(cfn(x[class_idx]), cfn(y[class_idx]))
-    #             pyplot.text(xlim[0] + xd * 0.7, ylim[0] + yd * 0.05 * (ci + 2),
-    #                        '{1}: $R^2$ = {0:.2f}'.format(np.round(r ** 2, 2), classes[ci]),
-    #                        fontdict={'size': 10, 'color': colour})
-    #
-    #     if do_regress:
-    #         (slope, intercept, r, p, stde) = stats.linregress(cfn(x), cfn(y))
-    #         pyplot.text((xlim[0] + xd * 0.7), (ylim[0] + yd * 0.05), '$R^2$ = {0:.2f}'.format(np.round(r ** 2, 2)),
-    #                    fontdict={'size': 12})
-    #         logger.info('R^2 = {0:.4f}'.format(r ** 2))
-    #         logger.info('P (slope=0) = {0:f}'.format(p))
-    #         logger.info('Slope = {0:.4f}'.format(slope))
-    #         logger.info('Std error of slope = {0:.4f}'.format(stde))
-    #         yhat = cfn(x)*slope + intercept
-    #         rmse = np.sqrt(np.mean((cfn(y) - yhat) ** 2))
-    #         logger.info('RMS error = {0:.4f}'.format(rmse))
-    #     else:
-    #         r = np.nan
-    #         rmse = np.nan
-    #
-    #     if xlabel is not None:
-    #         pyplot.xlabel(xlabel, fontdict={'size': 12})
-    #     else:
-    #         pyplot.xlabel(x_feat_key, fontdict={'size': 12})
-    #     if ylabel is not None:
-    #         pyplot.ylabel(ylabel, fontdict={'size': 12})
-    #     else:
-    #         pyplot.ylabel(y_feat_key, fontdict={'size': 12})
-    #
-    #     pyplot.grid()
-    #     if classes.size > 0:
-    #         if show_thumbnails:
-    #             pyplot.legend(handles, classes, fontsize=12)
-    #         else:
-    #             pyplot.legend(classes, fontsize=12)
-    #     return r**2, rmse
-    #
-    # @staticmethod
-    # def sscatter_plot(im_feat_dict, x_feat_key='NDVI', y_feat_key='', class_key='', show_labels=True, show_class_labels=True,
-    #                  show_thumbnails=False, do_regress=True, xlabel=None, ylabel=None, xfn=lambda x: x, yfn=lambda y: y):
-    #     x = np.array([xfn(plot['feats'][x_feat_key]) for plot in list(im_feat_dict.values())])
-    #     y = np.array([yfn(plot[y_feat_key]) for plot in list(im_feat_dict.values())])
-    #
-    #     if show_class_labels == True:
-    #         class_labels = np.array([plot[class_key] for plot in list(im_feat_dict.values())])
-    #     else:
-    #         class_labels = None
-    #
-    #     if show_thumbnails == True:
-    #         thumbnails = np.array([plot['thumbnail'] for plot in list(im_feat_dict.values())])
-    #     else:
-    #         thumbnails = None
-    #
-    #     if show_labels == True:
-    #         labels = np.array([plot['ID'] for plot in list(im_feat_dict.values())])
-    #     else:
-    #         labels = None
-    #
-    #     if xlabel is None:
-    #         xlabel = x_feat_key
-    #     if ylabel is None:
-    #         ylabel = y_feat_key
-    #     # pyplot.ylabel(yf)
-    #     return scatter_plot(x, y, class_labels=class_labels, labels=labels, thumbnails=thumbnails,
-    #                                                do_regress=do_regress, xlabel=xlabel, ylabel=ylabel, xfn=xfn, yfn=yfn)
-    #
-    #
-    # def scatter_plot(self, x_feat_key='NDVI', y_feat_key='', class_key='', show_labels=True, show_class_labels=True,
-    #                  show_thumbnails=False, do_regress=True, xlabel=None, ylabel=None, xfn=lambda x: x, yfn=lambda y: y):
-    #     return ImPlotFeatureExtractor.sscatter_plot(self.im_feat_dict, x_feat_key=x_feat_key, y_feat_key=y_feat_key, class_key=class_key, show_labels=show_labels, show_class_labels=show_class_labels,
-    #                  show_thumbnails=show_thumbnails, do_regress=do_regress, xlabel=xlabel, ylabel=ylabel, xfn=xfn, yfn=yfn)
-
 class FeatureSelector(object):
     def __init__(self):
         return
@@ -712,7 +582,7 @@ class FeatureSelector(object):
             selected_feats_df[best_key] = best_feat
             selected_scores.append(best_score)
             available_feats_df.pop(best_key)
-            logger.info('Feature {0} of {1}: {2}'.format(selected_feats_df.shape[1], max_num_feats, best_key))
+            logger.info('Feature {0} of {1}: {2}, Score: {3:.1f}'.format(selected_feats_df.shape[1], max_num_feats, best_key, best_score))
         # logger.info(' ')
         selected_scores = np.array(selected_scores)
         selected_feat_keys = selected_feats_df.columns
@@ -723,80 +593,39 @@ class FeatureSelector(object):
 
         return selected_feats_df, selected_scores
 
-    # @staticmethod
-    # def forward_selection(X, y, feat_keys=None, max_num_feats=0, model=linear_model.LinearRegression(),
-    #                       score_fn=lambda y, pred: -1*np.sqrt(metrics.mean_squared_error(y,pred)), cv=None):
-    #     # X, feat_keys_mod, y = self.get_feat_array(y_key=y_feat_key)
-    #     if feat_keys is None:
-    #         feat_keys = [str(i) for i in range(0, X.shape[1])]
-    #     feat_list = X.transpose().tolist()
-    #     feat_dict = dict(list(zip(feat_keys, feat_list)))
-    #     if max_num_feats == 0:
-    #         max_num_feats = X.shape[1]
-    #     selected_feats = collections.OrderedDict()   # remember order items are added
-    #     selected_scores = []
-    #     available_feats = feat_dict
-    #
-    #     logger.info('Forward selection: ', end=' ')
-    #     while len(selected_feats) < max_num_feats:
-    #         best_score = -np.inf
-    #         best_feat = []
-    #         for feat_key, feat_vec in available_feats.items():
-    #             test_feats = list(selected_feats.values()) + [feat_vec]
-    #             scores, predicted = FeatureSelector.score_model(np.array(test_feats).transpose(), y, model=model, score_fn=score_fn, cv=cv, find_predicted=False)
-    #             score = scores['test_user'].mean()
-    #             if score > best_score:
-    #                 best_score = score
-    #                 best_feat = list(feat_vec)
-    #                 best_key = feat_key
-    #         selected_feats[best_key] = best_feat
-    #         selected_scores.append(best_score)
-    #         available_feats.pop(best_key)
-    #         logger.info(best_key + ', ', end=' ')
-    #     logger.info(' ')
-    #     selected_scores = np.array(selected_scores)
-    #     selected_feat_keys = list(selected_feats.keys())
-    #     best_selected_feat_keys = selected_feat_keys[:np.argmax(selected_scores) + 1]
-    #     logger.info('Best score: {0}'.format(selected_scores.max()))
-    #     logger.info('Num feats at best score: {0}'.format(np.argmax(selected_scores) + 1))
-    #     logger.info('Feat keys at best score: {0}'.format(best_selected_feat_keys))
-    #
-    #     return np.array(list(selected_feats.values())).transpose(), selected_scores, selected_feat_keys
 
     @staticmethod
-    def ranking(X, y, feat_keys=None, model=linear_model.LinearRegression(),
-                score_fn=lambda y, pred: -1*np.sqrt(metrics.mean_squared_error(y,pred)), cv=None):
+    def ranking(feat_df, y, model=linear_model.LinearRegression(), score_fn=None, cv=None):
         # X, feat_keys_mod, y = self.get_feat_array(y_key=y_feat_key)
-        if feat_keys is None:
-            feat_keys = [str(i) for i in range(0, X.shape[1])]
-        feat_list = X.transpose().tolist()
-        feat_dict = OrderedDict(list(zip(feat_keys, feat_list)))
+
+        logger.info('Ranking: ')
+        if score_fn is None:
+            logger.info('Using negative RMSE score')
+        else:
+            logger.info('Using user score')
+
         feat_scores = []
-        for i, (feat_key, feat_vect) in enumerate(feat_dict.items()):
-            if False:
-                score = score_fn(y, np.array(feat_vect).reshape(-1, 1))
+        for i, (feat_key, feat_vec) in enumerate(feat_df.iteritems()):
+            logger.info('Scoring feature {0} of {1}'.format(i+1, feat_df.shape[1]))
+
+            scores, predicted = FeatureSelector.score_model(pd.DataFrame(feat_vec), y, model=model, score_fn=score_fn, cv=cv, find_predicted=False)
+
+            if score_fn == None:
+                score = -np.sqrt((scores['test_-RMSE']**2).mean())
             else:
-                scores, predicted = FeatureSelector.score_model(np.array(feat_vect).reshape(-1, 1), y.reshape(-1, 1), model=model,
-                                                           score_fn=score_fn, cv=cv, find_predicted=True)
                 score = scores['test_user'].mean()
-                # score = scores['R2_stacked']        #hack
             feat_scores.append(score)
-            if i%20==0:
-                logger.info('.', end=' ')
-        logger.info(' ')
+
         feat_scores = np.array(feat_scores)
 
         logger.info('Best score: {0}'.format(feat_scores.max()))
-        logger.info('Best feat: {0}'.format(feat_keys[np.argmax(feat_scores)]))
+        logger.info('Best feat: {0}'.format(feat_df.columns[np.argmax(feat_scores)]))
         return feat_scores
 
     @staticmethod
     def score_model(X, y, model=linear_model.LinearRegression(), score_fn=None,
                     cv=None, find_predicted=True, print_scores=False):
 
-        # X = np.array(feat_list).transpose()
-        # y = np.array([plot[y_feat_key] for plot in self.im_feat_dict.values()])
-        # y = np.hstack([np.tile(plot[y_feat_key], plot[feat_keys[0]].size) for plot in self.im_feat_dict.values()])
         predicted = None
         if cv is None:
             cv = len(y)        # Leave one out
@@ -808,7 +637,8 @@ class FeatureSelector(object):
         else:
             scoring = {'-RMSE': make_scorer(lambda y, pred: -np.sqrt(metrics.mean_squared_error(y, pred)))}
 
-        scores = cross_validate(model, X, y, scoring=scoring, cv=cv)
+        # TO DO: this does k-fold.  We should try stratified k-fold with degradation strata.
+        scores = cross_validate(model, X, y, scoring=scoring, cv=cv, n_jobs=-1)
 
         if print_scores:
             rmse_ci = np.percentile(-scores['test_-RMSE'], [5, 95])
@@ -823,15 +653,8 @@ class FeatureSelector(object):
             if print_scores:
                 logger.info('R2 (stacked): {0:.4f}'.format(scores['R2_stacked']))
         return scores, predicted
-        # score = {}
-        # score = score_fn(y, predicted)
-        # score['r2'] = metrics.r2_score(y, predicted)
-        # score['rmse'] = np.sqrt(metrics.mean_squared_error(y, predicted))
-        # score['mse'] = (-scores['test_neg_mean_squared_error'])
-        # score['rms'] = np.sqrt(-scores['test_neg_mean_squared_error'])
 
 
-    # assumes X is 2D and scaled 0-1, clf is a trained classifier
 
 
 # params: calib_plots from >1 data set
@@ -844,7 +667,7 @@ class FeatureSelector(object):
 
 class ApplyLinearModel(object):
     def __init__(self, in_file_name='', out_file_name='', model=linear_model.LinearRegression, model_keys=[],
-                 feat_ex_fn=ImPlotFeatureExtractor.extract_patch_ms_features_ex, num_bands=9, save_feats=False):
+                 feat_ex_fn=ImageFeatureExtractor.extract_patch_ms_features_ex, num_bands=9, save_feats=False):
         self.in_file_name = in_file_name
         self.out_file_name = out_file_name
         self.model = model
@@ -932,7 +755,7 @@ class ApplyLinearModel(object):
     @staticmethod
     def construct_feat_ex_fns(model_keys=[], num_bands=9):
         import re
-        pan_bands, band_dict = mdl.ImPlotFeatureExtractor.get_band_info(num_bands)
+        pan_bands, band_dict = mdl.ImageFeatureExtractor.get_band_info(num_bands)
 
         win_fn_list = []
         inner_str_list = []
@@ -962,7 +785,6 @@ class ApplyLinearModel(object):
         return
 
     def create(self, win_size=(1, 1), step_size=(1, 1)):
-        from rasterio.windows import Window
         with rasterio.Env():
             with rasterio.open(self.in_file_name, 'r') as in_ds:
                 if self.save_feats:
@@ -986,7 +808,7 @@ class ApplyLinearModel(object):
                 # self.win_fn_list, self.band_ratio_list = AgcMap.construct_feat_ex_fns(self.model_keys, num_bands=in_ds.count)
 
                 with rasterio.open(self.out_file_name, 'w', **out_profile) as out_ds:
-                    pan_bands, band_dict = ImPlotFeatureExtractor.get_band_info(in_ds.count)
+                    pan_bands, band_dict = ImageFeatureExtractor.get_band_info(in_ds.count)
                     win_off = np.floor(np.array(win_size)/(2*step_size[0])).astype('int32')
                     prog_update = 10
                     for cy in range(0, in_ds.height - win_size[1] + 1, step_size[1]):     #12031): #

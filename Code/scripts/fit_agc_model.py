@@ -28,8 +28,8 @@ image_filename = r"D:\OneDrive\GEF Essentials\Source Images\WorldView3 Oct 2017\
 plot_agc_gdf = gpd.GeoDataFrame.from_file(plot_agc_shapefile_name)
 
 with rasterio.open(image_filename, 'r') as imr:
-    fex = mdl.ImPlotFeatureExtractor(image_reader=imr, plot_data_gdf=plot_agc_gdf)
-    im_plot_data_gdf = fex.extract_all_features(patch_fn=mdl.ImPlotFeatureExtractor.extract_patch_ms_features_ex)
+    fex = mdl.ImageFeatureExtractor(image_reader=imr, plot_data_gdf=plot_agc_gdf)
+    im_plot_data_gdf = fex.extract_all_features(patch_fn=mdl.ImageFeatureExtractor.extract_patch_ms_features_ex)
     # im_plot_data_gdf.pop('ST49')
 
 # fix stratum labels
@@ -50,14 +50,15 @@ mdl.scatter_ds(im_plot_data_gdf, x_col=('feats', 'pan/R'), y_col=('data', 'AbcHa
 
 # select best features for predicting AGC with linear regression
 y = im_plot_data_gdf['data']['AgcHa']
-selected_feats_df, selected_scores =  mdl.FeatureSelector.forward_selection(im_plot_data_gdf['feats'], y, max_num_feats=25, cv=5,  #cv=X.shape[0] / 5
+selected_feats_df, selected_scores =  mdl.FeatureSelector.forward_selection(im_plot_data_gdf['feats'], y, max_num_feats=50, cv=10,  #cv=X.shape[0] / 5
                                                                                         score_fn=None)
+# feat_scores = mdl.FeatureSelector.ranking(im_plot_data_gdf['feats'], y, cv=5, score_fn=None)
 
 # calculate scores of selected features with LOOCV
 selected_loocv_scores = []
 num_feats = range(0, len(selected_scores))
 for i in num_feats:
-    scores, predicted = mdl.FeatureSelector.score_model(selected_feats_df.to_numpy()[:, :i + 1], y, model=linear_model.LinearRegression(), find_predicted=True, cv=selected_feats_df.shape[0])
+    scores, predicted = mdl.FeatureSelector.score_model(selected_feats_df.to_numpy()[:, :i + 1], y, model=linear_model.LinearRegression(), find_predicted=True, cv=10)
     loocv_scores = {'R2': scores['R2_stacked'], 'RMSE': np.abs(scores['test_-RMSE']).mean()/1000., 'RMSE CI': np.percentile(np.abs(scores['test_-RMSE']), [5, 95])}
     selected_loocv_scores.append(loocv_scores)
     print('Scored model {0} of {1}'.format(i+1, len(selected_scores)))
@@ -143,10 +144,73 @@ logger.info(np.array(best_single_feat_model.intercept_))
 
 
 # TODO: - check why CV RMSE is better than RMSE on full training set,
-#  - why does FS perform worse in py 3.8 vs 2.7
-#  - entropy vs nanentropy
-#  - can we get around duplication feature ex fn in ApplyLinearModel
+#  x - why does FS perform worse in py 3.8 vs 2.7
+#  x - entropy vs nanentropy
+#  - some model / feature selection comparisons
+#  - can we get around duplication feature ex fn in ApplyLinearModel?
 #  - docs, boilerplate, license
+
+if True:
+    from functools import partial
+    from collections import OrderedDict
+    import copy
+
+
+class PatchFeatureExtractor():
+
+    def __init__(self, num_bands=9):
+        self.pan_bands, self.band_dict = mdl.ImageFeatureExtractor.get_band_info(num_bands)
+        # self.feat_keys = []
+        self.fn_dict = {}
+        return
+
+
+    def generate_fn_dict(self):
+        if len(self.fn_dict) > 0:
+            return
+
+        # inner band ratios
+        self.inner_dict = OrderedDict()
+        self.inner_dict['pan/1'] = lambda pan, bands: pan
+        # self.inner_dict['1/pan'] = lambda pan, bands: 1/pan
+        for num_key in list(self.band_dict.keys()):
+            self.inner_dict['{0}/pan'.format(num_key)] = lambda pan, bands, num_key=num_key: bands[self.band_dict[num_key], :, :] / pan
+            self.inner_dict['pan/{0}'.format(num_key)] = lambda pan, bands, num_key=num_key: pan / bands[self.band_dict[num_key], :, :]
+            self.inner_dict['{0}/1'.format(num_key)] = lambda pan, bands, num_key=num_key: bands[self.band_dict[num_key], :, :]
+            # self.inner_dict['1/{0}'.format(num_key)] = lambda pan, bands, num_key=num_key: 1/bands[self.band_dict[num_key], :, :]
+            for den_key in list(self.band_dict.keys()):
+                if not num_key == den_key:
+                    self.inner_dict['{0}/{1}'.format(num_key, den_key)] = lambda pan, bands, num_key=num_key, den_key=den_key: bands[self.band_dict[num_key], :, :] / bands[self.band_dict[den_key], :, :]
+
+        # inner veg indices
+        SAVI_L = 0.05
+        # these vals for MODIS from https://en.wikipedia.org/wiki/Enhanced_vegetation_index
+        # L = 1.; C1 = 6; C2 = 7.5; G = 2.5
+        nir_keys = [key for key in list(self.band_dict.keys()) if ('NIR' in key) or ('RE' in key)]
+        for nir_key in nir_keys:
+            post_fix = '' if nir_key == 'NIR' else '_{0}'.format(nir_key)
+            self.inner_dict['NDVI' + post_fix] = lambda pan, bands, nir_key=nir_key: (bands[self.band_dict[nir_key], :, :] - bands[self.band_dict['R'], :, :]) / \
+                                          (bands[self.band_dict[nir_key], :, :] + bands[self.band_dict['R'], :, :])
+            self.inner_dict['SAVI' + post_fix] = lambda pan, bands, nir_key=nir_key: (1 + SAVI_L) * (bands[self.band_dict[nir_key], :, :] - bands[self.band_dict['R'], :, :]) / \
+                                          (SAVI_L + bands[self.band_dict[nir_key], :, :] + bands[self.band_dict['R'], :, :])
+
+        self.win_dict = OrderedDict({'mean': np.mean, 'std': np.std, 'entropy': mdl.nanentropy})
+        self.scale_dict = OrderedDict({'log': np.log10, 'sqr': lambda x: np.power(x, 2), 'sqrt': np.sqrt})
+        # mean, std, entropy
+        for inner_key, inner_fn in self.inner_dict.items():
+            for win_key, win_fn in self.win_dict.items():
+                fn_key = '({0}({1}))'.format(win_key, inner_key)
+                fn = lambda pan, bands, win_fn=win_fn, inner_fn=inner_fn: win_fn(inner_fn(pan, bands))
+                self.fn_dict[fn_key] = fn
+                if win_key == 'mean':
+                    for scale_key, scale_fn in self.scale_dict.items():
+                        fn_key = '{0}({1}({2}))'.format(scale_key, win_key, inner_key)
+                        fn = lambda pan, bands, scale_fn=scale_fn, win_fn=win_fn, inner_fn=inner_fn: scale_fn(win_fn(inner_fn(pan, bands)))
+                        self.fn_dict[fn_key] = fn
+        # **2, sqrt, log (with x and 1/x feats - do we need both **2 and sqrt?)
+
+
+
 
 if False:
     from sklearn.kernel_ridge import KernelRidge
@@ -203,8 +267,8 @@ clf_file = r"D:\Data\Development\Projects\PhD GeoInformatics\Data\NGI\GEF DEM\DS
 vr = mdl.GdalVectorReader(plot_agc_shapefile_name)
 ld = vr.read()
 imr_clf = mdl.GdalImageReader(clf_file)
-fex_clf = mdl.ImPlotFeatureExtractor(image_reader=imr_clf, plot_feat_dict=ld['GEF Plot Polygons with Agc v5'])
-implot_feat_dict_clf = fex_clf.extract_all_features(patch_fn=mdl.ImPlotFeatureExtractor.extract_patch_clf_features)
+fex_clf = mdl.ImageFeatureExtractor(image_reader=imr_clf, plot_feat_dict=ld['GEF Plot Polygons with Agc v5'])
+implot_feat_dict_clf = fex_clf.extract_all_features(patch_fn=mdl.ImageFeatureExtractor.extract_patch_clf_features)
 
 # set DegrClass field in implot_feat_dict using plot ID
 for f in list(implot_feat_dict_clf.values()):
@@ -250,8 +314,8 @@ reload(mdl)
 vr = mdl.GdalVectorReader(plot_agc_shapefile_name)
 ld = vr.read()
 imr = mdl.GdalImageReader(image_filename)
-fex = mdl.ImPlotFeatureExtractor(image_reader=imr, plot_feat_dict=ld['GEF Plot Polygons with Agc v5'])
-implot_feat_dict = fex.extract_all_features(patch_fn=mdl.ImPlotFeatureExtractor.extract_patch_ms_features_ex)
+fex = mdl.ImageFeatureExtractor(image_reader=imr, plot_feat_dict=ld['GEF Plot Polygons with Agc v5'])
+implot_feat_dict = fex.extract_all_features(patch_fn=mdl.ImageFeatureExtractor.extract_patch_ms_features_ex)
 
 # set DegrClass field in implot_feat_dict using plot ID
 for f in list(implot_feat_dict.values()):

@@ -28,7 +28,7 @@ if sys.version_info.major == 3 and (type(selected_keys[0]) is bytes or type(sele
 print([(i,key) for i,key in enumerate(selected_keys)])
 
 mapper = su.ApplyLinearModel(in_file_name=inFile, out_file_name=outFile, model=lm, model_keys=selected_keys,
-                             feat_ex_fn=su.ImPlotFeatureExtractor.extract_patch_ms_features_ex, save_feats=False)
+                             feat_ex_fn=su.ImageFeatureExtractor.extract_patch_ms_features_ex, save_feats=False)
 
 mapper.create(win_size=(33, 33), step_size=(33, 33))
 mapper.post_proc()
