@@ -168,7 +168,7 @@ def scatter_ds(data, x_col=None, y_col=None, class_col=None, label_col=None, thu
 
     if do_regress:  # find and display regression error stats
         (slope, intercept, r, p, stde) = stats.linregress(x, y)
-        scores, predicted = FeatureSelector.score_model(x[:,None], y[:,None], model=linear_model.LinearRegression(),
+        scores, predicted = FeatureSelector.score_model(x.to_numpy().reshape(-1,1), y.to_numpy().reshape(-1,1), model=linear_model.LinearRegression(),
                                                         find_predicted=True, cv=len(x), print_scores=False, score_fn=None)
 
         pyplot.text((xlim[0] + xd * 0.7), (ylim[0] + yd * 0.05), '$R^2$ = {0:.2f}'.format(np.round(scores['R2_stacked'], 2)),
@@ -178,7 +178,7 @@ def scatter_ds(data, x_col=None, y_col=None, class_col=None, label_col=None, thu
 
         yhat = x * slope + intercept
         rmse = np.sqrt(np.mean((y - yhat) ** 2))
-
+        logger.info('Regression scores')
         logger.info('RMSE: {0:.4f}'.format(rmse))
         logger.info('RMSE LOOCV: {0:.4f}'.format(-scores['test_-RMSE'].mean()))
         logger.info('R^2:  {0:.4f}'.format(r ** 2))
@@ -218,10 +218,9 @@ class PatchFeatureExtractor():
 
     def __init__(self, num_bands=9):
         self.pan_bands, self.band_dict = ImageFeatureExtractor.get_band_info(num_bands)
-        # self.feat_keys = []
         self.fn_dict = {}
+        self.generate_fn_dict()
         return
-
 
     def generate_fn_dict(self):
         if len(self.fn_dict) > 0:
@@ -232,13 +231,13 @@ class PatchFeatureExtractor():
         self.inner_dict['pan/1'] = lambda pan, bands: pan
         # self.inner_dict['1/pan'] = lambda pan, bands: 1/pan   # TO DO check = does log10 invalidate?
         for num_key in list(self.band_dict.keys()):
-            self.inner_dict['{0}/pan'.format(num_key)] = lambda pan, bands, num_key=num_key: bands[self.band_dict[num_key], :, :] / pan
-            self.inner_dict['pan/{0}'.format(num_key)] = lambda pan, bands, num_key=num_key: pan / bands[self.band_dict[num_key], :, :]
-            self.inner_dict['{0}/1'.format(num_key)] = lambda pan, bands, num_key=num_key: bands[self.band_dict[num_key], :, :]
-            # self.inner_dict['1/{0}'.format(num_key)] = lambda pan, bands, num_key=num_key: 1/bands[self.band_dict[num_key], :, :] # TO DO check = does log10 invalidate?
+            self.inner_dict['{0}/pan'.format(num_key)] = lambda pan, bands, num_key=num_key: bands[self.band_dict[num_key], :] / pan
+            self.inner_dict['pan/{0}'.format(num_key)] = lambda pan, bands, num_key=num_key: pan / bands[self.band_dict[num_key], :]
+            self.inner_dict['{0}/1'.format(num_key)] = lambda pan, bands, num_key=num_key: bands[self.band_dict[num_key], :]
+            # self.inner_dict['1/{0}'.format(num_key)] = lambda pan, bands, num_key=num_key: 1/bands[self.band_dict[num_key], :] # TO DO check = does log10 invalidate?
             for den_key in list(self.band_dict.keys()):
                 if not num_key == den_key:
-                    self.inner_dict['{0}/{1}'.format(num_key, den_key)] = lambda pan, bands, num_key=num_key, den_key=den_key: bands[self.band_dict[num_key], :, :] / bands[self.band_dict[den_key], :, :]
+                    self.inner_dict['{0}/{1}'.format(num_key, den_key)] = lambda pan, bands, num_key=num_key, den_key=den_key: old_div(bands[self.band_dict[num_key], :],  bands[self.band_dict[den_key], :])
 
         # inner veg indices
         SAVI_L = 0.05
@@ -247,10 +246,10 @@ class PatchFeatureExtractor():
         nir_keys = [key for key in list(self.band_dict.keys()) if ('NIR' in key) or ('RE' in key)]
         for nir_key in nir_keys:
             post_fix = '' if nir_key == 'NIR' else '_{0}'.format(nir_key)
-            self.inner_dict['NDVI' + post_fix] = lambda pan, bands, nir_key=nir_key: (bands[self.band_dict[nir_key], :, :] - bands[self.band_dict['R'], :, :]) / \
-                                          (bands[self.band_dict[nir_key], :, :] + bands[self.band_dict['R'], :, :])
-            self.inner_dict['SAVI' + post_fix] = lambda pan, bands, nir_key=nir_key: (1 + SAVI_L) * (bands[self.band_dict[nir_key], :, :] - bands[self.band_dict['R'], :, :]) / \
-                                          (SAVI_L + bands[self.band_dict[nir_key], :, :] + bands[self.band_dict['R'], :, :])
+            self.inner_dict['NDVI' + post_fix] = lambda pan, bands, nir_key=nir_key: 1 + (bands[self.band_dict[nir_key], :] - bands[self.band_dict['R'], :]) / \
+                                          (bands[self.band_dict[nir_key], :] + bands[self.band_dict['R'], :])
+            self.inner_dict['SAVI' + post_fix] = lambda pan, bands, nir_key=nir_key: 1 + (1 + SAVI_L) * (bands[self.band_dict[nir_key], :] - bands[self.band_dict['R'], :]) / \
+                                          (SAVI_L + bands[self.band_dict[nir_key], :] + bands[self.band_dict['R'], :])
 
         self.win_dict = OrderedDict({'mean': np.mean, 'std': np.std, 'entropy': nanentropy})
         self.scale_dict = OrderedDict({'log': np.log10, 'sqr': lambda x: np.power(x, 2), 'sqrt': np.sqrt})
@@ -262,6 +261,7 @@ class PatchFeatureExtractor():
                 self.fn_dict[fn_key] = fn
                 if win_key == 'mean':
                     for scale_key, scale_fn in self.scale_dict.items():
+                        # if scale_key == 'log' or scale_key == 'sqrt'('VI' in inner_key) or ('ND' in inner_key):
                         fn_key = '{0}({1}({2}))'.format(scale_key, win_key, inner_key)
                         fn = lambda pan, bands, scale_fn=scale_fn, win_fn=win_fn, inner_fn=inner_fn: scale_fn(win_fn(inner_fn(pan, bands)))
                         self.fn_dict[fn_key] = fn
@@ -273,6 +273,7 @@ class PatchFeatureExtractor():
 
 # class to extract features from polygons in an raster
 class ImageFeatureExtractor(object):
+
     def __init__(self, image_reader=rasterio.io.DatasetReader, plot_feat_dict={}, plot_data_gdf=gpd.GeoDataFrame()):
         ''' Class
         Parameters
@@ -284,7 +285,7 @@ class ImageFeatureExtractor(object):
         self.image_reader = image_reader
         self.plot_data_gdf = plot_data_gdf
         self.im_plot_data_gdf = gpd.GeoDataFrame()
-
+        self.patch_feature_extractor = PatchFeatureExtractor()
 
     @staticmethod
     def get_band_info(num_bands=9):
@@ -306,6 +307,23 @@ class ImageFeatureExtractor(object):
             pan_bands = [0, 1, 2, 3]
             band_dict = OrderedDict([('R', 0), ('G', 1), ('B', 2), ('NIR', 3)])
         return pan_bands, band_dict
+
+
+    def extract_patch_features(self, patch_ms, mask=None):
+        if mask is None:
+            mask = np.all(patch_ms>0, axis=0)  #np.ones(imbuf.shape[:2])
+        mask = np.bool8(mask)
+        patch_ms_mask = np.float64(patch_ms[:, mask])
+
+        pan_bands, band_dict = ImageFeatureExtractor.get_band_info(patch_ms.shape[0])
+        pan_mask = patch_ms_mask[pan_bands, :].mean(axis=0)      # TO DO: fix for len(pan_bands)=1
+
+        feat_dict = OrderedDict()
+        for fn_key, fn in self.patch_feature_extractor.fn_dict.items():
+            feat_dict[fn_key] = fn(pan_mask, patch_ms_mask)
+
+        return feat_dict
+
 
     @staticmethod
     def extract_patch_ms_features_ex(imbuf, mask=None, per_pixel=False, include_texture=True):
@@ -337,7 +355,7 @@ class ImageFeatureExtractor(object):
                 for key2 in list(feat_dict.keys()):
                     if not key2 == key1:
                         new_key = '{0}/{1}'.format(key1, key2)
-                        poly_feat_dict[new_key] = old_div(feat_dict[key1],feat_dict[key2])
+                        poly_feat_dict[new_key] = feat_dict[key1] / feat_dict[key2]
             # poly_feat_dict = feat_dict
         else:
             feat_dict['1/pan'] = 1. / feat_dict['pan']
@@ -411,7 +429,7 @@ class ImageFeatureExtractor(object):
                         plot_feat_dict['Std({0})'.format(feat_key)] = feat_vect.std()
                         plot_feat_dict['Entropy({0})'.format(feat_key)] = nanentropy(feat_vect)
 
-                    if ('VI' in feat_key) or ('ND' in feat_key):        # avoid -ve logs / sqrts
+                    if True:    # ('VI' in feat_key) or ('ND' in feat_key):        # avoid -ve logs / sqrts
                         plot_feat_dict['1+Log({0})'.format(feat_key)] = np.log10(1. + feat_vect.mean())
                         plot_feat_dict['1+({0})^.5'.format(feat_key)] = np.sqrt(1. + feat_vect.mean())
                     else:
@@ -484,19 +502,29 @@ class ImageFeatureExtractor(object):
                 continue
 
             im_buf = self.image_reader.read(window=plot_window)     # read plot ROI from image
-            im_buf = np.moveaxis(im_buf, 0, 2)  # TODO get rid of this somehow eg change all imbuf axis orderings to bands first
+            if False:
+                im_buf = np.moveaxis(im_buf, 0, 2)  # TODO get rid of this somehow eg change all imbuf axis orderings to bands first
+                thumbnail = np.float32(im_buf.copy())
 
-            if np.all(im_buf == 0) and not patch_fn == self.extract_patch_clf_features:
-                logger.warning(f'Excluding plot {plot["ID"]} - all pixels are zero')
-                continue
+                if np.all(im_buf == 0) and not patch_fn == self.extract_patch_clf_features:
+                    logger.warning(f'Excluding plot {plot["ID"]} - all pixels are zero')
+                    continue
 
-            # amend plot_mask to exclude NAN and -ve pixels
-            if False: #patch_fn == self.extract_patch_clf_features:
-                plot_mask = plot_mask & np.all(~np.isnan(im_buf), axis=2)
+                # amend plot_mask to exclude NAN and -ve pixels
+                if False: #patch_fn == self.extract_patch_clf_features:
+                    plot_mask = plot_mask & np.all(~np.isnan(im_buf), axis=2)
+                else:
+                    plot_mask = plot_mask & np.all(im_buf > 0, axis=2) & np.all(~np.isnan(im_buf), axis=2)
+
+                im_feat_dict = patch_fn(im_buf.copy(), mask=plot_mask, per_pixel=per_pixel)    # extract image features for this plot
             else:
-                plot_mask = plot_mask & np.all(im_buf > 0, axis=2) & np.all(~np.isnan(im_buf), axis=2)
 
-            im_feat_dict = patch_fn(im_buf.copy(), mask=plot_mask, per_pixel=per_pixel)    # extract image features for this plot
+                thumbnail = np.float32(np.moveaxis(im_buf, 0, 2))
+                if np.all(im_buf == 0):
+                    logger.warning(f'Excluding plot {plot["ID"]} - all pixels are zero')
+                    continue
+                plot_mask = plot_mask & np.all(im_buf > 0, axis=0) & np.all(~np.isnan(im_buf), axis=0)
+                im_feat_dict = self.extract_patch_features(im_buf, mask=plot_mask)  # extract image features for this plot
 
             im_data_dict = im_feat_dict.copy()      # copy plot data into feat dict
             for k, v in plot.items():
@@ -510,7 +538,6 @@ class ImageFeatureExtractor(object):
                 im_data_dict['AgcHa2'] = litterCHa + im_data_dict['AbcHa2']
 
             # create and store plot thumbnail
-            thumbnail = np.float32(im_buf.copy())
             thumbnail[~plot_mask] = 0.
             im_data_dict['thumbnail'] = thumbnail
 
@@ -755,7 +782,7 @@ class ApplyLinearModel(object):
     @staticmethod
     def construct_feat_ex_fns(model_keys=[], num_bands=9):
         import re
-        pan_bands, band_dict = mdl.ImageFeatureExtractor.get_band_info(num_bands)
+        pan_bands, band_dict = ImageFeatureExtractor.get_band_info(num_bands)
 
         win_fn_list = []
         inner_str_list = []

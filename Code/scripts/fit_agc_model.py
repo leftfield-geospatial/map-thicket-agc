@@ -39,18 +39,20 @@ im_plot_data_gdf.loc[im_plot_data_gdf['data']['Stratum'] == 'Intact', ('data', '
 
 # make some scatter plots of features vs AGC/ABC
 pyplot.figure()
-mdl.scatter_ds(im_plot_data_gdf, x_col=('feats', 'pan/R'), y_col=('data', 'AgcHa'), class_col=('data', 'Stratum'),
+# mdl.scatter_ds(im_plot_data_gdf, x_col=('feats', 'pan/R'), y_col=('data', 'AgcHa'), class_col=('data', 'Stratum'),
+#                xfn=lambda x: np.log10(x), do_regress=True)
+mdl.scatter_ds(im_plot_data_gdf, x_col=('feats', '(mean(pan/R))'), y_col=('data', 'AgcHa'), class_col=('data', 'Stratum'),
                xfn=lambda x: np.log10(x), do_regress=True)
 pyplot.figure()
-mdl.scatter_ds(im_plot_data_gdf, x_col=('feats', '(R/G)^2'), y_col=('data', 'AbcHa'), class_col=('data', 'Stratum'),
+mdl.scatter_ds(im_plot_data_gdf, x_col=('feats', 'sqr(mean(R/G))'), y_col=('data', 'AbcHa'), class_col=('data', 'Stratum'),
                xfn=lambda x: np.log10(x), do_regress=True)
 pyplot.figure()
-mdl.scatter_ds(im_plot_data_gdf, x_col=('feats', 'pan/R'), y_col=('data', 'AbcHa'), class_col=('data', 'Stratum'),
+mdl.scatter_ds(im_plot_data_gdf, x_col=('feats', '(mean(pan/R))'), y_col=('data', 'AbcHa'), class_col=('data', 'Stratum'),
                xfn=lambda x: np.log10(x), do_regress=True, thumbnail_col=('data','thumbnail'), label_col=('data', 'ID'))
 
 # select best features for predicting AGC with linear regression
 y = im_plot_data_gdf['data']['AgcHa']
-selected_feats_df, selected_scores =  mdl.FeatureSelector.forward_selection(im_plot_data_gdf['feats'], y, max_num_feats=50, cv=10,  #cv=X.shape[0] / 5
+selected_feats_df, selected_scores =  mdl.FeatureSelector.forward_selection(im_plot_data_gdf['feats'], y, max_num_feats=25, cv=10,  #cv=X.shape[0] / 5
                                                                                         score_fn=None)
 # feat_scores = mdl.FeatureSelector.ranking(im_plot_data_gdf['feats'], y, cv=5, score_fn=None)
 
@@ -79,7 +81,7 @@ pyplot.xlabel('Number of features')
 pyplot.ylabel('RMSE (t C ha$^{-1}$)')
 pyplot.tight_layout()
 pyplot.pause(.1)
-pyplot.savefig(root_path.joinpath(r'Data\Outputs\Plots\AgcAccVsNumFeats1_Py38Cv5.png'), dpi=300)
+pyplot.savefig(root_path.joinpath(r'Data\Outputs\Plots\AgcAccVsNumFeats1b_Py38Cv5.png'), dpi=300)
 
 fig, ax1 = pyplot.subplots()
 fig.set_size_inches(8, 4, forward=True)
@@ -95,7 +97,7 @@ ax2.plot(num_feats, -selected_loocv_scores_df['RMSE'], color=color)
 ax2.tick_params(axis='y', labelcolor=color)
 fig.tight_layout()  # otherwise the right y-label is slightly clipped
 pyplot.pause(.1)
-fig.savefig(root_path.joinpath(r'Data\Outputs\Plots\AgcAccVsNumFeats2_Py38Cv5.png'), dpi=300)
+fig.savefig(root_path.joinpath(r'Data\Outputs\Plots\AgcAccVsNumFeats2b_Py38Cv5.png'), dpi=300)
 
 #------------------------------------------------------------------------------------------------------------------------
 # Fit best multiple and single feature models, generate acccuracy stats and plots
@@ -150,64 +152,6 @@ logger.info(np.array(best_single_feat_model.intercept_))
 #  - can we get around duplication feature ex fn in ApplyLinearModel?
 #  - docs, boilerplate, license
 
-if True:
-    from functools import partial
-    from collections import OrderedDict
-    import copy
-
-
-class PatchFeatureExtractor():
-
-    def __init__(self, num_bands=9):
-        self.pan_bands, self.band_dict = mdl.ImageFeatureExtractor.get_band_info(num_bands)
-        # self.feat_keys = []
-        self.fn_dict = {}
-        return
-
-
-    def generate_fn_dict(self):
-        if len(self.fn_dict) > 0:
-            return
-
-        # inner band ratios
-        self.inner_dict = OrderedDict()
-        self.inner_dict['pan/1'] = lambda pan, bands: pan
-        # self.inner_dict['1/pan'] = lambda pan, bands: 1/pan
-        for num_key in list(self.band_dict.keys()):
-            self.inner_dict['{0}/pan'.format(num_key)] = lambda pan, bands, num_key=num_key: bands[self.band_dict[num_key], :, :] / pan
-            self.inner_dict['pan/{0}'.format(num_key)] = lambda pan, bands, num_key=num_key: pan / bands[self.band_dict[num_key], :, :]
-            self.inner_dict['{0}/1'.format(num_key)] = lambda pan, bands, num_key=num_key: bands[self.band_dict[num_key], :, :]
-            # self.inner_dict['1/{0}'.format(num_key)] = lambda pan, bands, num_key=num_key: 1/bands[self.band_dict[num_key], :, :]
-            for den_key in list(self.band_dict.keys()):
-                if not num_key == den_key:
-                    self.inner_dict['{0}/{1}'.format(num_key, den_key)] = lambda pan, bands, num_key=num_key, den_key=den_key: bands[self.band_dict[num_key], :, :] / bands[self.band_dict[den_key], :, :]
-
-        # inner veg indices
-        SAVI_L = 0.05
-        # these vals for MODIS from https://en.wikipedia.org/wiki/Enhanced_vegetation_index
-        # L = 1.; C1 = 6; C2 = 7.5; G = 2.5
-        nir_keys = [key for key in list(self.band_dict.keys()) if ('NIR' in key) or ('RE' in key)]
-        for nir_key in nir_keys:
-            post_fix = '' if nir_key == 'NIR' else '_{0}'.format(nir_key)
-            self.inner_dict['NDVI' + post_fix] = lambda pan, bands, nir_key=nir_key: (bands[self.band_dict[nir_key], :, :] - bands[self.band_dict['R'], :, :]) / \
-                                          (bands[self.band_dict[nir_key], :, :] + bands[self.band_dict['R'], :, :])
-            self.inner_dict['SAVI' + post_fix] = lambda pan, bands, nir_key=nir_key: (1 + SAVI_L) * (bands[self.band_dict[nir_key], :, :] - bands[self.band_dict['R'], :, :]) / \
-                                          (SAVI_L + bands[self.band_dict[nir_key], :, :] + bands[self.band_dict['R'], :, :])
-
-        self.win_dict = OrderedDict({'mean': np.mean, 'std': np.std, 'entropy': mdl.nanentropy})
-        self.scale_dict = OrderedDict({'log': np.log10, 'sqr': lambda x: np.power(x, 2), 'sqrt': np.sqrt})
-        # mean, std, entropy
-        for inner_key, inner_fn in self.inner_dict.items():
-            for win_key, win_fn in self.win_dict.items():
-                fn_key = '({0}({1}))'.format(win_key, inner_key)
-                fn = lambda pan, bands, win_fn=win_fn, inner_fn=inner_fn: win_fn(inner_fn(pan, bands))
-                self.fn_dict[fn_key] = fn
-                if win_key == 'mean':
-                    for scale_key, scale_fn in self.scale_dict.items():
-                        fn_key = '{0}({1}({2}))'.format(scale_key, win_key, inner_key)
-                        fn = lambda pan, bands, scale_fn=scale_fn, win_fn=win_fn, inner_fn=inner_fn: scale_fn(win_fn(inner_fn(pan, bands)))
-                        self.fn_dict[fn_key] = fn
-        # **2, sqrt, log (with x and 1/x feats - do we need both **2 and sqrt?)
 
 
 
