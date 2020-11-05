@@ -8,6 +8,7 @@ from sklearn import linear_model
 from modules import modelling as mdl
 from matplotlib import pyplot
 import logging
+import joblib, pickle
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -51,8 +52,9 @@ mdl.scatter_ds(im_plot_data_gdf, x_col=('feats', '(mean(pan/R))'), y_col=('data'
                xfn=lambda x: np.log10(x), do_regress=True, thumbnail_col=('data','thumbnail'), label_col=('data', 'ID'))
 
 # select best features for predicting AGC with linear regression
+# TODO - experiment with different cv vals here and below - it has a big effect on what is selected and how it is scored.  Likewise, so do small numerical differences in feats.
 y = im_plot_data_gdf['data']['AgcHa']
-selected_feats_df, selected_scores =  mdl.FeatureSelector.forward_selection(im_plot_data_gdf['feats'], y, max_num_feats=25, cv=10,  #cv=X.shape[0] / 5
+selected_feats_df, selected_scores =  mdl.FeatureSelector.forward_selection(im_plot_data_gdf['feats'], y, max_num_feats=25, cv=5,  #cv=X.shape[0] / 5
                                                                                         score_fn=None)
 # feat_scores = mdl.FeatureSelector.ranking(im_plot_data_gdf['feats'], y, cv=5, score_fn=None)
 
@@ -60,7 +62,7 @@ selected_feats_df, selected_scores =  mdl.FeatureSelector.forward_selection(im_p
 selected_loocv_scores = []
 num_feats = range(0, len(selected_scores))
 for i in num_feats:
-    scores, predicted = mdl.FeatureSelector.score_model(selected_feats_df.to_numpy()[:, :i + 1], y, model=linear_model.LinearRegression(), find_predicted=True, cv=10)
+    scores, predicted = mdl.FeatureSelector.score_model(selected_feats_df.to_numpy()[:, :i + 1], y, model=linear_model.LinearRegression(), find_predicted=True, cv=5)
     loocv_scores = {'R2': scores['R2_stacked'], 'RMSE': np.abs(scores['test_-RMSE']).mean()/1000., 'RMSE CI': np.percentile(np.abs(scores['test_-RMSE']), [5, 95])}
     selected_loocv_scores.append(loocv_scores)
     print('Scored model {0} of {1}'.format(i+1, len(selected_scores)))
@@ -81,7 +83,7 @@ pyplot.xlabel('Number of features')
 pyplot.ylabel('RMSE (t C ha$^{-1}$)')
 pyplot.tight_layout()
 pyplot.pause(.1)
-pyplot.savefig(root_path.joinpath(r'Data\Outputs\Plots\AgcAccVsNumFeats1b_Py38Cv5.png'), dpi=300)
+pyplot.savefig(root_path.joinpath(r'Data\Outputs\Plots\AgcAccVsNumFeats1b_Py38Cv10.png'), dpi=300)
 
 fig, ax1 = pyplot.subplots()
 fig.set_size_inches(8, 4, forward=True)
@@ -97,7 +99,7 @@ ax2.plot(num_feats, -selected_loocv_scores_df['RMSE'], color=color)
 ax2.tick_params(axis='y', labelcolor=color)
 fig.tight_layout()  # otherwise the right y-label is slightly clipped
 pyplot.pause(.1)
-fig.savefig(root_path.joinpath(r'Data\Outputs\Plots\AgcAccVsNumFeats2b_Py38Cv5.png'), dpi=300)
+fig.savefig(root_path.joinpath(r'Data\Outputs\Plots\AgcAccVsNumFeats2b_Py38Cv10.png'), dpi=300)
 
 #------------------------------------------------------------------------------------------------------------------------
 # Fit best multiple and single feature models, generate acccuracy stats and plots
@@ -112,7 +114,7 @@ logger.info(selected_feats_df.columns[:best_model_idx+1].to_numpy())
 fig = pyplot.figure()
 fig.set_size_inches(5, 4, forward=True)
 mdl.scatter_y_actual_vs_pred(y/1000., predicted, scores)
-fig.savefig(root_path.joinpath(r'Data\Outputs\Plots\MeasVsPredAgcMultiFeatModel.png'), dpi=300)
+fig.savefig(root_path.joinpath(r'Data\Outputs\Plots\MeasVsPredAgcMultiFeatModel_b.png'), dpi=300)
 
 # fitting
 best_multi_feat_model = linear_model.LinearRegression()
@@ -121,6 +123,10 @@ logger.info('Multi feat model coefficients:')
 logger.info(np.array(best_multi_feat_model.coef_))
 logger.info('Multi feat model intercept:')
 logger.info(np.array(best_multi_feat_model.intercept_))
+
+if True:
+    joblib.dump([best_multi_feat_model, selected_feats_df.columns[:best_model_idx+1].to_numpy(), scores], root_path.joinpath(r'Data\Outputs\Models\BestMultiFeatModelPy38Cv5v2.joblib'))
+    pickle.dump([best_multi_feat_model, selected_feats_df.columns[:best_model_idx+1].to_numpy(), scores], open(root_path.joinpath(r'Data\Outputs\Models\BestMultiFeatModelPy38Cv5v2.pickle'), 'wb'))
 
 # single feat model
 logger.info('Single feat model scores:')
@@ -134,7 +140,12 @@ logger.info(selected_feats_df.columns[:1].to_numpy())
 fig = pyplot.figure()
 fig.set_size_inches(5, 4, forward=True)
 mdl.scatter_y_actual_vs_pred(y/1000., predicted, scores)
-fig.savefig(root_path.joinpath(r'Data\Outputs\Plots\MeasVsPredAgcSingleFeatModel.png'), dpi=300)
+fig.savefig(root_path.joinpath(r'Data\Outputs\Plots\MeasVsPredAgcSingleFeatModel_b.png'), dpi=300)
+
+if True:
+    joblib.dump([best_multi_feat_model, selected_feats_df.columns[:best_model_idx+1].to_numpy(), scores], root_path.joinpath(r'Data\Outputs\Models\BestSingleFeatModelPy38Cv5v2.joblib'))
+    pickle.dump([best_multi_feat_model, selected_feats_df.columns[:best_model_idx+1].to_numpy(), scores], open(root_path.joinpath(r'Data\Outputs\Models\BestSingleFeatModelPy38Cv5v2.pickle'), 'wb'))
+
 
 # fitting
 best_single_feat_model = linear_model.LinearRegression(fit_intercept=True)
@@ -144,6 +155,22 @@ logger.info(np.array(best_single_feat_model.coef_))
 logger.info('Single feat model intercept:')
 logger.info(np.array(best_single_feat_model.intercept_))
 
+
+lm = linear_model.LinearRegression()
+lm.fit(Xselected_feats[:, :best_model_idx + 1], old_div(y, 1000))
+joblib.dump([lm, selected_keys[:best_model_idx + 1]],
+            r'C:\Data\Development\Projects\PhD GeoInformatics\Docs\Funding\GEF5\Invoices, Timesheets and Reports\Final Report\bestModelPy38Cv5v1.joblib')
+pickle.dump([lm, selected_keys[:best_model_idx + 1]], open(
+    r'C:\Data\Development\Projects\PhD GeoInformatics\Docs\Funding\GEF5\Invoices, Timesheets and Reports\Final Report\bestModelPy38Cv5v1.pickle',
+    'wb'))
+
+lm = linear_model.LinearRegression()
+lm.fit(Xselected_feats[:, :1], old_div(y, 1000))
+joblib.dump([lm, selected_keys[:1]],
+            r'C:\Data\Development\Projects\PhD GeoInformatics\Docs\Funding\GEF5\Invoices, Timesheets and Reports\Final Report\bestSingleTermModelPy38Cv5v1.joblib')
+pickle.dump([lm, selected_keys[:1]], open(
+    r'C:\Data\Development\Projects\PhD GeoInformatics\Docs\Funding\GEF5\Invoices, Timesheets and Reports\Final Report\bestSingleTermModelPy38Cv5v1.pickle',
+    'wb'))
 
 # TODO: - check why CV RMSE is better than RMSE on full training set,
 #  x - why does FS perform worse in py 3.8 vs 2.7
@@ -368,6 +395,7 @@ pyplot.subplot(1, 2, 1)
 scatter_y_pred(y/1000., predicted, scores)
 pyplot.title('(a)')
 pyplot.subplot(1, 2, 2)
+
 print('\nBest single feature model scores:')
 scores, predicted = mdl.FeatureSelector.score_model(Xselected_feats[:, :1], old_div(y, 1000), model=linear_model.LinearRegression(),
                                                     find_predicted=True, cv=X.shape[0], print_scores=True)

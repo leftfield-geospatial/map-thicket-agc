@@ -57,6 +57,11 @@ def nanentropy(x, axis=None):
     x is assumed to be an (nsignals, nsamples) array containing integers between
     0 and n_unique_vals
     """
+    if (len(axis) > x.ndim) or (np.any(np.array(axis) > x.ndim)):
+        raise Exception('len(axis) > x.ndim) or (np.any(axis > x.ndim))')
+    elif len(axis) == x.ndim:
+        axis = None
+
     if axis is None:
         # quantise x
         nbins = 100
@@ -72,7 +77,7 @@ def nanentropy(x, axis=None):
         # compute Shannon entropy in bits
         return -np.sum(p * np.log2(p))
     else:        # hack for 2D slices of 3D array (on a rolling_window 3D array)
-        along_axis = np.setdiff1d(range(0, len(x.shape)), axis)[0]
+        along_axis = np.setdiff1d(range(0, x.ndim), axis)[0]
         e = np.zeros((x.shape[along_axis]))
         for slice in range(x.shape[along_axis]):
             if along_axis == 0:
@@ -215,12 +220,44 @@ class GroundClass(Enum):
     Shadow = 4
 
 class PatchFeatureExtractor():
+    # TODO: Notes
+    # For modelling/ fex the inner funtions need to work on 2D arrays where 1st dim is bands and second dim flattened im x/y dir
+    # Then the win fns will be on 1D resulting arrays of inner fn which will give scalar vals i.e. no need for axis= params
+    #
+    # For mapping??
+    #  A) Separate inner and outer=win/scale fns
+    #    Inner ops on 3D arrays with bands on 1st dim and im x, y on 2d and 3rd dims.  The result is a 2D array correspond to im x, y.
+    #    The 2D array gets a 3D view with eg x, y along first 2 dims, and windows down 3rd dim.  The win applies along the
+    #    first and second dims to give a 1D array with as many elems as columns in the image.
+    #  B) Comhined inner and outer fns as for modelling
+    #    The 3D array gets a 4D view with dim1 = bands, dim2,3 = im x, y and dim4 = windows.
+    #    Inner ops on 4D arrays as above.  The result is a 3D view/array with 1st band dim gone, dim1,2 = im x,y and dim3 = win.
+    #    [The above is perhaps not a greatidea because storing the full 3D windowed array in mem as it is wasteful and not very flexible.
+    #    (~1000x more mem than for option A with 33 pixel window with 33 pixel steps).]
+    #    The win fns then operate as above, reducing the 3D array to a 1D array
+    #  C) The windowed view contruction is built inside a combined approach between the inner and win fns.  This may be
+    #     tricky to combine with modelling fex as that doesn't need view construction - possibly use an option when contructing
+    #     the fn dict.  If that option is doable, actually think this will be neatest and most efficient option.  It will mean
+    #     that the win_fn needs to be complexified to A) if inp is 1D, go to scalar, else B) if inp is 3D, operate down dims 1&2 and retutn 1D
+    #
+    #  In ref to C.. what about leaving out mask for modelling and rather setting those pixels to nan, then using nanmean etc for windows.
+    #  Then both modelling and mapping window functions will operate along axes 0 and 1.  Ya... I like this better.
 
     def __init__(self, num_bands=9):
         self.pan_bands, self.band_dict = ImageFeatureExtractor.get_band_info(num_bands)
         self.fn_dict = {}
         self.generate_fn_dict()
         return
+
+    @staticmethod
+    def rolling_window_view(x, window_size=33, step_size=1):
+        if False:
+            shape = x.shape[:-1] + (int(1 + (x.shape[-1] - window) / step_size), window)
+            strides = x.strides[:-1] + (step_size * x.strides[-1], x.strides[-1])
+        else:
+            shape = x.shape[:-1] + (window, int(1 + (x.shape[-1] - window) / step_size))
+            strides = x.strides[:-1] + (x.strides[-1], step_size * x.strides[-1])
+        return np.lib.stride_tricks.as_strided(x, shape=shape, strides=strides, writeable=False)
 
     def generate_fn_dict(self):
         if len(self.fn_dict) > 0:
@@ -251,8 +288,9 @@ class PatchFeatureExtractor():
             self.inner_dict['SAVI' + post_fix] = lambda pan, bands, nir_key=nir_key: 1 + (1 + SAVI_L) * (bands[self.band_dict[nir_key], :] - bands[self.band_dict['R'], :]) / \
                                           (SAVI_L + bands[self.band_dict[nir_key], :] + bands[self.band_dict['R'], :])
 
-        self.win_dict = OrderedDict({'mean': np.mean, 'std': np.std, 'entropy': nanentropy})
+        self.win_dict = OrderedDict({'mean': lambda x: np.nanmean(x, axis=(0,1)), 'std': lambda x: np.nanstd(x, axis=(0,1)), 'entropy': lambda x: nanentropy(x, axis=(0,1))})
         self.scale_dict = OrderedDict({'log': np.log10, 'sqr': lambda x: np.power(x, 2), 'sqrt': np.sqrt})
+
         # mean, std, entropy
         for inner_key, inner_fn in self.inner_dict.items():
             for win_key, win_fn in self.win_dict.items():
@@ -267,8 +305,6 @@ class PatchFeatureExtractor():
                         self.fn_dict[fn_key] = fn
 
         # **2, sqrt, log (with x and 1/x feats - do we need both **2 and sqrt?)
-
-
 
 
 # class to extract features from polygons in an raster
@@ -313,8 +349,8 @@ class ImageFeatureExtractor(object):
         if mask is None:
             mask = np.all(patch_ms>0, axis=0)  #np.ones(imbuf.shape[:2])
         mask = np.bool8(mask)
-        patch_ms_mask = np.float64(patch_ms[:, mask])
-
+        patch_ms_mask = np.float64(patch_ms)
+        patch_ms_mask[:, ~mask] = np.nan
         pan_bands, band_dict = ImageFeatureExtractor.get_band_info(patch_ms.shape[0])
         pan_mask = patch_ms_mask[pan_bands, :].mean(axis=0)      # TO DO: fix for len(pan_bands)=1
 
@@ -694,12 +730,11 @@ class FeatureSelector(object):
 
 class ApplyLinearModel(object):
     def __init__(self, in_file_name='', out_file_name='', model=linear_model.LinearRegression, model_keys=[],
-                 feat_ex_fn=ImageFeatureExtractor.extract_patch_ms_features_ex, num_bands=9, save_feats=False):
+                 save_feats=False):
         self.in_file_name = in_file_name
         self.out_file_name = out_file_name
         self.model = model
         self.model_keys = model_keys
-        self.feat_ex_fn = feat_ex_fn
         self.pan_bands = []
         self.band_dict = {}
         self.save_feats = save_feats
@@ -804,8 +839,12 @@ class ApplyLinearModel(object):
 
     @staticmethod
     def rolling_window(a, window, step_size=1):
-        shape = a.shape[:-1] + (int(1 + (a.shape[-1] - window) / step_size), window)
-        strides = a.strides[:-1] + (step_size * a.strides[-1], a.strides[-1])
+        if True:
+            shape = a.shape[:-1] + (int(1 + (a.shape[-1] - window) / step_size), window)
+            strides = a.strides[:-1] + (step_size * a.strides[-1], a.strides[-1])
+        else:
+            shape = a.shape[:-1] + (window, int(1 + (a.shape[-1] - window) / step_size))
+            strides = a.strides[:-1] + (a.strides[-1], step_size * a.strides[-1])
         return np.lib.stride_tricks.as_strided(a, shape=shape, strides=strides, writeable=False)
 
     def feat_ex(self, im_buf=[]):
