@@ -130,7 +130,6 @@ if True:
 
 # single feat model
 logger.info('Single feat model scores:')
-best_model_idx = np.argmin(selected_loocv_scores_df['RMSE'])
 scores, predicted = mdl.FeatureSelector.score_model(selected_feats_df.iloc[:, :1], y/1000, model=linear_model.LinearRegression(),
                                                     find_predicted=True, cv=selected_feats_df.shape[0], print_scores=True)
 

@@ -865,7 +865,7 @@ class ApplyLinearModel(object):
         with rasterio.Env():
             with rasterio.open(self.in_file_name, 'r') as in_ds:
                 pan_bands, band_dict = ImageFeatureExtractor.get_band_info(in_ds.count)
-                patch_feature_extractor = PatchFeatureExtractor(num_bands=len(band_dict), rolling_window_xsize=win_size[0], rolling_window_xstep=step_size[0])
+                patch_feature_extractor = PatchFeatureExtractor(num_bands=in_ds.count, rolling_window_xsize=win_size[0], rolling_window_xstep=step_size[0])
                 win_off = np.floor(np.array(win_size) / (2 * step_size[0])).astype('int32')
                 prog_update = 10
 
@@ -914,7 +914,9 @@ class ApplyLinearModel(object):
                                 band_ratio[in_nan_mask] = np.nan           # to exclude from window stats/fns
                                 feat_buf = win_fn(ApplyLinearModel.rolling_window(band_ratio, win_size[0], step_size=step_size[0])) * self.model.coef_[i]
                             else:
-                                feat_buf = patch_feature_extractor.fn_dict[model_key](pan, in_buf)
+                                in_buf[:, in_nan_mask] = np.nan
+                                pan[in_nan_mask] = np.nan
+                                feat_buf = patch_feature_extractor.fn_dict[model_key](pan, in_buf) * self.model.coef_[i]
                             agc_buf += feat_buf
                             if i==0:
                                 first_feat_buf = feat_buf

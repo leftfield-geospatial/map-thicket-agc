@@ -47,3 +47,8 @@ mapper.post_proc()
 # gdal_fillnodata -md 20 -si 0 -b 1 o17OCT01084657-M2AS_R1C12-058217622010_01_P001_AGC_Py27Cv5v2_24Feat_10m.tif -of GTiff -co COMPRESS=DEFLATE o17OCT01084657-M2AS_R1C12-058217622010_01_P001_AGC_Py27Cv5v2_24Feat_10m_fillnodata.tif
 # gdal_merge -o GEF_WV3_Oct2017_AGC_10m.tif -co COMPRESS=DEFLATE -separate -a_nodata nan o17OCT01084657-M2AS_R1C12-058217622010_01_P001_AGC_Py27Cv5v2_1Feat_10m_postproc.tif o17OCT01084657-M2AS_R1C12-058217622010_01_P001_AGC_Py27Cv5v2_24Feat_10m_postproc.tif
 
+# tmp = np.ones((3,3))
+# tmp2 = np.hstack((tmp,tmp*2,tmp*3,tmp*4,tmp*5))
+# pfe = mdl.PatchFeatureExtractor(num_bands=9, rolling_window_xsize=3, rolling_window_xstep=3)
+# pfe.rolling_window_view(tmp2)
+
