@@ -57,10 +57,11 @@ def nanentropy(x, axis=None):
     x is assumed to be an (nsignals, nsamples) array containing integers between
     0 and n_unique_vals
     """
-    if (len(axis) > x.ndim) or (np.any(np.array(axis) > x.ndim)):
-        raise Exception('len(axis) > x.ndim) or (np.any(axis > x.ndim))')
-    elif len(axis) == x.ndim:
-        axis = None
+    if not axis is None:
+        if (len(axis) > x.ndim) or (np.any(np.array(axis) > x.ndim)):
+            raise Exception('len(axis) > x.ndim) or (np.any(axis > x.ndim))')
+        elif len(axis) == x.ndim:
+            axis = None
 
     if axis is None:
         # quantise x
@@ -86,7 +87,7 @@ def nanentropy(x, axis=None):
                 xa = x[:,slice,:]
             elif along_axis == 2:
                 xa = x[:,:,slice]
-            e[slice] = nanentropy(xa)
+            e[slice] = nanentropy(xa, axis=None)
         return e
 
 
@@ -243,23 +244,27 @@ class PatchFeatureExtractor():
     #  In ref to C.. what about leaving out mask for modelling and rather setting those pixels to nan, then using nanmean etc for windows.
     #  Then both modelling and mapping window functions will operate along axes 0 and 1.  Ya... I like this better.
 
-    def __init__(self, num_bands=9):
+    def __init__(self, num_bands=9, rolling_window_xsize=None, rolling_window_xstep=None):
         self.pan_bands, self.band_dict = ImageFeatureExtractor.get_band_info(num_bands)
         self.fn_dict = {}
-        self.generate_fn_dict()
+        self.rolling_window_xsize = rolling_window_xsize
+        self.rolling_window_xstep = rolling_window_xstep
+        if (self.rolling_window_xsize is not None) and (self.rolling_window_xstep is not None):
+            self.generate_fn_dict(apply_rolling_window=True)
+        else:
+            self.generate_fn_dict()
         return
 
-    @staticmethod
-    def rolling_window_view(x, window_size=33, step_size=1):
+    def rolling_window_view(self, x):
         if False:
-            shape = x.shape[:-1] + (int(1 + (x.shape[-1] - window) / step_size), window)
-            strides = x.strides[:-1] + (step_size * x.strides[-1], x.strides[-1])
+            shape = x.shape[:-1] + (int(1 + (x.shape[-1] - self.rolling_window_xsize) / self.rolling_window_xstep), self.rolling_window_xsize)
+            strides = x.strides[:-1] + (self.rolling_window_xstep * x.strides[-1], x.strides[-1])
         else:
-            shape = x.shape[:-1] + (window, int(1 + (x.shape[-1] - window) / step_size))
-            strides = x.strides[:-1] + (x.strides[-1], step_size * x.strides[-1])
+            shape = x.shape[:-1] + (self.rolling_window_xsize, int(1 + (x.shape[-1] - self.rolling_window_xsize) / self.rolling_window_xstep))
+            strides = x.strides[:-1] + (x.strides[-1], self.rolling_window_xstep * x.strides[-1])
         return np.lib.stride_tricks.as_strided(x, shape=shape, strides=strides, writeable=False)
 
-    def generate_fn_dict(self):
+    def generate_fn_dict(self, apply_rolling_window=False):
         if len(self.fn_dict) > 0:
             return
 
@@ -288,7 +293,13 @@ class PatchFeatureExtractor():
             self.inner_dict['SAVI' + post_fix] = lambda pan, bands, nir_key=nir_key: 1 + (1 + SAVI_L) * (bands[self.band_dict[nir_key], :] - bands[self.band_dict['R'], :]) / \
                                           (SAVI_L + bands[self.band_dict[nir_key], :] + bands[self.band_dict['R'], :])
 
-        self.win_dict = OrderedDict({'mean': lambda x: np.nanmean(x, axis=(0,1)), 'std': lambda x: np.nanstd(x, axis=(0,1)), 'entropy': lambda x: nanentropy(x, axis=(0,1))})
+        if apply_rolling_window:
+            self.win_dict = OrderedDict({'mean': lambda x: np.nanmean(self.rolling_window_view(x), axis=(0,1)),
+                                         'std': lambda x: np.nanstd(self.rolling_window_view(x), axis=(0,1)),
+                                         'entropy': lambda x: nanentropy(self.rolling_window_view(x), axis=(0,1))})
+        else:
+            self.win_dict = OrderedDict({'mean': lambda x: np.nanmean(x, axis=(0,1)), 'std': lambda x: np.nanstd(x, axis=(0,1)), 'entropy': lambda x: nanentropy(x, axis=(0,1))})
+
         self.scale_dict = OrderedDict({'log': np.log10, 'sqr': lambda x: np.power(x, 2), 'sqrt': np.sqrt})
 
         # mean, std, entropy
@@ -853,6 +864,11 @@ class ApplyLinearModel(object):
     def create(self, win_size=(1, 1), step_size=(1, 1)):
         with rasterio.Env():
             with rasterio.open(self.in_file_name, 'r') as in_ds:
+                pan_bands, band_dict = ImageFeatureExtractor.get_band_info(in_ds.count)
+                patch_feature_extractor = PatchFeatureExtractor(num_bands=len(band_dict), rolling_window_xsize=win_size[0], rolling_window_xstep=step_size[0])
+                win_off = np.floor(np.array(win_size) / (2 * step_size[0])).astype('int32')
+                prog_update = 10
+
                 if self.save_feats:
                     out_bands = len(self.model_keys) + 1
                 else:
@@ -874,9 +890,6 @@ class ApplyLinearModel(object):
                 # self.win_fn_list, self.band_ratio_list = AgcMap.construct_feat_ex_fns(self.model_keys, num_bands=in_ds.count)
 
                 with rasterio.open(self.out_file_name, 'w', **out_profile) as out_ds:
-                    pan_bands, band_dict = ImageFeatureExtractor.get_band_info(in_ds.count)
-                    win_off = np.floor(np.array(win_size)/(2*step_size[0])).astype('int32')
-                    prog_update = 10
                     for cy in range(0, in_ds.height - win_size[1] + 1, step_size[1]):     #12031): #
                         # read row of windows into mem and slide the win on this rather than the actual file
                         # NB rasterio index is x,y, numpy index is row, col (i.e. y,x)
@@ -894,11 +907,14 @@ class ApplyLinearModel(object):
                         out_win = Window(win_off[0], int(cy/step_size[0]) + win_off[1], out_size[0], 1)
                         # for i, (win_fn, band_ratio_fn) in enumerate(zip(self.win_fn_list, self.band_ratio_list)):
                         for i, model_key in enumerate(self.model_keys):
-                            inner_str, win_fn, band_ratio_fn = ApplyLinearModel.construct_feat_ex_fn(model_key, pan_bands=pan_bands,
-                                                                                                     band_dict=band_dict)
-                            band_ratio = band_ratio_fn(pan, in_buf)
-                            band_ratio[in_nan_mask] = np.nan           # to exclude from window stats/fns
-                            feat_buf = win_fn(ApplyLinearModel.rolling_window(band_ratio, win_size[0], step_size=step_size[0])) * self.model.coef_[i]
+                            if False:
+                                inner_str, win_fn, band_ratio_fn = ApplyLinearModel.construct_feat_ex_fn(model_key, pan_bands=pan_bands,
+                                                                                                         band_dict=band_dict)
+                                band_ratio = band_ratio_fn(pan, in_buf)
+                                band_ratio[in_nan_mask] = np.nan           # to exclude from window stats/fns
+                                feat_buf = win_fn(ApplyLinearModel.rolling_window(band_ratio, win_size[0], step_size=step_size[0])) * self.model.coef_[i]
+                            else:
+                                feat_buf = patch_feature_extractor.fn_dict[model_key](pan, in_buf)
                             agc_buf += feat_buf
                             if i==0:
                                 first_feat_buf = feat_buf
@@ -920,6 +936,7 @@ class ApplyLinearModel(object):
                         # out_win = Window(win_off[0], cy + win_off[1], in_ds.width - win_size[0] + 1, 1)
                         out_ds.write(agc_buf.reshape(1,-1), indexes=1, window=out_win)
 
+                        # TODO: proper progress bar
                         if np.floor(old_div(100*cy, in_ds.height)) > prog_update:
                             print('.', end=' ')
                             prog_update += 10

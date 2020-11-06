@@ -62,7 +62,7 @@ selected_feats_df, selected_scores =  mdl.FeatureSelector.forward_selection(im_p
 selected_loocv_scores = []
 num_feats = range(0, len(selected_scores))
 for i in num_feats:
-    scores, predicted = mdl.FeatureSelector.score_model(selected_feats_df.to_numpy()[:, :i + 1], y, model=linear_model.LinearRegression(), find_predicted=True, cv=5)
+    scores, predicted = mdl.FeatureSelector.score_model(selected_feats_df.to_numpy()[:, :i + 1], y, model=linear_model.LinearRegression(), find_predicted=True, cv=len(selected_feats_df))
     loocv_scores = {'R2': scores['R2_stacked'], 'RMSE': np.abs(scores['test_-RMSE']).mean()/1000., 'RMSE CI': np.percentile(np.abs(scores['test_-RMSE']), [5, 95])}
     selected_loocv_scores.append(loocv_scores)
     print('Scored model {0} of {1}'.format(i+1, len(selected_scores)))
@@ -142,11 +142,6 @@ fig.set_size_inches(5, 4, forward=True)
 mdl.scatter_y_actual_vs_pred(y/1000., predicted, scores)
 fig.savefig(root_path.joinpath(r'Data\Outputs\Plots\MeasVsPredAgcSingleFeatModel_b.png'), dpi=300)
 
-if True:
-    joblib.dump([best_multi_feat_model, selected_feats_df.columns[:best_model_idx+1].to_numpy(), scores], root_path.joinpath(r'Data\Outputs\Models\BestSingleFeatModelPy38Cv5v2.joblib'))
-    pickle.dump([best_multi_feat_model, selected_feats_df.columns[:best_model_idx+1].to_numpy(), scores], open(root_path.joinpath(r'Data\Outputs\Models\BestSingleFeatModelPy38Cv5v2.pickle'), 'wb'))
-
-
 # fitting
 best_single_feat_model = linear_model.LinearRegression(fit_intercept=True)
 best_single_feat_model.fit(selected_feats_df.iloc[:, :1], y/1000)
@@ -154,6 +149,11 @@ logger.info('Single feat model coefficient:')
 logger.info(np.array(best_single_feat_model.coef_))
 logger.info('Single feat model intercept:')
 logger.info(np.array(best_single_feat_model.intercept_))
+
+if True:
+    joblib.dump([best_single_feat_model, selected_feats_df.columns[:1].to_numpy(), scores], root_path.joinpath(r'Data\Outputs\Models\BestSingleFeatModelPy38Cv5v2.joblib'))
+    pickle.dump([best_single_feat_model, selected_feats_df.columns[:1].to_numpy(), scores], open(root_path.joinpath(r'Data\Outputs\Models\BestSingleFeatModelPy38Cv5v2.pickle'), 'wb'))
+
 
 
 lm = linear_model.LinearRegression()
