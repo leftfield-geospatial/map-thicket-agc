@@ -52,5 +52,5 @@ mapper.post_proc()
 # tmp = np.ones((3,3))
 # tmp2 = np.hstack((tmp,tmp*2,tmp*3,tmp*4,tmp*5))
 # pfe = mdl.PatchFeatureExtractor(num_bands=9, rolling_window_xsize=3, rolling_window_xstep=3)
-# pfe.rolling_window_view(tmp2)
+# pfe.__rolling_window_view(tmp2)
 

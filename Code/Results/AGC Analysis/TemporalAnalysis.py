@@ -23,7 +23,7 @@ ld = vr.read()
 
 image_readers = [su.GdalImageReader(imageFile) for imageFile in imageFiles]
 feature_extractors = [su.ImageFeatureExtractor(image_reader=imr, plot_feat_dict=ld['GEF Plot Polygons with AGC']) for imr in image_readers]
-implot_feat_dicts = [fex.extract_all_features(patch_fn=su.ImageFeatureExtractor.extract_patch_ms_features_ex) for fex in feature_extractors]
+implot_feat_dicts = [fex.extract_image_features(patch_fn=su.ImageFeatureExtractor.extract_patch_ms_features_ex) for fex in feature_extractors]
 vr.cleanup()
 for imr in image_readers:
     imr.cleanup()

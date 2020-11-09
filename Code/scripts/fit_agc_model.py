@@ -30,7 +30,7 @@ plot_agc_gdf = gpd.GeoDataFrame.from_file(plot_agc_shapefile_name)
 
 with rasterio.open(image_filename, 'r') as imr:
     fex = mdl.ImageFeatureExtractor(image_reader=imr, plot_data_gdf=plot_agc_gdf)
-    im_plot_data_gdf = fex.extract_all_features(patch_fn=mdl.ImageFeatureExtractor.extract_patch_ms_features_ex)
+    im_plot_data_gdf = fex.extract_image_features(patch_fn=mdl.ImageFeatureExtractor.extract_patch_ms_features_ex)
     # im_plot_data_gdf.pop('ST49')
 
 # fix stratum labels
@@ -238,7 +238,7 @@ vr = mdl.GdalVectorReader(plot_agc_shapefile_name)
 ld = vr.read()
 imr_clf = mdl.GdalImageReader(clf_file)
 fex_clf = mdl.ImageFeatureExtractor(image_reader=imr_clf, plot_feat_dict=ld['GEF Plot Polygons with Agc v5'])
-implot_feat_dict_clf = fex_clf.extract_all_features(patch_fn=mdl.ImageFeatureExtractor.extract_patch_clf_features)
+implot_feat_dict_clf = fex_clf.extract_image_features(patch_fn=mdl.ImageFeatureExtractor.extract_patch_clf_features)
 
 # set DegrClass field in implot_feat_dict using plot ID
 for f in list(implot_feat_dict_clf.values()):
@@ -285,7 +285,7 @@ vr = mdl.GdalVectorReader(plot_agc_shapefile_name)
 ld = vr.read()
 imr = mdl.GdalImageReader(image_filename)
 fex = mdl.ImageFeatureExtractor(image_reader=imr, plot_feat_dict=ld['GEF Plot Polygons with Agc v5'])
-implot_feat_dict = fex.extract_all_features(patch_fn=mdl.ImageFeatureExtractor.extract_patch_ms_features_ex)
+implot_feat_dict = fex.extract_image_features(patch_fn=mdl.ImageFeatureExtractor.extract_patch_ms_features_ex)
 
 # set DegrClass field in implot_feat_dict using plot ID
 for f in list(implot_feat_dict.values()):

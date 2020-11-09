@@ -56,7 +56,7 @@ ld = vr.read()
 with rasterio.open(imageFile, 'r') as imr:
     fex = su.ImageFeatureExtractor(image_reader=imr, plot_feat_dict=ld['GEF Plot Polygons with AGC'])
     # reload(su)
-    implot_feat_dict = fex.extract_all_features(patch_fn=su.ImageFeatureExtractor.extract_patch_ms_features_ex)
+    implot_feat_dict = fex.extract_image_features(patch_fn=su.ImageFeatureExtractor.extract_patch_ms_features_ex)
 # implot_feat_dict.pop('ST49')
 
 # set DegrClass field in implot_feat_dict using plot ID
@@ -245,7 +245,7 @@ vr = su.GdalVectorReader(samplingPlotGtFile)
 ld = vr.read()
 imr_clf = su.GdalImageReader(clf_file)
 fex_clf = su.ImageFeatureExtractor(image_reader=imr_clf, plot_feat_dict=ld['GEF Plot Polygons with Agc v5'])
-implot_feat_dict_clf = fex_clf.extract_all_features(patch_fn=su.ImageFeatureExtractor.extract_patch_clf_features)
+implot_feat_dict_clf = fex_clf.extract_image_features(patch_fn=su.ImageFeatureExtractor.extract_patch_clf_features)
 
 # set DegrClass field in implot_feat_dict using plot ID
 for f in list(implot_feat_dict_clf.values()):
@@ -292,7 +292,7 @@ vr = su.GdalVectorReader(samplingPlotGtFile)
 ld = vr.read()
 imr = su.GdalImageReader(imageFile)
 fex = su.ImageFeatureExtractor(image_reader=imr, plot_feat_dict=ld['GEF Plot Polygons with Agc v5'])
-implot_feat_dict = fex.extract_all_features(patch_fn=su.ImageFeatureExtractor.extract_patch_ms_features_ex)
+implot_feat_dict = fex.extract_image_features(patch_fn=su.ImageFeatureExtractor.extract_patch_ms_features_ex)
 
 # set DegrClass field in implot_feat_dict using plot ID
 for f in list(implot_feat_dict.values()):

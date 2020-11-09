@@ -1,48 +1,22 @@
-# TODO remove future etc
-# TODO replace GladImageReader with rasterio or equivalent
-# TODO replace GladVectorReader with ?? - something that reads to pandas?
+"""
+Classes and functions for feature extraction (from image patches) and feature selection using forward selection
 
-
-
-from __future__ import print_function
-from __future__ import division
-from builtins import zip
-from builtins import str
-from builtins import range
-from builtins import object
-from past.utils import old_div
-import sys
-import warnings, logging
-import gdal
-import ogr
+#TODO: license boilerplate
+"""
+import sys, warnings, logging
+from collections import OrderedDict
 import numpy as np
-import osr
 import matplotlib.pyplot as pyplot
-from enum import Enum
-from rasterio.rio.options import nodata_opt
-from scipy import stats as stats
-import scipy.signal as signal
 from matplotlib import patches
+from scipy import stats as stats
 from sklearn import linear_model, metrics
 from sklearn.model_selection import cross_val_predict, cross_validate
-
-import collections
-from collections import OrderedDict
 from sklearn.preprocessing import PolynomialFeatures
-from skimage.feature import greycomatrix, greycoprops
-from skimage import data
-import geopandas as gpd, pandas as pd
-
-from PIL import Image
-from PIL import ImageDraw
-import os
-import numpy as np
-import rasterio
-import re
 import rasterio
 from rasterio.features import sieve
 from rasterio.windows import Window
 from rasterio.mask import raster_geometry_mask
+import geopandas as gpd, pandas as pd
 
 if sys.version_info.major == 3:
     from sklearn.metrics import make_scorer
@@ -54,8 +28,16 @@ logger.setLevel(logging.DEBUG)
 
 def nanentropy(x, axis=None):
     """
-    x is assumed to be an (nsignals, nsamples) array containing integers between
-    0 and n_unique_vals
+    Find entropy ignoring NaNs
+
+    Parameters
+    ----------
+    x: n-dimentionsal numpy array
+    axis: specify dimension(s) of x along which to find entropy, default=None in which case all dimensions are used
+
+    Returns
+    -------
+    Entropy of x long specified dimensions
     """
     if not axis is None:
         if (len(axis) > x.ndim) or (np.any(np.array(axis) > x.ndim)):
@@ -63,21 +45,19 @@ def nanentropy(x, axis=None):
         elif len(axis) == x.ndim:
             axis = None
 
-    if axis is None:
-        # quantise x
+    if axis is None:    # find entropy along all dimensions of x
         nbins = 100
+        # quantise x into nbins bins
         x = x[~np.isnan(x)]
         if len(x) < 10:
             return 0.
-        x = x-x.min()
-        x = np.int32(np.round(np.float32(nbins*x)/x.max()))
+        x = x - x.min()
+        x = np.int32(np.round(np.float32(nbins * x) / x.max()))
 
         value, counts = np.unique(x, return_counts=True)
         p = np.array([count/float(x.size) for count in counts])
-        # p = np.array([np.size(x[x == i]) / (1.0 * x.size) for i in np.unique(x)])
-        # compute Shannon entropy in bits
         return -np.sum(p * np.log2(p))
-    else:        # hack for 2D slices of 3D array (on a rolling_window 3D array)
+    else:        # slice 3D array
         along_axis = np.setdiff1d(range(0, x.ndim), axis)[0]
         e = np.zeros((x.shape[along_axis]))
         for slice in range(x.shape[along_axis]):
@@ -87,32 +67,35 @@ def nanentropy(x, axis=None):
                 xa = x[:,slice,:]
             elif along_axis == 2:
                 xa = x[:,:,slice]
+            else:
+                raise Exception('along_axis > 2 or < 0')
             e[slice] = nanentropy(xa, axis=None)
         return e
 
-
-def scatter_y_actual_vs_pred(y, pred, scores, xlabel='Measured AGC (t C ha$^{-1}$)', ylabel='Predicted AGC (t C ha$^{-1}$)'):
-    df = pd.DataFrame({xlabel: y, ylabel: pred})
-    scatter_ds(df, do_regress=False)
-    # scatter_plot(y, pred, xlabel=xlabel, ylabel=ylabel, do_regress = False)
-
-    mn = np.min([y, pred])
-    mx = np.max([y, pred])
-    h, = pyplot.plot([0, mx], [0, mx], 'k--', lw=2, zorder=-1, label='1:1')
-    pyplot.xlim(0, mx)
-    pyplot.ylim(0, mx)
-    pyplot.text(26, 5, str.format('$R^2$ = {0:.2f}', scores['R2_stacked']),
-               fontdict={'size': 11})
-    pyplot.text(26, 2, str.format('RMSE = {0:.2f} t C ha{1}',np.abs(scores['test_-RMSE']).mean(),'$^{-1}$'),
-               fontdict={'size': 11})
-    pyplot.show()
-    pyplot.tight_layout()
-    pyplot.legend([h], ['1:1'], frameon=False)
-    pyplot.pause(0.1)
-
-
 def scatter_ds(data, x_col=None, y_col=None, class_col=None, label_col=None, thumbnail_col=None, do_regress=True,
                x_label=None, y_label=None, xfn=lambda x: x, yfn=lambda y: y):
+    """
+    2D scatter plot of pandas dataframe with annotations etc
+
+    Parameters
+    ----------
+    data: pandas dataframe
+    x_col: column to use for x axis
+    y_col: column to use for y axis
+    class_col: column to use for colouring classes (optional)
+    label_col: column to use for text labels of data points (optional)
+    thumbnail_col: columnt to use for image thumbnails (optional)
+    do_regress: True: display regression accuracies, default=False
+    x_label: text string for x axis label, if None use x_col
+    y_label: text string for y axis label, if None use y_col
+    xfn: function pointer for modifying x data (e.g. lambda x: np.log10(x))
+    yfn: function pointer for modifying y data (e.g. lambda x: np.log10(x))
+
+    Returns
+    -------
+    R2, RMSE statistics
+    """
+
     ims = 20.       # scale factor for thumbnails
     if x_col is None:
         x_col = data.columns[0]
@@ -126,10 +109,6 @@ def scatter_ds(data, x_col=None, y_col=None, class_col=None, label_col=None, thu
         data['class_col'] = np.zeros((data.shape[0],1))
         class_col = 'class_col'
 
-    # TO DO: either remove thumbnail option or refactor
-    # TO DO: sort classes
-    # if 'Intact' in classes and 'Moderate' in classes and 'Degraded' in classes and classes.size==3:
-    #     classes = np.array(['Degraded', 'Moderate', 'Intact'])
     classes = np.array([class_name for class_name, class_group in data.groupby(by=class_col)])
     n_classes =  len(classes)
     if n_classes == 1:
@@ -147,9 +126,10 @@ def scatter_ds(data, x_col=None, y_col=None, class_col=None, label_col=None, thu
     ax = pyplot.gca()
     handles = [0] * n_classes
 
+    # loop through data grouped by class (strata) if any
     for class_i, (class_label, class_data) in enumerate(data.groupby(by=class_col)):
         colour = colours[class_i]
-        if thumbnail_col is None:
+        if thumbnail_col is None:   # plot data points
             pyplot.plot(xfn(class_data[x_col]), yfn(class_data[y_col]), markerfacecolor=colour, marker='.', label=class_label, linestyle='None',
                        markeredgecolor=colour, markersize=5)
         for rowi, row in class_data.iterrows():
@@ -214,77 +194,109 @@ def scatter_ds(data, x_col=None, y_col=None, class_col=None, label_col=None, thu
     pyplot.show()
     return r ** 2, rmse
 
-class GroundClass(Enum):
-    Ground = 1
-    DPlant = 2
-    LPlant = 3
-    Shadow = 4
+
+def scatter_y_actual_vs_pred(y, pred, scores, xlabel='Measured AGC (t C ha$^{-1}$)', ylabel='Predicted AGC (t C ha$^{-1}$)'):
+    """
+    Scatter plot of predicted vs actual data in format for reporting
+
+    Parameters
+    ----------
+    y: actual data
+    pred: predicted data
+    scores: scores dict as returned by FeatureSelector.score_model()
+    xlabel: label for x axis (optional)
+    ylabel: label for y axis (optional)
+
+    """
+
+    df = pd.DataFrame({xlabel: y, ylabel: pred})    # form a datafram for scatter_ds
+    scatter_ds(df, do_regress=False)
+
+    mn = np.min([y, pred])
+    mx = np.max([y, pred])
+    h, = pyplot.plot([0, mx], [0, mx], 'k--', lw=2, zorder=-1, label='1:1')
+    pyplot.xlim(0, mx)
+    pyplot.ylim(0, mx)
+    pyplot.text(26, 5, str.format('$R^2$ = {0:.2f}', scores['R2_stacked']),
+               fontdict={'size': 11})
+    pyplot.text(26, 2, str.format('RMSE = {0:.2f} t C ha{1}',np.abs(scores['test_-RMSE']).mean(),'$^{-1}$'),
+               fontdict={'size': 11})
+    pyplot.show()
+    pyplot.tight_layout()
+    pyplot.legend([h], ['1:1'], frameon=False)
+    pyplot.pause(0.1)   # hack to get around pyplot bug when saving figure
+
 
 class PatchFeatureExtractor():
-    # TODO: Notes
-    # For modelling/ fex the inner funtions need to work on 2D arrays where 1st dim is bands and second dim flattened im x/y dir
-    # Then the win fns will be on 1D resulting arrays of inner fn which will give scalar vals i.e. no need for axis= params
-    #
-    # For mapping??
-    #  A) Separate inner and outer=win/scale fns
-    #    Inner ops on 3D arrays with bands on 1st dim and im x, y on 2d and 3rd dims.  The result is a 2D array correspond to im x, y.
-    #    The 2D array gets a 3D view with eg x, y along first 2 dims, and windows down 3rd dim.  The win applies along the
-    #    first and second dims to give a 1D array with as many elems as columns in the image.
-    #  B) Comhined inner and outer fns as for modelling
-    #    The 3D array gets a 4D view with dim1 = bands, dim2,3 = im x, y and dim4 = windows.
-    #    Inner ops on 4D arrays as above.  The result is a 3D view/array with 1st band dim gone, dim1,2 = im x,y and dim3 = win.
-    #    [The above is perhaps not a greatidea because storing the full 3D windowed array in mem as it is wasteful and not very flexible.
-    #    (~1000x more mem than for option A with 33 pixel window with 33 pixel steps).]
-    #    The win fns then operate as above, reducing the 3D array to a 1D array
-    #  C) The windowed view contruction is built inside a combined approach between the inner and win fns.  This may be
-    #     tricky to combine with modelling fex as that doesn't need view construction - possibly use an option when contructing
-    #     the fn dict.  If that option is doable, actually think this will be neatest and most efficient option.  It will mean
-    #     that the win_fn needs to be complexified to A) if inp is 1D, go to scalar, else B) if inp is 3D, operate down dims 1&2 and retutn 1D
-    #
-    #  In ref to C.. what about leaving out mask for modelling and rather setting those pixels to nan, then using nanmean etc for windows.
-    #  Then both modelling and mapping window functions will operate along axes 0 and 1.  Ya... I like this better.
-
     def __init__(self, num_bands=9, rolling_window_xsize=None, rolling_window_xstep=None):
+        """
+        Class for extracting band ratio, vegetation index and texture features from multi-spectral image patches.
+        Optional application of rolling window (x direction only)
+
+        Parameters
+        ----------
+        num_bands: number of multi-spectral bands
+        rolling_window_xsize: x size of rolling window in pixels (optional).  If None, no rolling window applied
+        rolling_window_xstep: Number of pixels to step in x direction (optional).
+        """
         self.pan_bands, self.band_dict = ImageFeatureExtractor.get_band_info(num_bands)
         self.fn_dict = {}
         self.rolling_window_xsize = rolling_window_xsize
         self.rolling_window_xstep = rolling_window_xstep
         if (self.rolling_window_xsize is not None) and (self.rolling_window_xstep is not None):
-            self.generate_fn_dict(apply_rolling_window=True)
+            self.__generate_fn_dict(apply_rolling_window=True)
         else:
-            self.generate_fn_dict()
+            self.__generate_fn_dict()
         return
 
-    def rolling_window_view(self, x):
-        if False:
-            shape = x.shape[:-1] + (int(1 + (x.shape[-1] - self.rolling_window_xsize) / self.rolling_window_xstep), self.rolling_window_xsize)
-            strides = x.strides[:-1] + (self.rolling_window_xstep * x.strides[-1], x.strides[-1])
-        else:
-            shape = x.shape[:-1] + (self.rolling_window_xsize, int(1 + (x.shape[-1] - self.rolling_window_xsize) / self.rolling_window_xstep))
-            strides = x.strides[:-1] + (x.strides[-1], self.rolling_window_xstep * x.strides[-1])
+    def __rolling_window_view(self, x):
+        """
+        Return a 3D strided view of 2D array where rolling windows are stacked along the third dimension.  No data
+        copying is involved - for fast and memory efficient rolling window applications.
+
+        Parameters
+        ----------
+        x: array to return view of
+
+        Returns
+        -------
+        3D rolling window view of x
+        """
+
+        shape = x.shape[:-1] + (self.rolling_window_xsize, int(1 + (x.shape[-1] - self.rolling_window_xsize) / self.rolling_window_xstep))
+        strides = x.strides[:-1] + (x.strides[-1], self.rolling_window_xstep * x.strides[-1])
         return np.lib.stride_tricks.as_strided(x, shape=shape, strides=strides, writeable=False)
 
-    def generate_fn_dict(self, apply_rolling_window=False):
+    def __generate_fn_dict(self, apply_rolling_window=False):
+        """
+        Generate feature extraction dictionary self.fn_dict with values= pointer to feature extraction functions, and
+        keys= descriptive feature strings.  Suitable for use with modelling from patches or mapping a whole image i.e.
+        ImageFeatureExtractor and ApplyLinearModel.  Generates band ratios, veg. indices, simple texture measures, and
+        non-linear transformations thereof.
+
+        Parameters
+        ----------
+        apply_rolling_window: Apply window function inside a rolling window
+
+        """
+
         if len(self.fn_dict) > 0:
             return
 
         # inner band ratios
         self.inner_dict = OrderedDict()
         self.inner_dict['pan/1'] = lambda pan, bands: pan
-        # self.inner_dict['1/pan'] = lambda pan, bands: 1/pan   # TO DO check = does log10 invalidate?
         for num_key in list(self.band_dict.keys()):
             self.inner_dict['{0}/pan'.format(num_key)] = lambda pan, bands, num_key=num_key: bands[self.band_dict[num_key], :] / pan
             self.inner_dict['pan/{0}'.format(num_key)] = lambda pan, bands, num_key=num_key: pan / bands[self.band_dict[num_key], :]
             self.inner_dict['{0}/1'.format(num_key)] = lambda pan, bands, num_key=num_key: bands[self.band_dict[num_key], :]
-            # self.inner_dict['1/{0}'.format(num_key)] = lambda pan, bands, num_key=num_key: 1/bands[self.band_dict[num_key], :] # TO DO check = does log10 invalidate?
             for den_key in list(self.band_dict.keys()):
                 if not num_key == den_key:
-                    self.inner_dict['{0}/{1}'.format(num_key, den_key)] = lambda pan, bands, num_key=num_key, den_key=den_key: old_div(bands[self.band_dict[num_key], :],  bands[self.band_dict[den_key], :])
+                    self.inner_dict['{0}/{1}'.format(num_key, den_key)] = lambda pan, bands, num_key=num_key, den_key=den_key: \
+                        bands[self.band_dict[num_key], :] /  bands[self.band_dict[den_key], :]
 
         # inner veg indices
-        SAVI_L = 0.05
-        # these vals for MODIS from https://en.wikipedia.org/wiki/Enhanced_vegetation_index
-        # L = 1.; C1 = 6; C2 = 7.5; G = 2.5
+        SAVI_L = 0.05   # wikipedia
         nir_keys = [key for key in list(self.band_dict.keys()) if ('NIR' in key) or ('RE' in key)]
         for nir_key in nir_keys:
             post_fix = '' if nir_key == 'NIR' else '_{0}'.format(nir_key)
@@ -293,77 +305,99 @@ class PatchFeatureExtractor():
             self.inner_dict['SAVI' + post_fix] = lambda pan, bands, nir_key=nir_key: 1 + (1 + SAVI_L) * (bands[self.band_dict[nir_key], :] - bands[self.band_dict['R'], :]) / \
                                           (SAVI_L + bands[self.band_dict[nir_key], :] + bands[self.band_dict['R'], :])
 
+        # window functions
         if apply_rolling_window:
-            self.win_dict = OrderedDict({'mean': lambda x: np.nanmean(self.rolling_window_view(x), axis=(0,1)),
-                                         'std': lambda x: np.nanstd(self.rolling_window_view(x), axis=(0,1)),
-                                         'entropy': lambda x: nanentropy(self.rolling_window_view(x), axis=(0,1))})
+            self.win_dict = OrderedDict({'mean': lambda x: np.nanmean(self.__rolling_window_view(x), axis=(0, 1)),
+                                         'std': lambda x: np.nanstd(self.__rolling_window_view(x), axis=(0, 1)),
+                                         'entropy': lambda x: nanentropy(self.__rolling_window_view(x), axis=(0, 1))})
         else:
             self.win_dict = OrderedDict({'mean': lambda x: np.nanmean(x, axis=(0,1)), 'std': lambda x: np.nanstd(x, axis=(0,1)), 'entropy': lambda x: nanentropy(x, axis=(0,1))})
 
         self.scale_dict = OrderedDict({'log': np.log10, 'sqr': lambda x: np.power(x, 2), 'sqrt': np.sqrt})
 
-        # mean, std, entropy
+        # combine inner, window and scaling functions
         for inner_key, inner_fn in self.inner_dict.items():
             for win_key, win_fn in self.win_dict.items():
                 fn_key = '({0}({1}))'.format(win_key, inner_key)
                 fn = lambda pan, bands, win_fn=win_fn, inner_fn=inner_fn: win_fn(inner_fn(pan, bands))
                 self.fn_dict[fn_key] = fn
-                if win_key == 'mean':
+                if win_key == 'mean':   # for backward compatibility - TODO: apply scaling to all windows
                     for scale_key, scale_fn in self.scale_dict.items():
-                        # if scale_key == 'log' or scale_key == 'sqrt'('VI' in inner_key) or ('ND' in inner_key):
                         fn_key = '{0}({1}({2}))'.format(scale_key, win_key, inner_key)
                         fn = lambda pan, bands, scale_fn=scale_fn, win_fn=win_fn, inner_fn=inner_fn: scale_fn(win_fn(inner_fn(pan, bands)))
                         self.fn_dict[fn_key] = fn
 
-        # **2, sqrt, log (with x and 1/x feats - do we need both **2 and sqrt?)
 
 
-# class to extract features from polygons in an raster
 class ImageFeatureExtractor(object):
+    def __init__(self, image_reader=rasterio.io.DatasetReader, plot_data_gdf=gpd.GeoDataFrame()):
+        """
+        Class to extract features from patches (e.g. ground truth plots) in an image
 
-    def __init__(self, image_reader=rasterio.io.DatasetReader, plot_feat_dict={}, plot_data_gdf=gpd.GeoDataFrame()):
-        ''' Class
         Parameters
         ----------
-        image_reader
-        plot_feat_dict
-        plot_data_gdf
-        '''
+        image_reader: rasterio.io.DatasetReader pointing to relevant image
+        plot_data_gdf: geopandas geodataframe of plot polygons with optional ground truth.  As created by
+        """
         self.image_reader = image_reader
         self.plot_data_gdf = plot_data_gdf
         self.im_plot_data_gdf = gpd.GeoDataFrame()
         self.patch_feature_extractor = PatchFeatureExtractor()
 
+    #TODO - put staticmethods in a more sensible place, or make them members?
     @staticmethod
     def get_band_info(num_bands=9):
-        if num_bands == 8:  # assume Wv3
-            # pan_bands = np.array([1, 2, 3, 4, 5, 6])     # this needs some experimentation and may be better using the actual pan info
+        """
+        Get an array of band numbers to sum to generate panchromatic, and a dict of band labels and numbers for
+        assumed multi-spectral images (Worldview3 or NGI aerial)
+
+        Parameters
+        ----------
+        num_bands: number of multi-spectral bands in the image
+
+        Returns
+        -------
+        (pan_bands, band_dict), where
+            pan_bands: array of band numbers to sum to create pan
+            band_dict: dictions of {band name: band number} for multi-spectral bands
+        """
+        if num_bands == 8:  # assume WV3
+            # pan_bands = np.array([1, 2, 3, 4, 5, 6])
             pan_bands = [1, 2, 4, 5]
             band_dict = OrderedDict([('C', 0), ('B', 1), ('G', 2), ('Y', 3), ('R', 4), ('RE', 5), ('NIR', 6), ('NIR2', 7)])
-            # band_dict = OrderedDict(
-            #     [('B', 1), ('G', 2), ('Y', 3), ('R', 4), ('RE', 5), ('NIR', 6), ('NIR2', 7)])       # exclude C which is noisy
-        elif num_bands == 9:  # assume Wv3 ms + pan in band 0
-            # pan_bands = np.array([0])
+        elif num_bands == 9:  # assume WV3 MS & PAN in band 0
+            # pan_bands = np.array([0])     # old version
             pan_bands = [2, 3, 5, 6]
             band_dict = OrderedDict(
                 [('C', 1), ('B', 2), ('G', 3), ('Y', 4), ('R', 5), ('RE', 6), ('NIR', 7), ('NIR2', 8)])
-            # band_dict = OrderedDict(
-            #     [('B', 2), ('G', 3), ('Y', 4), ('R', 5), ('RE', 6), ('NIR', 7), ('NIR2', 8)])       # exclude C which is noisy
-        else:  # assume NGI
-            # pan_bands = np.array([0, 1, 2, 3])
+        else:  # assume NGI aerial
             pan_bands = [0, 1, 2, 3]
             band_dict = OrderedDict([('R', 0), ('G', 1), ('B', 2), ('NIR', 3)])
         return pan_bands, band_dict
 
 
-    def extract_patch_features(self, patch_ms, mask=None):
+    def __extract_patch_features(self, patch_ms, mask=None):
+        """
+        Extract dictionary of features for multi-spectral image patch with optional mask
+
+        Parameters
+        ----------
+        patch_ms: numpy array of multi-spectal image patch - bands along first dimension (as with rasterio)
+        mask: mask of pixels to include (optional)
+
+        Returns
+        -------
+        A dictionary of features feat_dict = {'<feature string>': <feature value>, ...}
+        """
+
         if mask is None:
-            mask = np.all(patch_ms>0, axis=0)  #np.ones(imbuf.shape[:2])
+            mask = np.all(patch_ms>0, axis=0)
+
         mask = np.bool8(mask)
         patch_ms_mask = np.float64(patch_ms)
         patch_ms_mask[:, ~mask] = np.nan
         pan_bands, band_dict = ImageFeatureExtractor.get_band_info(patch_ms.shape[0])
-        pan_mask = patch_ms_mask[pan_bands, :].mean(axis=0)      # TO DO: fix for len(pan_bands)=1
+        pan_mask = patch_ms_mask[pan_bands, :].mean(axis=0)      # TODO: fix for len(pan_bands)=1
 
         feat_dict = OrderedDict()
         for fn_key, fn in self.patch_feature_extractor.fn_dict.items():
@@ -371,154 +405,7 @@ class ImageFeatureExtractor(object):
 
         return feat_dict
 
-
-    @staticmethod
-    def extract_patch_ms_features_ex(imbuf, mask=None, per_pixel=False, include_texture=True):
-        feat_dict = OrderedDict()
-
-        # note that ms bands have been scaled and likely will not sum back to approx pan, so it is better to use the actual pan
-        pan_bands, band_dict = ImageFeatureExtractor.get_band_info(imbuf.shape[2])
-
-        if mask is None:
-            mask = np.all(imbuf>0, axis=2)  #np.ones(imbuf.shape[:2])
-        mask = np.bool8(mask)
-        # mask = mask & np.all(imbuf > 0, axis=2) & np.all(imbuf[:,:,], axis=2)
-        imbuf_mask = np.ndarray(shape=(np.int32(mask.sum()), imbuf.shape[2]), dtype=np.float64)
-        for i in range(0, imbuf.shape[2]):
-            band = imbuf[:, :, i]
-            imbuf_mask[:, i] = np.float64(band[mask])               # TODO HACK - check / 5000.  # 5000 is scale for MODIS / XCALIB
-
-        # construct basic per-pixel features
-
-        feat_dict['pan'] = np.mean(imbuf_mask[:, pan_bands], 1)
-        # feat_dict['int'] = np.sum(imbuf_mask[:, np.array([2, 3, 5, 6])], 1)     #hack - remove
-        if True:
-            # constuct features of all possible band/pan ratios
-            for key in list(band_dict.keys()):
-                feat_dict[key] = imbuf_mask[:, band_dict[key]]
-            poly_feat_dict = OrderedDict()
-            for key1 in list(feat_dict.keys()):
-                poly_feat_dict[key1] = feat_dict[key1]
-                for key2 in list(feat_dict.keys()):
-                    if not key2 == key1:
-                        new_key = '{0}/{1}'.format(key1, key2)
-                        poly_feat_dict[new_key] = feat_dict[key1] / feat_dict[key2]
-            # poly_feat_dict = feat_dict
-        else:
-            feat_dict['1/pan'] = 1. / feat_dict['pan']
-            for key in list(band_dict.keys()):
-                feat_dict[key] = imbuf_mask[:, band_dict[key]]
-                feat_dict['1/{0}'.format(key)] = 1./imbuf_mask[:, band_dict[key]]   # invert features to get band ratios with polynomial combinations
-
-            feat_array = np.array(list(feat_dict.values())).transpose()
-            poly_feats = PolynomialFeatures(degree=2, interaction_only=False)
-            poly_feat_array = np.float64(poly_feats.fit_transform(feat_array))
-            poly_feat_names = np.array(poly_feats.get_feature_names())
-            my_poly_feat_names = []
-            for feat_name in poly_feat_names:       # messy way of re-constructing meaningful feature names
-                my_feat_name = ''
-                if feat_name == '1':
-                    my_feat_name = '1'
-                else:
-                    ns = np.array(feat_name.split('x'))
-                    ns = ns[ns!='']
-                    for nss in ns:
-                        nsss = np.array(nss.split('^'))
-                        my_feat_name += '({0})'.format(list(feat_dict.keys())[int(nsss[0])])
-                        if nsss.size > 1:
-                            my_feat_name += '^' + nsss[1]
-                my_poly_feat_names.append(my_feat_name)
-                # print feat_name
-                # print my_feat_name
-
-            # remove constant features (x * 1/x)
-            const_idx = np.all(np.round(poly_feat_array, 6)==1., axis=0)
-            poly_feat_array = poly_feat_array[:, ~const_idx]
-            poly_feat_names = poly_feat_names[~const_idx]
-            my_poly_feat_names = np.array(my_poly_feat_names)[~const_idx]
-            poly_feat_dict = OrderedDict(list(zip(my_poly_feat_names, poly_feat_array.transpose())))
-
-        # add NDVI and SAVI here, to avoid making ratios of them
-        SAVI_L = 0.05
-        # these vals for MODIS from https://en.wikipedia.org/wiki/Enhanced_vegetation_index
-        L = 1.; C1 = 6; C2 = 7.5; G = 2.5
-        nir_keys = [key for key in list(band_dict.keys()) if ('NIR' in key) or ('RE' in key)]
-        for i, nir_key in enumerate(nir_keys):
-            nir = imbuf_mask[:, band_dict[nir_key]]
-            r = imbuf_mask[:, band_dict['R']]
-            ndvi = old_div((nir - r),(nir + r))
-            savi = old_div((1 + SAVI_L) * (nir - r),(SAVI_L + nir + r))
-            # evi = G * (nir - r) / (L + nir + C1*r - C2*imbuf_mask[:, band_dict['B']])
-            # evi[np.isnan(evi)] = 0; evi[np.isinf(evi)] = 0
-            post_fix = '' if nir_key == 'NIR' else '_{0}'.format(nir_key)
-            poly_feat_dict['NDVI' + post_fix] = ndvi
-            poly_feat_dict['SAVI' + post_fix] = savi
-            # poly_feat_dict['EVI' + post_fix] = evi
-
-        if 'NIR2' in band_dict and False:
-            nir2 = imbuf_mask[:, band_dict['NIR2']]
-            nir = imbuf_mask[:, band_dict['NIR']]
-            poly_feat_dict['NDWI'] = old_div((nir2 - nir), (nir2 + nir))
-
-        # poly_feat_dict['NDVI'] = (imbuf_mask[:, band_dict['NIR']] - imbuf_mask[:, band_dict['R']]) / (imbuf_mask[:, band_dict['NIR']] + imbuf_mask[:, band_dict['R']])
-        # poly_feat_dict['SAVI'] = (1 + L) * (imbuf_mask[:, band_dict['NIR']] - imbuf_mask[:, band_dict['R']]) / (L + imbuf_mask[:, band_dict['NIR']] + imbuf_mask[:, band_dict['R']])
-        # poly_feat_dict['EVI'] = G * (imbuf_mask[:, band_dict['NIR']] - imbuf_mask[:, band_dict['R']]) / \
-        #                         (L + imbuf_mask[:, band_dict['NIR']] + C1*imbuf_mask[:, band_dict['R']] - C2*imbuf_mask[:, band_dict['B']])
-        if not per_pixel:   # find mean, std dev and ?? features over the plot
-            if True:
-                plot_feat_dict = OrderedDict()
-                for feat_key, feat_vect in poly_feat_dict.items():
-                    plot_feat_dict[feat_key] = feat_vect.mean()
-                    # note: here some fns are applied to per plot feats and not to per pixel feats (based on theory that only band ratios are necessary/valid per pixel)
-                    plot_feat_dict['({0})^2'.format(feat_key)] = (feat_vect.mean()**2)
-
-                    if include_texture:
-                        plot_feat_dict['Std({0})'.format(feat_key)] = feat_vect.std()
-                        plot_feat_dict['Entropy({0})'.format(feat_key)] = nanentropy(feat_vect)
-
-                    if True:    # ('VI' in feat_key) or ('ND' in feat_key):        # avoid -ve logs / sqrts
-                        plot_feat_dict['1+Log({0})'.format(feat_key)] = np.log10(1. + feat_vect.mean())
-                        plot_feat_dict['1+({0})^.5'.format(feat_key)] = np.sqrt(1. + feat_vect.mean())
-                    else:
-                        plot_feat_dict['Log({0})'.format(feat_key)] = np.log10(feat_vect.mean())
-                        plot_feat_dict['({0})^.5'.format(feat_key)] = np.sqrt(feat_vect.mean())
-                    # plot_feat_dict['({0})^.5'.format(feat_key)] = np.sqrt(feat_vect.mean())
-
-                    if False: # GLCM features
-                        # find pan and quantise to nlevels levels
-                        nlevels = 10
-                        max_dn = 4000
-                        pan_band = np.mean(imbuf[:,:,pan_bands], axis=2)
-                        if True:   # global clip normalise
-                            pan_band[pan_band < 0] = 0
-                            pan_band[pan_band > max_dn] = max_dn
-                            pan_band = np.uint8(old_div(((nlevels - 1) * pan_band), max_dn))
-                        else:       # local min max normalise
-                            pan_band = pan_band - pan_band.min()
-                            pan_band = np.uint8(old_div(((nlevels-1)*pan_band),pan_band.max()))
-                        cm = greycomatrix(pan_band, distances=[2, 8], angles=[0, old_div(np.pi, 2)], levels=nlevels, symmetric=True, normed=False)
-                        for prop_key, prop in {'corr':'correlation', 'diss':'dissimilarity', 'hom':'homogeneity'}.items():
-                            d = greycoprops(cm, prop)
-                            dd = d.mean(axis=1)
-                            plot_feat_dict['{0}(GLCM)'.format(prop_key)] = dd.mean()
-                            plot_feat_dict['{0}(GLCM)[0]'.format(prop_key)] = dd[0]
-                            plot_feat_dict['{0}(GLCM)[-1]'.format(prop_key)] = dd[-1]
-            else:
-                plot_feat_dict = OrderedDict()
-                for feat_key, feat_vect in poly_feat_dict.items():
-                    plot_feat_dict['Mean({0})'.format(feat_key)] = feat_vect.mean()
-                    if ('NDVI' in feat_key) or ('SAVI' in feat_key):
-                        plot_feat_dict['1+Log({0})'.format(feat_key)] = np.log10(1.+feat_vect.mean())
-                    else:
-                        plot_feat_dict['Log({0})'.format(feat_key)] = np.log10(feat_vect.mean())
-                    plot_feat_dict['Std({0})'.format(feat_key)] = feat_vect.std()
-            return plot_feat_dict
-        else:
-            return poly_feat_dict
-
-
-    # per_pixel = True, patch_fn = su.ImPlotFeatureExtractor.extract_patch_ms_features
-    def extract_all_features(self, per_pixel=False, patch_fn=extract_patch_ms_features_ex):
+    def extract_image_features(self):
         # geotransform = ds.GetGeoTransform()
         # transform = osr.CoordinateTransformation(self.plot_feat_dict['spatial_ref'], gdal.osr.SpatialReference(self.image_reader.crs.to_string()))
         # transform = osr.CoordinateTransformation(gdal.osr.SpatialReference(self.plot_data_gdf.crs.to_wkt()),
@@ -571,7 +458,7 @@ class ImageFeatureExtractor(object):
                     logger.warning(f'Excluding plot {plot["ID"]} - all pixels are zero')
                     continue
                 plot_mask = plot_mask & np.all(im_buf > 0, axis=0) & np.all(~np.isnan(im_buf), axis=0)
-                im_feat_dict = self.extract_patch_features(im_buf, mask=plot_mask)  # extract image features for this plot
+                im_feat_dict = self.__extract_patch_features(im_buf, mask=plot_mask)  # extract image features for this plot
 
             im_data_dict = im_feat_dict.copy()      # copy plot data into feat dict
             for k, v in plot.items():
