@@ -3,7 +3,7 @@ Classes and functions for feature extraction (from image patches) and feature se
 
 #TODO: license boilerplate
 """
-import sys, warnings, logging
+import sys, warnings, logging, os
 from collections import OrderedDict
 import numpy as np
 import matplotlib.pyplot as pyplot
@@ -393,7 +393,7 @@ class MsPatchFeatureExtractor(PatchFeatureExtractor):
                         self.fn_dict[fn_key] = fn
 
 
-    def extract_features(self, im_patch, mask=None):
+    def extract_features(self, im_patch, mask=None, fn_keys=None):
         """
         Extract dictionary of features for multi-spectral image patch with optional mask
 
@@ -401,11 +401,14 @@ class MsPatchFeatureExtractor(PatchFeatureExtractor):
         ----------
         im_patch: numpy array of multi-spectal image patch - bands along first dimension (as with rasterio)
         mask: mask of pixels to include (optional) - same x-y size as im_patch
+        fn_keys: list of feature keys to extract (optional - default extract all)
 
         Returns
         -------
         A dictionary of features feat_dict = {'<feature string>': <feature value>, ...}
         """
+        if fn_keys is None:
+            fn_keys = self.fn_dict.keys()
 
         if mask is None:
             mask = np.all(im_patch>0, axis=0)
@@ -418,8 +421,8 @@ class MsPatchFeatureExtractor(PatchFeatureExtractor):
         pan_mask = im_patch_mask[self.pan_bands, :].mean(axis=0)      # TODO: fix for len(pan_bands)=1
 
         feat_dict = OrderedDict()
-        for fn_key, fn in self.fn_dict.items():
-            feat_dict[fn_key] = fn(pan_mask, im_patch_mask)
+        for fn_key in fn_keys:
+            feat_dict[fn_key] = self.fn_dict[fn_key](pan_mask, im_patch_mask)
 
         return feat_dict
 
@@ -444,7 +447,7 @@ class ImageFeatureExtractor(object):
 
     def extract_image_features(self):
         """
-        Extract features from plot polygons specified by self.plot_data_gdf in image self.image_reader
+        Extract features from plot polygons specified by self.plot_data_gdf in image
 
         Returns
         -------
@@ -453,28 +456,25 @@ class ImageFeatureExtractor(object):
 
         self.plot_data_gdf = self.plot_data_gdf.to_crs(self.image_reader.crs)   # convert plot co-ordinates to image projection
 
-        # self.im_data_df = pd.DataFrame()
-        im_plot_data_dict = {}
-
+        im_plot_data_dict = {}      # dict to store plot features etc
         im_plot_count = 0
-        max_thumbnail_vals = np.zeros((self.image_reader.count))
+        max_thumbnail_vals = np.zeros((self.image_reader.count))    # max vals for each image band to scale thumbnails
 
-        # loop through plot polygons
-        for plot_id, plot in self.plot_data_gdf.iterrows():
-            # convert polygon to mask with rio
+        for plot_id, plot in self.plot_data_gdf.iterrows():     # loop through plot polygons
+            # convert polygon to raster mask
             plot_mask, plot_transform, plot_window = raster_geometry_mask(self.image_reader, [plot['geometry']], crop=True,
                                                                      all_touched=False)
-            plot_cnrs_pixel =  np.fliplr(np.array(plot_window.toranges()).transpose())
-            plot_mask = ~plot_mask
+            plot_cnrs_pixel =  np.array(plot_window.toranges())
+            plot_mask = ~plot_mask  # TODO: can we lose this?
 
             # check plot window lies inside image
-            # TODO - is there a rio shortcut for this?
-            if not (np.all(plot_cnrs_pixel >= 0) and np.all(plot_cnrs_pixel[:, 0] < self.image_reader.width) \
-                    and np.all(plot_cnrs_pixel[:, 1] < self.image_reader.height)):  # and plot.has_key('Yc') and plot['Yc'] > 0.:
+            if not (np.all(plot_cnrs_pixel[1, :] < self.image_reader.width) and np.all(plot_cnrs_pixel[0, :] < self.image_reader.height) \
+                    and np.all(plot_cnrs_pixel >= 0)):  # and plot.has_key('Yc') and plot['Yc'] > 0.:
                 logger.warning(f'Excluding plot {plot["ID"]} - outside image extent')
                 continue
 
             im_buf = self.image_reader.read(window=plot_window)     # read plot ROI from image
+
             if np.all(im_buf == 0):
                 logger.warning(f'Excluding plot {plot["ID"]} - all pixels are zero')
                 continue
@@ -487,20 +487,17 @@ class ImageFeatureExtractor(object):
 
             im_feat_dict = self.patch_feature_extractor.extract_features(im_buf, mask=plot_mask)  # extract image features for this plot
 
-            # im_data_dict = im_feat_dict.copy()      # copy plot data into feat dict
-            # for k, v in plot.items():
-            #     im_data_dict[k] = v
-            im_data_dict = {**im_feat_dict, **plot}
+            im_data_dict = {**im_feat_dict, **plot}     # combine features and other plot data
             im_data_dict['thumbnail'] = thumbnail
 
-            # calculate versions of ABC and AGC with actual polygon area, rather than theoretical plot sizes
+            # calculate versions of ABC and AGC normalised by actual polygon area, rather than theoretical plot sizes
             if 'Abc' in plot and 'LitterCHa' in plot:
                 litterCHa = np.max([plot['LitterCHa'], 0.])
                 abc = np.max([plot['Abc'], 0.])
                 im_data_dict['AbcHa2'] = abc * (100. ** 2) /  plot['geometry'].area
                 im_data_dict['AgcHa2'] = litterCHa + im_data_dict['AbcHa2']
 
-            im_plot_data_dict[plot_id] = im_data_dict
+            im_plot_data_dict[plot_id] = im_data_dict       # add to dict of all plots
 
             # calc max thumbnail vals for scaling later
             max_val = np.percentile(thumbnail, 98., axis=(0,1))
@@ -778,8 +775,9 @@ class ApplyLinearModel(object):
     def create(self, win_size=(1, 1), step_size=(1, 1)):
         with rasterio.Env():
             with rasterio.open(self.in_file_name, 'r') as in_ds:
-                pan_bands, band_dict = ImageFeatureExtractor.get_band_info(in_ds.count)
-                patch_feature_extractor = PatchFeatureExtractor(num_bands=in_ds.count, rolling_window_xsize=win_size[0], rolling_window_xstep=step_size[0])
+                # pan_bands, band_dict = MsPatchFeatureExtractor.get_band_info(in_ds.count)
+                patch_feature_extractor = MsPatchFeatureExtractor(num_bands=in_ds.count, apply_rolling_window=True,
+                                                                  rolling_window_xsize=win_size[0], rolling_window_xstep=step_size[0])
                 win_off = np.floor(np.array(win_size) / (2 * step_size[0])).astype('int32')
                 prog_update = 10
 
@@ -814,24 +812,28 @@ class ApplyLinearModel(object):
                         in_buf = in_ds.read(bands, window=in_win).astype(rasterio.float32)  # NB bands along first dim
 
                         # TO DO:  deal with -ve vals i.e. make all nans, mask out or something
-                        pan = in_buf[pan_bands, :, :].mean(axis=0)
-                        in_nan_mask = np.any(in_buf <= 0, axis=0) | np.any(pan == 0, axis=0)  # this is overly conservative but neater/faster
+                        pan = in_buf[patch_feature_extractor.pan_bands, :, :].mean(axis=0)
                         # agc_buf = self.model.intercept_ * np.ones((1, in_ds.width - win_size[0] + 1), dtype=out_ds.dtypes[0])
                         agc_buf = self.model.intercept_ * np.ones((out_size[0]), dtype=out_ds.dtypes[0])
                         out_win = Window(win_off[0], int(cy/step_size[0]) + win_off[1], out_size[0], 1)
                         # for i, (win_fn, band_ratio_fn) in enumerate(zip(self.win_fn_list, self.band_ratio_list)):
+                        if False:
+                            in_nan_mask = np.any(in_buf <= 0, axis=0) | np.any(pan == 0,
+                                                                               axis=0)  # this is overly conservative but neater/faster
+                            in_buf[:, in_nan_mask] = np.nan
+                            pan[in_nan_mask] = np.nan
+                        else:
+                            in_nan_mask = np.all(in_buf > 0, axis=0) & np.all(pan != 0,
+                                                                               axis=0)  # this is overly conservative but neater/faster
+                            feat_dict = patch_feature_extractor.extract_features(in_buf, mask=in_nan_mask, fn_keys=self.model_keys)
+
                         for i, model_key in enumerate(self.model_keys):
                             if False:
-                                inner_str, win_fn, band_ratio_fn = ApplyLinearModel.construct_feat_ex_fn(model_key, pan_bands=pan_bands,
-                                                                                                         band_dict=band_dict)
-                                band_ratio = band_ratio_fn(pan, in_buf)
-                                band_ratio[in_nan_mask] = np.nan           # to exclude from window stats/fns
-                                feat_buf = win_fn(ApplyLinearModel.rolling_window(band_ratio, win_size[0], step_size=step_size[0])) * self.model.coef_[i]
-                            else:
-                                in_buf[:, in_nan_mask] = np.nan
-                                pan[in_nan_mask] = np.nan
                                 feat_buf = patch_feature_extractor.fn_dict[model_key](pan, in_buf) * self.model.coef_[i]
-                            agc_buf += feat_buf
+                                agc_buf += feat_buf
+                            else:
+                                feat_buf = feat_dict[model_key]
+                                agc_buf += feat_buf * self.model.coef_[i]
                             if i==0:
                                 first_feat_buf = feat_buf
                             if self.save_feats:
@@ -853,7 +855,7 @@ class ApplyLinearModel(object):
                         out_ds.write(agc_buf.reshape(1,-1), indexes=1, window=out_win)
 
                         # TODO: proper progress bar
-                        if np.floor(old_div(100*cy, in_ds.height)) > prog_update:
+                        if np.floor(100*cy/ in_ds.height) > prog_update:
                             print('.', end=' ')
                             prog_update += 10
                             # break

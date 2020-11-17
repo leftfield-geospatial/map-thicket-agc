@@ -17,13 +17,14 @@ else:
 sys.path.append(str(root_path.joinpath('Code')))
 logging.basicConfig(format='%(levelname)s %(name)s: %(message)s')
 
-
 image_filename = r"D:\OneDrive\GEF Essentials\Source Images\WorldView3 Oct 2017\WorldView3_Oct2017_OrthoNgiDem_AtcorSrtmAdjCorr_PanAndPandSharpMs.tif"
 
-map_filename = root_path.joinpath(r'Data\Outputs\Geospatial\GEF5 SLM - WV3 Oct 2017 - Univariate AGC - 10m.tif')
-map_filename = root_path.joinpath(r'Data\Outputs\Geospatial\GEF5 SLM - WV3 Oct 2017 - Multivariate AGC - 10m.tif')
-model_filename = root_path.joinpath(r'Data\Outputs\Models\BestSingleFeatModelPy38Cv5v2.joblib')
-model_filename = root_path.joinpath(r'Data\Outputs\Models\BestMultiFeatModelPy38Cv5v2.joblib')
+if False:
+    map_filename = root_path.joinpath(r'Data\Outputs\Geospatial\GEF5 SLM - WV3 Oct 2017 - Univariate AGC - 10m.tif')
+    model_filename = root_path.joinpath(r'Data\Outputs\Models\BestSingleFeatModelPy38Cv5v2.joblib')
+else:
+    map_filename = root_path.joinpath(r'Data\Outputs\Geospatial\GEF5 SLM - WV3 Oct 2017 - Multivariate AGC - 10m.tif')
+    model_filename = root_path.joinpath(r'Data\Outputs\Models\BestMultiFeatModelPy38Cv5v2.joblib')
 # model_filename = r'C:\Data\Development\Projects\PhD GeoInformatics\Docs\Funding\GEF5\Invoices, Timesheets and Reports\Final Report\bestSingleTermModel.pickle'
 
 # gdal command lines (gdal v3+ to work with qgis)
@@ -34,6 +35,7 @@ model_filename = root_path.joinpath(r'Data\Outputs\Models\BestMultiFeatModelPy38
 # gdaladdo -ro -r average --config COMPRESS_OVERVIEW DEFLATE --config PHOTOMETRIC_OVERVIEW RGB --config INTERLEAVE_OVERVIEW BAND o17OCT01084657-M2AS_R1C12-058217622010_01_P001_PanAndPansharpMS.tif 2 4 8 16 32 64 128
 
 model, model_keys, model_scores = joblib.load(model_filename)
+
 # model, model_keys = pickle.load(open(model_filename, 'rb'), encoding='latin1')
 #
 # if sys.version_info.major == 3 and (type(model_keys[0]) is bytes or type(model_keys[0]) is np.bytes_):
