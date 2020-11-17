@@ -228,31 +228,31 @@ def scatter_y_actual_vs_pred(y, pred, scores, xlabel='Measured AGC (t C ha$^{-1}
 
 
 class PatchFeatureExtractor():
-    def __init__(self, num_bands=9, rolling_window_xsize=None, rolling_window_xstep=None):
+    def __init__(self, apply_rolling_window=False, rolling_window_xsize=None, rolling_window_xstep=None):
         """
-        Class for extracting band ratio, vegetation index and texture features from multi-spectral image patches.
+        Virtual class for features from image patches.
         Optional application of rolling window (x direction only)
 
         Parameters
         ----------
-        num_bands: number of multi-spectral bands
-        rolling_window_xsize: x size of rolling window in pixels (optional).  If None, no rolling window applied
-        rolling_window_xstep: Number of pixels to step in x direction (optional).
+        apply_rolling_window: include rolling window in feature functions
+        rolling_window_xsize: x size of rolling window in pixels (optional)
+        rolling_window_xstep: Number of pixels to step in x direction (optional)
         """
-        self.pan_bands, self.band_dict = ImageFeatureExtractor.get_band_info(num_bands)
         self.fn_dict = {}
+        if apply_rolling_window==True:
+            if rolling_window_xsize is None or rolling_window_xstep is None:
+                raise Exception("rolling_window_xsize and rolling_window_xstep must be specified")
+        self.apply_rolling_window = apply_rolling_window
         self.rolling_window_xsize = rolling_window_xsize
         self.rolling_window_xstep = rolling_window_xstep
-        if (self.rolling_window_xsize is not None) and (self.rolling_window_xstep is not None):
-            self.__generate_fn_dict(apply_rolling_window=True)
-        else:
-            self.__generate_fn_dict()
+        self.generate_fn_dict()
         return
 
-    def __rolling_window_view(self, x):
+    def rolling_window_view(self, x):
         """
-        Return a 3D strided view of 2D array where rolling windows are stacked along the third dimension.  No data
-        copying is involved - for fast and memory efficient rolling window applications.
+        Return a 3D strided view of 2D array to allow fast rolling window operations.
+        Rolling windows are stacked along the third dimension.  No data copying is involved.
 
         Parameters
         ----------
@@ -267,7 +267,7 @@ class PatchFeatureExtractor():
         strides = x.strides[:-1] + (x.strides[-1], self.rolling_window_xstep * x.strides[-1])
         return np.lib.stride_tricks.as_strided(x, shape=shape, strides=strides, writeable=False)
 
-    def __generate_fn_dict(self, apply_rolling_window=False):
+    def generate_fn_dict(self):
         """
         Generate feature extraction dictionary self.fn_dict with values= pointer to feature extraction functions, and
         keys= descriptive feature strings.  Suitable for use with modelling from patches or mapping a whole image i.e.
@@ -279,70 +279,31 @@ class PatchFeatureExtractor():
         apply_rolling_window: Apply window function inside a rolling window
 
         """
+        raise NotImplementedError()
 
-        if len(self.fn_dict) > 0:
-            return
-
-        # inner band ratios
-        self.inner_dict = OrderedDict()
-        self.inner_dict['pan/1'] = lambda pan, bands: pan
-        for num_key in list(self.band_dict.keys()):
-            self.inner_dict['{0}/pan'.format(num_key)] = lambda pan, bands, num_key=num_key: bands[self.band_dict[num_key], :] / pan
-            self.inner_dict['pan/{0}'.format(num_key)] = lambda pan, bands, num_key=num_key: pan / bands[self.band_dict[num_key], :]
-            self.inner_dict['{0}/1'.format(num_key)] = lambda pan, bands, num_key=num_key: bands[self.band_dict[num_key], :]
-            for den_key in list(self.band_dict.keys()):
-                if not num_key == den_key:
-                    self.inner_dict['{0}/{1}'.format(num_key, den_key)] = lambda pan, bands, num_key=num_key, den_key=den_key: \
-                        bands[self.band_dict[num_key], :] /  bands[self.band_dict[den_key], :]
-
-        # inner veg indices
-        SAVI_L = 0.05   # wikipedia
-        nir_keys = [key for key in list(self.band_dict.keys()) if ('NIR' in key) or ('RE' in key)]
-        for nir_key in nir_keys:
-            post_fix = '' if nir_key == 'NIR' else '_{0}'.format(nir_key)
-            self.inner_dict['NDVI' + post_fix] = lambda pan, bands, nir_key=nir_key: 1 + (bands[self.band_dict[nir_key], :] - bands[self.band_dict['R'], :]) / \
-                                          (bands[self.band_dict[nir_key], :] + bands[self.band_dict['R'], :])
-            self.inner_dict['SAVI' + post_fix] = lambda pan, bands, nir_key=nir_key: 1 + (1 + SAVI_L) * (bands[self.band_dict[nir_key], :] - bands[self.band_dict['R'], :]) / \
-                                          (SAVI_L + bands[self.band_dict[nir_key], :] + bands[self.band_dict['R'], :])
-
-        # window functions
-        if apply_rolling_window:
-            self.win_dict = OrderedDict({'mean': lambda x: np.nanmean(self.__rolling_window_view(x), axis=(0, 1)),
-                                         'std': lambda x: np.nanstd(self.__rolling_window_view(x), axis=(0, 1)),
-                                         'entropy': lambda x: nanentropy(self.__rolling_window_view(x), axis=(0, 1))})
-        else:
-            self.win_dict = OrderedDict({'mean': lambda x: np.nanmean(x, axis=(0,1)), 'std': lambda x: np.nanstd(x, axis=(0,1)), 'entropy': lambda x: nanentropy(x, axis=(0,1))})
-
-        self.scale_dict = OrderedDict({'log': np.log10, 'sqr': lambda x: np.power(x, 2), 'sqrt': np.sqrt})
-
-        # combine inner, window and scaling functions
-        for inner_key, inner_fn in self.inner_dict.items():
-            for win_key, win_fn in self.win_dict.items():
-                fn_key = '({0}({1}))'.format(win_key, inner_key)
-                fn = lambda pan, bands, win_fn=win_fn, inner_fn=inner_fn: win_fn(inner_fn(pan, bands))
-                self.fn_dict[fn_key] = fn
-                if win_key == 'mean':   # for backward compatibility - TODO: apply scaling to all windows
-                    for scale_key, scale_fn in self.scale_dict.items():
-                        fn_key = '{0}({1}({2}))'.format(scale_key, win_key, inner_key)
-                        fn = lambda pan, bands, scale_fn=scale_fn, win_fn=win_fn, inner_fn=inner_fn: scale_fn(win_fn(inner_fn(pan, bands)))
-                        self.fn_dict[fn_key] = fn
-
-
-
-class ImageFeatureExtractor(object):
-    def __init__(self, image_reader=rasterio.io.DatasetReader, plot_data_gdf=gpd.GeoDataFrame()):
+    def extract_features(self, im_patch, mask=None):
         """
-        Class to extract features from patches (e.g. ground truth plots) in an image
+        Virtual method to extract features from image patch with optional mask
+        """
+        raise NotImplementedError()
+
+
+class MsPatchFeatureExtractor(PatchFeatureExtractor):
+    def __init__(self, num_bands=9, apply_rolling_window=False, rolling_window_xsize=None, rolling_window_xstep=None):
+        """
+        PatchFeatureExtractor for extracting band ratio, vegetation index and texture features from multi-spectral image patches.
 
         Parameters
         ----------
-        image_reader: rasterio.io.DatasetReader pointing to relevant image
-        plot_data_gdf: geopandas geodataframe of plot polygons with optional ground truth.  As created by
+        num_bands: number of multi-spectral bands
+        apply_rolling_window: include rolling window in feature functions
+        rolling_window_xsize: x size of rolling window in pixels (optional).  If None, no rolling window applied
+        rolling_window_xstep: Number of pixels to step in x direction (optional).
         """
-        self.image_reader = image_reader
-        self.plot_data_gdf = plot_data_gdf
-        self.im_plot_data_gdf = gpd.GeoDataFrame()
-        self.patch_feature_extractor = PatchFeatureExtractor()
+        self.num_bands = num_bands
+        self.pan_bands, self.band_dict = self.get_band_info(num_bands)
+        PatchFeatureExtractor.__init__(self, apply_rolling_window=apply_rolling_window, rolling_window_xsize=rolling_window_xsize,
+                                       rolling_window_xstep=rolling_window_xstep)
 
     #TODO - put staticmethods in a more sensible place, or make them members?
     @staticmethod
@@ -375,15 +336,71 @@ class ImageFeatureExtractor(object):
             band_dict = OrderedDict([('R', 0), ('G', 1), ('B', 2), ('NIR', 3)])
         return pan_bands, band_dict
 
+    def generate_fn_dict(self):
+        """
+        Generate feature extraction dictionary self.fn_dict with values= pointers to feature extraction functions, and
+        keys= descriptive feature strings.  Suitable for use with modelling from patches or mapping a whole image i.e.
+        ImageFeatureExtractor and ApplyLinearModel.  Generates band ratios, veg. indices, simple texture measures, and
+        non-linear transformations thereof.
 
-    def __extract_patch_features(self, patch_ms, mask=None):
+        """
+
+        if len(self.fn_dict) > 0:
+            return
+
+        # inner band ratios
+        self.inner_dict = OrderedDict()
+        self.inner_dict['pan/1'] = lambda pan, bands: pan
+        for num_key in list(self.band_dict.keys()):
+            self.inner_dict['{0}/pan'.format(num_key)] = lambda pan, bands, num_key=num_key: bands[self.band_dict[num_key], :] / pan
+            self.inner_dict['pan/{0}'.format(num_key)] = lambda pan, bands, num_key=num_key: pan / bands[self.band_dict[num_key], :]
+            self.inner_dict['{0}/1'.format(num_key)] = lambda pan, bands, num_key=num_key: bands[self.band_dict[num_key], :]
+            for den_key in list(self.band_dict.keys()):
+                if not num_key == den_key:
+                    self.inner_dict['{0}/{1}'.format(num_key, den_key)] = lambda pan, bands, num_key=num_key, den_key=den_key: \
+                        bands[self.band_dict[num_key], :] /  bands[self.band_dict[den_key], :]
+
+        # inner veg indices
+        SAVI_L = 0.05   # wikipedia
+        nir_keys = [key for key in list(self.band_dict.keys()) if ('NIR' in key) or ('RE' in key)]
+        for nir_key in nir_keys:
+            post_fix = '' if nir_key == 'NIR' else '_{0}'.format(nir_key)
+            self.inner_dict['NDVI' + post_fix] = lambda pan, bands, nir_key=nir_key: 1 + (bands[self.band_dict[nir_key], :] - bands[self.band_dict['R'], :]) / \
+                                          (bands[self.band_dict[nir_key], :] + bands[self.band_dict['R'], :])
+            self.inner_dict['SAVI' + post_fix] = lambda pan, bands, nir_key=nir_key: 1 + (1 + SAVI_L) * (bands[self.band_dict[nir_key], :] - bands[self.band_dict['R'], :]) / \
+                                          (SAVI_L + bands[self.band_dict[nir_key], :] + bands[self.band_dict['R'], :])
+
+        # window functions
+        if self.apply_rolling_window:
+            self.win_dict = OrderedDict({'mean': lambda x: np.nanmean(self.rolling_window_view(x), axis=(0, 1)),
+                                         'std': lambda x: np.nanstd(self.rolling_window_view(x), axis=(0, 1)),
+                                         'entropy': lambda x: nanentropy(self.rolling_window_view(x), axis=(0, 1))})
+        else:
+            self.win_dict = OrderedDict({'mean': lambda x: np.nanmean(x, axis=(0,1)), 'std': lambda x: np.nanstd(x, axis=(0,1)), 'entropy': lambda x: nanentropy(x, axis=(0,1))})
+
+        self.scale_dict = OrderedDict({'log': np.log10, 'sqr': lambda x: np.power(x, 2), 'sqrt': np.sqrt})
+
+        # combine inner, window and scaling functions
+        for inner_key, inner_fn in self.inner_dict.items():
+            for win_key, win_fn in self.win_dict.items():
+                fn_key = '({0}({1}))'.format(win_key, inner_key)
+                fn = lambda pan, bands, win_fn=win_fn, inner_fn=inner_fn: win_fn(inner_fn(pan, bands))
+                self.fn_dict[fn_key] = fn
+                if win_key == 'mean':   # for backward compatibility - TODO: apply scaling to all windows
+                    for scale_key, scale_fn in self.scale_dict.items():
+                        fn_key = '{0}({1}({2}))'.format(scale_key, win_key, inner_key)
+                        fn = lambda pan, bands, scale_fn=scale_fn, win_fn=win_fn, inner_fn=inner_fn: scale_fn(win_fn(inner_fn(pan, bands)))
+                        self.fn_dict[fn_key] = fn
+
+
+    def extract_features(self, im_patch, mask=None):
         """
         Extract dictionary of features for multi-spectral image patch with optional mask
 
         Parameters
         ----------
-        patch_ms: numpy array of multi-spectal image patch - bands along first dimension (as with rasterio)
-        mask: mask of pixels to include (optional)
+        im_patch: numpy array of multi-spectal image patch - bands along first dimension (as with rasterio)
+        mask: mask of pixels to include (optional) - same x-y size as im_patch
 
         Returns
         -------
@@ -391,28 +408,50 @@ class ImageFeatureExtractor(object):
         """
 
         if mask is None:
-            mask = np.all(patch_ms>0, axis=0)
+            mask = np.all(im_patch>0, axis=0)
 
         mask = np.bool8(mask)
-        patch_ms_mask = np.float64(patch_ms)
-        patch_ms_mask[:, ~mask] = np.nan
-        pan_bands, band_dict = ImageFeatureExtractor.get_band_info(patch_ms.shape[0])
-        pan_mask = patch_ms_mask[pan_bands, :].mean(axis=0)      # TODO: fix for len(pan_bands)=1
+        im_patch_mask = np.float64(im_patch)
+        im_patch_mask[:, ~mask] = np.nan
+        if self.num_bands != im_patch.shape[0]:
+            raise Exception("im_patch must have the same number of bands as passed to MsPatchFeatureExtractor(...)")
+        pan_mask = im_patch_mask[self.pan_bands, :].mean(axis=0)      # TODO: fix for len(pan_bands)=1
 
         feat_dict = OrderedDict()
-        for fn_key, fn in self.patch_feature_extractor.fn_dict.items():
-            feat_dict[fn_key] = fn(pan_mask, patch_ms_mask)
+        for fn_key, fn in self.fn_dict.items():
+            feat_dict[fn_key] = fn(pan_mask, im_patch_mask)
 
         return feat_dict
 
-    def extract_image_features(self):
-        # geotransform = ds.GetGeoTransform()
-        # transform = osr.CoordinateTransformation(self.plot_feat_dict['spatial_ref'], gdal.osr.SpatialReference(self.image_reader.crs.to_string()))
-        # transform = osr.CoordinateTransformation(gdal.osr.SpatialReference(self.plot_data_gdf.crs.to_wkt()),
-        #                                          gdal.osr.SpatialReference(self.image_reader.crs.to_wkt()))
 
-        self.plot_data_gdf = self.plot_data_gdf.to_crs(self.image_reader.crs)
-        self.plot_data_gdf = self.plot_data_gdf.set_index('ID').sort_index()
+class ImageFeatureExtractor(object):
+    def __init__(self, image_filename=None, plot_data_gdf=gpd.GeoDataFrame()):
+        """
+        Class to extract features from patches (e.g. ground truth plots) in an image
+
+        Parameters
+        ----------
+        image_filename: path to image file
+        plot_data_gdf: geopandas geodataframe of plot polygons with optional ground truth and index of plot ID strings
+        """
+        self.image_reader = rasterio.open(image_filename, 'r')
+        self.plot_data_gdf = plot_data_gdf
+        self.im_plot_data_gdf = gpd.GeoDataFrame()  # geodataframe of features in subindex 'feats' and data in 'data'
+        self.patch_feature_extractor = MsPatchFeatureExtractor(num_bands=self.image_reader.count)
+
+    def __del__(self):
+        self.image_reader.close()
+
+    def extract_image_features(self):
+        """
+        Extract features from plot polygons specified by self.plot_data_gdf in image self.image_reader
+
+        Returns
+        -------
+        geodataframe of features in subindex 'feats' and data in 'data'
+        """
+
+        self.plot_data_gdf = self.plot_data_gdf.to_crs(self.image_reader.crs)   # convert plot co-ordinates to image projection
 
         # self.im_data_df = pd.DataFrame()
         im_plot_data_dict = {}
@@ -436,33 +475,23 @@ class ImageFeatureExtractor(object):
                 continue
 
             im_buf = self.image_reader.read(window=plot_window)     # read plot ROI from image
-            if False:
-                im_buf = np.moveaxis(im_buf, 0, 2)  # TODO get rid of this somehow eg change all imbuf axis orderings to bands first
-                thumbnail = np.float32(im_buf.copy())
+            if np.all(im_buf == 0):
+                logger.warning(f'Excluding plot {plot["ID"]} - all pixels are zero')
+                continue
 
-                if np.all(im_buf == 0) and not patch_fn == self.extract_patch_clf_features:
-                    logger.warning(f'Excluding plot {plot["ID"]} - all pixels are zero')
-                    continue
+            plot_mask = plot_mask & np.all(im_buf > 0, axis=0) & np.all(~np.isnan(im_buf), axis=0)  # exclude any nan or -ve pixels
 
-                # amend plot_mask to exclude NAN and -ve pixels
-                if False: #patch_fn == self.extract_patch_clf_features:
-                    plot_mask = plot_mask & np.all(~np.isnan(im_buf), axis=2)
-                else:
-                    plot_mask = plot_mask & np.all(im_buf > 0, axis=2) & np.all(~np.isnan(im_buf), axis=2)
+            # create plot thumbnail for visualisation
+            thumbnail = np.float32(np.moveaxis(im_buf, 0, 2))
+            thumbnail[~plot_mask] = 0.
 
-                im_feat_dict = patch_fn(im_buf.copy(), mask=plot_mask, per_pixel=per_pixel)    # extract image features for this plot
-            else:
+            im_feat_dict = self.patch_feature_extractor.extract_features(im_buf, mask=plot_mask)  # extract image features for this plot
 
-                thumbnail = np.float32(np.moveaxis(im_buf, 0, 2))
-                if np.all(im_buf == 0):
-                    logger.warning(f'Excluding plot {plot["ID"]} - all pixels are zero')
-                    continue
-                plot_mask = plot_mask & np.all(im_buf > 0, axis=0) & np.all(~np.isnan(im_buf), axis=0)
-                im_feat_dict = self.__extract_patch_features(im_buf, mask=plot_mask)  # extract image features for this plot
-
-            im_data_dict = im_feat_dict.copy()      # copy plot data into feat dict
-            for k, v in plot.items():
-                im_data_dict[k] = v
+            # im_data_dict = im_feat_dict.copy()      # copy plot data into feat dict
+            # for k, v in plot.items():
+            #     im_data_dict[k] = v
+            im_data_dict = {**im_feat_dict, **plot}
+            im_data_dict['thumbnail'] = thumbnail
 
             # calculate versions of ABC and AGC with actual polygon area, rather than theoretical plot sizes
             if 'Abc' in plot and 'LitterCHa' in plot:
@@ -471,13 +500,9 @@ class ImageFeatureExtractor(object):
                 im_data_dict['AbcHa2'] = abc * (100. ** 2) /  plot['geometry'].area
                 im_data_dict['AgcHa2'] = litterCHa + im_data_dict['AbcHa2']
 
-            # create and store plot thumbnail
-            thumbnail[~plot_mask] = 0.
-            im_data_dict['thumbnail'] = thumbnail
-
             im_plot_data_dict[plot_id] = im_data_dict
 
-            # store max thumbnail vals for scaling later
+            # calc max thumbnail vals for scaling later
             max_val = np.percentile(thumbnail, 98., axis=(0,1))
             max_thumbnail_vals[max_val > max_thumbnail_vals] = max_val[max_val > max_thumbnail_vals]
             im_plot_count += 1
@@ -500,11 +525,13 @@ class ImageFeatureExtractor(object):
         data_labels = ['feats']*len(im_feat_dict) + ['data']*(len(im_data_dict) - len(im_feat_dict))
         columns = pd.MultiIndex.from_arrays([data_labels, list(im_data_dict.keys())], names=['high','low'])
 
+        # create geodataframe of results
         self.im_plot_data_gdf = gpd.GeoDataFrame.from_dict(im_plot_data_dict, orient='index')
         self.im_plot_data_gdf.columns = columns
         self.im_plot_data_gdf[('data','ID')] = self.im_plot_data_gdf.index
 
         return self.im_plot_data_gdf
+
 
 class FeatureSelector(object):
     def __init__(self):

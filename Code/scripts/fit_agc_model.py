@@ -27,10 +27,10 @@ plot_agc_shapefile_name = root_path.joinpath(r'Data\Outputs\Geospatial\GEF Plot 
 image_filename = r"D:\OneDrive\GEF Essentials\Source Images\WorldView3 Oct 2017\WorldView3_Oct2017_OrthoNgiDem_AtcorSrtmAdjCorr_PanAndPandSharpMs.tif"
 
 plot_agc_gdf = gpd.GeoDataFrame.from_file(plot_agc_shapefile_name)
+plot_agc_gdf = plot_agc_gdf.set_index('ID').sort_index()
 
-with rasterio.open(image_filename, 'r') as imr:
-    fex = mdl.ImageFeatureExtractor(image_reader=imr, plot_data_gdf=plot_agc_gdf)
-    im_plot_data_gdf = fex.extract_image_features(patch_fn=mdl.ImageFeatureExtractor.extract_patch_ms_features_ex)
+fex = mdl.ImageFeatureExtractor(image_filename=image_filename, plot_data_gdf=plot_agc_gdf)
+im_plot_data_gdf = fex.extract_image_features()
     # im_plot_data_gdf.pop('ST49')
 
 # fix stratum labels
