@@ -1,8 +1,10 @@
 """
-Classes and functions for feature extraction (from image patches) and feature selection using forward selection
-
-#TODO: license boilerplate
+  GEF5-SLM: Above ground carbon estimation in thicket using multi-spectral images
+  Copyright (C) 2020 Dugal Harris
+  Released under GNU Affero General Public License (AGPL) (https://www.gnu.org/licenses/agpl.html)
+  Email dugalh@gmail.com
 """
+
 import sys, warnings, logging, os
 from collections import OrderedDict
 import numpy as np
@@ -289,6 +291,12 @@ class PatchFeatureExtractor():
 
 
 class MsPatchFeatureExtractor(PatchFeatureExtractor):
+    # TODO: PatchFeatureExtractor and MsPatchFeatureExtractor could use some refactoring that gets around the
+    #  necessity for apply_rolling_window which is confusing e.g. rolling_window_xsize and rolling_window_xstep are
+    #  always passed to extract_features(), and not to __init__. extract_features() then passes to feature functions in
+    #  fn_dict.  If there is no rolling window then rolling_window_xsize and rolling_window_xstep are set to the patch x
+    #  size.  This would avoid the need for upfront specification of rolling window.
+
     def __init__(self, num_bands=9, apply_rolling_window=False, rolling_window_xsize=None, rolling_window_xstep=None):
         """
         PatchFeatureExtractor for extracting band ratio, vegetation index and texture features from multi-spectral image patches.
@@ -305,7 +313,6 @@ class MsPatchFeatureExtractor(PatchFeatureExtractor):
         PatchFeatureExtractor.__init__(self, apply_rolling_window=apply_rolling_window, rolling_window_xsize=rolling_window_xsize,
                                        rolling_window_xstep=rolling_window_xstep)
 
-    #TODO - put staticmethods in a more sensible place, or make them members?
     @staticmethod
     def get_band_info(num_bands=9):
         """
@@ -338,11 +345,10 @@ class MsPatchFeatureExtractor(PatchFeatureExtractor):
 
     def generate_fn_dict(self):
         """
-        Generate feature extraction dictionary self.fn_dict with values= pointers to feature extraction functions, and
-        keys= descriptive feature strings.  Suitable for use with modelling from patches or mapping a whole image i.e.
-        ImageFeatureExtractor and ApplyLinearModel.  Generates band ratios, veg. indices, simple texture measures, and
-        non-linear transformations thereof.
-
+        Generate feature extraction dictionary with values= pointers to feature extraction functions, and
+        keys= descriptive feature strings.
+        Suitable for use with modelling from patches or mapping a whole image i.e. ImageFeatureExtractor and ApplyLinearModel.
+        Generates band ratios, veg. indices, simple texture measures, and non-linear transformations thereof.
         """
 
         if len(self.fn_dict) > 0:
@@ -427,14 +433,15 @@ class MsPatchFeatureExtractor(PatchFeatureExtractor):
         return feat_dict
 
 
-class ImageFeatureExtractor(object):
+class MsImageFeatureExtractor(object):
+    # TODO: this doesn't need to be a class - refactor as function
     def __init__(self, image_filename=None, plot_data_gdf=gpd.GeoDataFrame()):
         """
         Class to extract features from patches (e.g. ground truth plots) in an image
 
         Parameters
         ----------
-        image_filename: path to image file
+        image_filename: path to image file from which to extract features
         plot_data_gdf: geopandas geodataframe of plot polygons with optional ground truth and index of plot ID strings
         """
         self.image_reader = rasterio.open(image_filename, 'r')
@@ -531,11 +538,35 @@ class ImageFeatureExtractor(object):
 
 
 class FeatureSelector(object):
+    # TODO: again, this does not need to be a class, perhaps separate files (modules) makes better sense
     def __init__(self):
         return
+
     @staticmethod
     def forward_selection(feat_df, y, max_num_feats=0, model=linear_model.LinearRegression(),
                           score_fn=None, cv=None):
+        """
+        Forward selection of features from a pandas dataframe, using cross-validation
+
+        Parameters
+        ----------
+        feat_df : pandas.DataFrame
+            features data only
+        y : numpy.array_like
+            target/output values corresponding to feat_df
+        max_num_feats : int
+            maximum number of features to select (default = select all)
+        model : sklearn.BaseEstimator
+            model for feature evaluation (default = LinearRegression)
+        score_fn : function in form score = score_fn(y_true, y_pred)
+            a model score function in the form of a sklearn metric (eg RMSE) to evaluate model (default = -RMSE)
+        cv : int
+            number of cross-validated folds to use (default = )
+
+        Returns
+        -------
+
+        """
 
         if max_num_feats == 0:
             max_num_feats = feat_df.shape[1]
@@ -556,7 +587,7 @@ class FeatureSelector(object):
                 scores, predicted = FeatureSelector.score_model(test_feats_df, y, model=model,
                                                                 score_fn=score_fn, cv=cv, find_predicted=False)
                 if score_fn is None:
-                    score = -np.sqrt((scores['test_-RMSE']**2).mean())       # NB not mean(sum(RMSE))
+                    score = -np.sqrt((scores['test_-RMSE']**2).mean())       # NB not mean(sqrt(RMSE))
                 else:
                     score = scores['test_user'].mean()
 
@@ -739,7 +770,7 @@ class ApplyLinearModel(object):
     @staticmethod
     def construct_feat_ex_fns(model_keys=[], num_bands=9):
         import re
-        pan_bands, band_dict = ImageFeatureExtractor.get_band_info(num_bands)
+        pan_bands, band_dict = MsImageFeatureExtractor.get_band_info(num_bands)
 
         win_fn_list = []
         inner_str_list = []

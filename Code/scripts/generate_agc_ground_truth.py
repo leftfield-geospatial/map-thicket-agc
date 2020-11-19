@@ -1,7 +1,10 @@
-# TODO boilerplate (author) and license
+"""
+  GEF5-SLM: Above ground carbon estimation in thicket using multi-spectral images
+  Copyright (C) 2020 Dugal Harris
+  Released under GNU Affero General Public License (AGPL) (https://www.gnu.org/licenses/agpl.html)
+  Email dugalh@gmail.com
 """
 
-"""
 from builtins import zip
 import matplotlib.pyplot as pyplot
 import numpy as np
@@ -32,19 +35,21 @@ plant_abc_file_name = root_path.joinpath('Data/Outputs/Allometry/Plant ABC 3.csv
 plot_agc_file_name = root_path.joinpath('Data/Outputs/Allometry/Plot AGC 3.csv')
 surrogate_file_name = root_path.joinpath('Data/Outputs/Allometry/Master Surrogate Map 3.csv')
 
+
 agc_plot_est = allom.AgcPlotEstimator(model_file_name=model_file_name, correction_method=allom.BiomassCorrectionMethod.NicklessZou)
-agc_plot_est.Estimate(woody_file_name=woody_file_name, litter_file_name=litter_file_name)
+agc_plot_est.estimate(woody_file_name=woody_file_name, litter_file_name=litter_file_name)
+
 
 if True:
     # write per-plant and per-plot ABC/AGC etc files
-    agc_plot_est.WriteAbcPlantFile(out_file_name=plant_abc_file_name)
-    agc_plot_est.WriteAgcPlotFile(out_file_name=plot_agc_file_name)
+    agc_plot_est.write_abc_plant_file(out_file_name=plant_abc_file_name)
+    agc_plot_est.write_agc_plot_file(out_file_name=plot_agc_file_name)
 
     # write out surrogate map
     with open(surrogate_file_name, 'w', newline='') as outfile:
-        writer = DictWriter(outfile, list(agc_plot_est.abc_aggregator.master_surrogate_dict.values())[100].keys())
+        writer = DictWriter(outfile, list(agc_plot_est._abc_aggregator.master_surrogate_dict.values())[100].keys())
         writer.writeheader()
-        writer.writerows(list(agc_plot_est.abc_aggregator.master_surrogate_dict.values()))
+        writer.writerows(list(agc_plot_est._abc_aggregator.master_surrogate_dict.values()))
 
     # plot relationships between plant volume and C stocks
     f1 = pyplot.figure('Relation between plant vol. and C stocks')

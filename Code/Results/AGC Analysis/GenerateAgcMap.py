@@ -1,3 +1,34 @@
+#
+   """
+      GEF5-SLM Above ground carbon estimation in thicket using multi-spectral images
+      Copyright (C) 2020 Dugal Harris
+      Released under GNU Affero General Public License (AGPL) (https://www.gnu.org/licenses/agpl.html)
+      email dugalh@gmail.com
+   """
+
+
+
+
+#
+
+      GEF5-SLM Above ground carbon estimation in thicket using multi-spectral images
+      Copyright (C) 2020  Dugal Harris
+
+      This program is free software: you can redistribute it and/or modify
+      it under the terms of the GNU Affero General Public License as published by
+      the Free Software Foundation, either version 3 of the License, or
+      (at your option) any later version.
+
+      This program is distributed in the hope that it will be useful,
+      but WITHOUT ANY WARRANTY; without even the implied warranty of
+      MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+      GNU Affero General Public License for more details.
+
+      You should have received a copy of the GNU Affero General Public License
+      along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+
+
 import sys
 from modules import modelling as su
 import numpy as np
@@ -28,7 +59,7 @@ if sys.version_info.major == 3 and (type(selected_keys[0]) is bytes or type(sele
 print([(i,key) for i,key in enumerate(selected_keys)])
 
 mapper = su.ApplyLinearModel(in_file_name=inFile, out_file_name=outFile, model=lm, model_keys=selected_keys,
-                             feat_ex_fn=su.ImageFeatureExtractor.extract_patch_ms_features_ex, save_feats=False)
+                             feat_ex_fn=su.MsImageFeatureExtractor.extract_patch_ms_features_ex, save_feats=False)
 
 mapper.create(win_size=(33, 33), step_size=(33, 33))
 mapper.post_proc()

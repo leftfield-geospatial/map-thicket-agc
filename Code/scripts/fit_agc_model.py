@@ -1,6 +1,10 @@
-# use SpatialUtils to produce models and plots for report
+"""
+  GEF5-SLM: Above ground carbon estimation in thicket using multi-spectral images
+  Copyright (C) 2020 Dugal Harris
+  Released under GNU Affero General Public License (AGPL) (https://www.gnu.org/licenses/agpl.html)
+  Email dugalh@gmail.com
+"""
 
-import rasterio
 import numpy as np
 import geopandas as gpd, pandas as pd
 import pathlib, sys, os, glob, warnings
@@ -29,7 +33,7 @@ image_filename = r"D:\OneDrive\GEF Essentials\Source Images\WorldView3 Oct 2017\
 plot_agc_gdf = gpd.GeoDataFrame.from_file(plot_agc_shapefile_name)
 plot_agc_gdf = plot_agc_gdf.set_index('ID').sort_index()
 
-fex = mdl.ImageFeatureExtractor(image_filename=image_filename, plot_data_gdf=plot_agc_gdf)
+fex = mdl.MsImageFeatureExtractor(image_filename=image_filename, plot_data_gdf=plot_agc_gdf)
 im_plot_data_gdf = fex.extract_image_features()
     # im_plot_data_gdf.pop('ST49')
 
@@ -237,8 +241,8 @@ clf_file = r"D:\Data\Development\Projects\PhD GeoInformatics\Data\NGI\GEF DEM\DS
 vr = mdl.GdalVectorReader(plot_agc_shapefile_name)
 ld = vr.read()
 imr_clf = mdl.GdalImageReader(clf_file)
-fex_clf = mdl.ImageFeatureExtractor(image_reader=imr_clf, plot_feat_dict=ld['GEF Plot Polygons with Agc v5'])
-implot_feat_dict_clf = fex_clf.extract_image_features(patch_fn=mdl.ImageFeatureExtractor.extract_patch_clf_features)
+fex_clf = mdl.MsImageFeatureExtractor(image_reader=imr_clf, plot_feat_dict=ld['GEF Plot Polygons with Agc v5'])
+implot_feat_dict_clf = fex_clf.extract_image_features(patch_fn=mdl.MsImageFeatureExtractor.extract_patch_clf_features)
 
 # set DegrClass field in implot_feat_dict using plot ID
 for f in list(implot_feat_dict_clf.values()):
@@ -284,8 +288,8 @@ reload(mdl)
 vr = mdl.GdalVectorReader(plot_agc_shapefile_name)
 ld = vr.read()
 imr = mdl.GdalImageReader(image_filename)
-fex = mdl.ImageFeatureExtractor(image_reader=imr, plot_feat_dict=ld['GEF Plot Polygons with Agc v5'])
-implot_feat_dict = fex.extract_image_features(patch_fn=mdl.ImageFeatureExtractor.extract_patch_ms_features_ex)
+fex = mdl.MsImageFeatureExtractor(image_reader=imr, plot_feat_dict=ld['GEF Plot Polygons with Agc v5'])
+implot_feat_dict = fex.extract_image_features(patch_fn=mdl.MsImageFeatureExtractor.extract_patch_ms_features_ex)
 
 # set DegrClass field in implot_feat_dict using plot ID
 for f in list(implot_feat_dict.values()):
