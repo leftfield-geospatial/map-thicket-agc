@@ -36,7 +36,7 @@ from __future__ import division
 from builtins import range
 from past.utils import old_div
 # TO DO: get rid of these manual paths
-# sys.path.append("C:\Data\Development\Projects\PhD GeoInformatics\Code\Misc Tools")
+# sys.path.append("C:\data\Development\Projects\PhD GeoInformatics\Code\Misc Tools")
 # os.environ['PATH'] += "C:\ProgramData\Anaconda3\envs\py27\Library\\bin"
 # os.environ['GDAL_DATA'] ="C:\Miniconda3\envs\geospatial\Library\share\gdal"
 # os.environ['PROJ_LIB']= "C:\Miniconda3\envs\geospatial\Library\share\proj"
@@ -74,10 +74,10 @@ def scatter_y_pred(y, pred, scores):
 #--------------------------------------------------------------------------------------------------------------
 # WV3 im analysis
 
-samplingPlotGtFile = r"C:\Data\Development\Projects\GEF-5 SLM\Data\Outputs\Geospatial\GEF Plot Polygons with AGC.shp"
-# imageFile = r"D:/Data/Development/Projects/PhD GeoInformatics/Data/Digital Globe/058217622010_01/PCI Output/ATCOR/SRTM+AdjCorr Aligned Photoscan DEM/ATCORCorrected_o17OCT01084657-P2AS_R1C12-058217622010_01_P001_PhotoscanDEM_14128022_PanSharp.pix"
-# imageFile = r"D:\Data\Development\Projects\PhD GeoInformatics\Data\Digital Globe\058217622010_01\PCI Output\ATCOR\SRTM+AdjCorr Aligned Photoscan DEM\o17OCT01084657-M2AS_R1C12-058217622010_01_P001_PanAndPansharpMS.vrt" %gdal 3 issues
-# imageFile = r"D:\Data\Development\Projects\PhD GeoInformatics\Data\Digital Globe\058217622010_01\PCI Output\ATCOR\SRTM+AdjCorr Aligned Photoscan DEM\o17OCT01084657-M2AS_R1C12-058217622010_01_P001_PanAndPansharpMS.tif"
+samplingPlotGtFile = r"C:\Data\Development\Projects\GEF-5 SLM\Data\outputs\geospatial\GEF Plot Polygons with AGC.shp"
+# imageFile = r"D:/data/Development/Projects/PhD GeoInformatics/data/Digital Globe/058217622010_01/PCI Output/ATCOR/SRTM+AdjCorr Aligned Photoscan DEM/ATCORCorrected_o17OCT01084657-P2AS_R1C12-058217622010_01_P001_PhotoscanDEM_14128022_PanSharp.pix"
+# imageFile = r"D:\data\Development\Projects\PhD GeoInformatics\data\Digital Globe\058217622010_01\PCI Output\ATCOR\SRTM+AdjCorr Aligned Photoscan DEM\o17OCT01084657-M2AS_R1C12-058217622010_01_P001_PanAndPansharpMS.vrt" %gdal 3 issues
+# imageFile = r"D:\data\Development\Projects\PhD GeoInformatics\data\Digital Globe\058217622010_01\PCI Output\ATCOR\SRTM+AdjCorr Aligned Photoscan DEM\o17OCT01084657-M2AS_R1C12-058217622010_01_P001_PanAndPansharpMS.tif"
 # imageFile = r"D:\OneDrive\GEF Essentials\Source Images\WorldView3 Aug 2017\WorldView3_Aug2018_OrthoThinSpline_NoAtcor_PanSharpMs.tif"
 imageFile = r"D:\OneDrive\GEF Essentials\Source Images\WorldView3 Oct 2017\WorldView3_Oct2017_OrthoNgiDem_AtcorSrtmAdjCorr_PanAndPandSharpMs.tif"
 
@@ -268,8 +268,8 @@ import numpy as np
 from sklearn import linear_model, metrics
 reload(su)
 
-samplingPlotGtFile = "C:/Data/Development/Projects/PhD GeoInformatics/Data/GEF Sampling/GEF Plot Polygons with Agc v5.shp"
-# imageFile = r"D:/Data/Development/Projects/PhD GeoInformatics/Data/Digital Globe/058217622010_01/PCI Output/ATCOR/SRTM+AdjCorr Aligned Photoscan DEM/ATCORCorrected_o17OCT01084657-P2AS_R1C12-058217622010_01_P001_PhotoscanDEM_14128022_PanSharp.pix"
+samplingPlotGtFile = "C:/data/Development/Projects/PhD GeoInformatics/data/GEF Sampling/GEF Plot Polygons with Agc v5.shp"
+# imageFile = r"D:/data/Development/Projects/PhD GeoInformatics/data/Digital Globe/058217622010_01/PCI Output/ATCOR/SRTM+AdjCorr Aligned Photoscan DEM/ATCORCorrected_o17OCT01084657-P2AS_R1C12-058217622010_01_P001_PhotoscanDEM_14128022_PanSharp.pix"
 clf_file = r"D:\Data\Development\Projects\PhD GeoInformatics\Data\NGI\GEF DEM\DSM Working\ground_clf2.tif"
 
 vr = su.GdalVectorReader(samplingPlotGtFile)
@@ -312,10 +312,10 @@ scatter_y_pred(y_clf/1000., predicted/1000., scores)
 
 # ----------------------------------------------------------------------------------------------------------------------
 # NGI image analysis
-samplingPlotGtFile = "C:/Data/Development/Projects/PhD GeoInformatics/Data/GEF Sampling/GEF Plot Polygons with Agc v5.shp"
-# imageFile = r"V:/Data/NGI/Rectified/3323D_2015_1001/RGBN/XCALIB/o3323d_2015_1001_GEF_RGBN_XCALIB.vrt"  # ""V:/Data/NGI/Rectified/3323D_2015_1001/RGBN/o3323d_2015_1001_02_0077_Lo25Wgs84_RGBN_XCALIB.tif"
+samplingPlotGtFile = "C:/data/Development/Projects/PhD GeoInformatics/data/GEF Sampling/GEF Plot Polygons with Agc v5.shp"
+# imageFile = r"V:/data/NGI/Rectified/3323D_2015_1001/RGBN/XCALIB/o3323d_2015_1001_GEF_RGBN_XCALIB.vrt"  # ""V:/data/NGI/Rectified/3323D_2015_1001/RGBN/o3323d_2015_1001_02_0077_Lo25Wgs84_RGBN_XCALIB.tif"
 imageFile = r"D:\Data\Development\Projects\PhD GeoInformatics\Data\NGI\Rectified\3322D_2015_1001\RGBN\XCALIB\AutoGcpWv3\o3323D_2015_1001_GEF_RGBN_XCALIb_v2.vrt"
-# imageFile = r"D:\Data\Development\Projects\PhD GeoInformatics\Data\NGI\Rectified\3322D_2015_1001\RGBN\AutoGcpWv3\3323d_2015_OrthoRect.vrt"
+# imageFile = r"D:\data\Development\Projects\PhD GeoInformatics\data\NGI\Rectified\3322D_2015_1001\RGBN\AutoGcpWv3\3323d_2015_OrthoRect.vrt"
 
 reload(su)
 

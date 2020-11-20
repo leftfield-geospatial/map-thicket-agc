@@ -389,7 +389,7 @@ class MsPatchFeatureExtractor(PatchFeatureExtractor):
             self.inner_dict['{0}/1'.format(num_key)] = lambda pan, bands, num_key=num_key: bands[self._band_dict[num_key], :]
             for den_key in list(self._band_dict.keys()):
                 if not num_key == den_key:
-                    self.inner_dict['{0}/{1}'.format(num_key, den_key)] = lambda pan, bands, num_key=num_key, den_key=den_key: \
+                    self.inner_dict['{0}/{1}'.format(num_key, den_key)] = lambda pan, bands, num_key=num_key, den_key=den_key:\
                         bands[self._band_dict[num_key], :] / bands[self._band_dict[den_key], :]
 
         # inner veg indices

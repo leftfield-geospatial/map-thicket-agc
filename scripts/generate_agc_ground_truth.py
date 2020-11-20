@@ -27,13 +27,13 @@ from agc_estimation import imaging as img
 
 #
 
-model_file_name = root_path.joinpath('Data/Sampling Inputs/Allometry/Allometric Models.xlsx')
-litter_file_name = root_path.joinpath('Data/Sampling Inputs/Allometry/Litter Allometric Data.xlsx')
-woody_file_name = root_path.joinpath('Data/Sampling Inputs/Allometry/Woody Allometric Data.xlsx')
+model_file_name = root_path.joinpath('data/sampling_inputs/allometry/allometric_models.xlsx')
+litter_file_name = root_path.joinpath('data/sampling_inputs/allometry/litter_allometric_data.xlsx')
+woody_file_name = root_path.joinpath('data/sampling_inputs/allometry/woody_allometric_data.xlsx')
 
-plant_abc_file_name = root_path.joinpath('Data/Outputs/Allometry/Plant ABC 3.csv')
-plot_agc_file_name = root_path.joinpath('Data/Outputs/Allometry/Plot AGC 3.csv')
-surrogate_file_name = root_path.joinpath('Data/Outputs/Allometry/Master Surrogate Map 3.csv')
+plant_abc_file_name = root_path.joinpath('data/outputs/allometry/plant_abc_v3.csv')
+plot_agc_file_name = root_path.joinpath('data/outputs/allometry/plot_agc_v3.csv')
+surrogate_file_name = root_path.joinpath('data/outputs/allometry/master_surrogate_map_v3.csv')
 
 
 agc_plot_est = allom.AgcPlotEstimator(model_file_name=model_file_name, correction_method=allom.BiomassCorrectionMethod.NicklessZou)
@@ -65,7 +65,7 @@ if True:
     ax.set_title('(b)')
     f1.tight_layout()
     f1.waitforbuttonpress(.5)
-    f1.savefig(root_path.joinpath('Data/Outputs/Allometry/VolVsAgcScatter.png'), dpi=300)
+    f1.savefig(root_path.joinpath('data/outputs/allometry/vol_vs_agc_scatter.png'), dpi=300)
 
     f2 = pyplot.figure('Relation between Litter C and ABC')
     f2.set_size_inches(5, 4, forward=True)
@@ -73,7 +73,7 @@ if True:
                    x_label='Litter C (t C ha$^{-1}$)', y_label='ABC (t C ha$^{-1}$)')
     f2.tight_layout()
     f2.waitforbuttonpress(.5)
-    f2.savefig(root_path.joinpath('Data/Outputs/Allometry/LitterCVsAbcScatter.png'), dpi=300)
+    f2.savefig(root_path.joinpath('data/outputs/allometry/litter_c_vs_abc_scatter.png'), dpi=300)
 
 
 if True:
@@ -133,8 +133,8 @@ if True:
         pyplot.tight_layout()
 
     f1.waitforbuttonpress(0.2)
-    f1.savefig(root_path.joinpath('Data/Outputs/Allometry/SpeciesAbcPerStratum.png'), dpi=300)
-    degr_species_abc_df.to_excel(root_path.joinpath('Data/Outputs/Allometry/SpeciesAbcContributionsPerStratum.xlsx'))
+    f1.savefig(root_path.joinpath('data/outputs/allometry/species_abc_per_stratum.png'), dpi=300)
+    degr_species_abc_df.to_excel(root_path.joinpath('data/outputs/allometry/species_abc_contributions_per_stratum.xlsx'))
 
     # ------------------------------------------------------------------------------------------------------------------
     # Plot plant height probability per stratum
@@ -168,7 +168,7 @@ if True:
         pyplot.tight_layout()
 
     f.waitforbuttonpress(0.2)
-    f.savefig(root_path.joinpath('Data/Outputs/Allometry/PlantHeightDistributionByStratum.png'), dpi=300)
+    f.savefig(root_path.joinpath('data/outputs/allometry/plant_height_distribution_by_stratum.png'), dpi=300)
 
     # ------------------------------------------------------------------------------------------------------------------
     # Plot plant height contribution to ABC per stratum
@@ -199,7 +199,7 @@ if True:
         pyplot.tight_layout()
 
     f.waitforbuttonpress(-1)    # wait before closing all windows
-    f.savefig(root_path.joinpath('Data/Outputs/Allometry/PlantHeightContributionToAbcByStratum.png'), dpi=300)
+    f.savefig(root_path.joinpath('data/outputs/allometry/plant_height_contribution_to_abc_by_stratum.png'), dpi=300)
 
 # TODO  - we can simulate what the "error" is when we increase the height cutoff idx (exclude heights less than x in
 #  containing plot, and extrap heights < x from nested plot, then compare to x=50)

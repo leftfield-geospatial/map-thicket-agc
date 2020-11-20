@@ -47,19 +47,19 @@ from collections import OrderedDict
 # # Python Imaging Library imports
 # from PIL import Image
 # from PIL import ImageDraw
-# sys.path.append("C:\Data\Development\Projects\PhD GeoInformatics\Code\Misc Tools")
+# sys.path.append("C:\data\Development\Projects\PhD GeoInformatics\Code\Misc Tools")
 from agc_estimation import imaging as su
 
 # |layerid=0|subset="Comment" LIKE 'H%'
 correctedShapeFileNames = [
-    r"C:\Data\Development\Projects\GEF-5 SLM\Data\Sampling Inputs\Plot locations\Sept 2017\Point_ge.shp",
-    r"C:\Data\Development\Projects\GEF-5 SLM\Data\Sampling Inputs\Plot locations\Dec 2017\Point_ge.shp",
-    r"C:\Data\Development\Projects\GEF-5 SLM\Data\Sampling Inputs\Plot locations\March 2018\Point_ge.shp",
+    r"C:/Data/Development/Projects/GEF-5 SLM/Data/Sampling Inputs/Plot locations/sept_2017/Point_ge.shp",
+    r"C:/Data/Development/Projects/GEF-5 SLM/Data/Sampling Inputs/Plot locations/dec_2017/Point_ge.shp",
+    r"C:/Data/Development/Projects/GEF-5 SLM/Data/Sampling Inputs\Plot locations\March 2018\Point_ge.shp",
     r"C:\Data\Development\Projects\GEF-5 SLM\Data\Sampling Inputs\Plot locations\June 2018\Point_ge.shp",
     r"C:\Data\Development\Projects\GEF-5 SLM\Data\Sampling Inputs\Plot locations\Sept 2018\Point_ge.shp",
     ]
 
-outShapeFileName = r"C:\Data\Development\Projects\GEF-5 SLM\Data\Outputs\Geospatial\GEF Plot Polygons with AGC.shp"
+outShapeFileName = r"C:\Data\Development\Projects\GEF-5 SLM\Data\outputs\geospatial\GEF Plot Polygons with AGC.shp"
 
 def world2Pixel(geoMatrix, x, y):
     """
@@ -127,7 +127,7 @@ for correctedShapeFileName in correctedShapeFileNames:
     # lyr = None
     # ds = None
 
-## Read the Geomax March 2019 files, correct them (and write out).  Add corrected info to the dgpsDict
+## Read the Geomax march_2019 files, correct them (and write out).  Add corrected info to the dgpsDict
 geomax_shapefile_names = [
     r"C:\Data\Development\Projects\GEF-5 SLM\Data\Sampling Inputs\Plot locations\March 2019\GEF_FIELD1.shp",
     r"C:\Data\Development\Projects\GEF-5 SLM\Data\Sampling Inputs\Plot locations\March 2019\GEF_FIELD2.shp",
@@ -226,7 +226,7 @@ print(field_reader.layer_dict['GEF_FIELD4']['spatial_ref'])
 from csv import DictReader
 
 plotCsGt = {}
-csGtFilenames = [r"C:\Data\Development\Projects\GEF-5 SLM\Data\Outputs\Allometry\Plot AGC.csv"]
+csGtFilenames = [r"C:\Data\Development\Projects\GEF-5 SLM\Data\outputs\Allometry\Plot AGC.csv"]
 
 for csGtFilename in csGtFilenames:
     with open(csGtFilename, 'r') as csGtFile:
@@ -327,7 +327,7 @@ if False:
     import os
     from csv import DictWriter
     # write out surrogate map for Cos
-    outFileName = str.format('{0}\\GEF Sampling Corrected Points.csv', os.path.dirname(outShapeFileName))
+    outFileName = str.format('{0}\\GEF Sampling corrected Points.csv', os.path.dirname(outShapeFileName))
 
     keys = ['Comment', 'PlotName', 'Horz_Prec', 'Vert_Prec', 'X', 'Y']
     with open(outFileName, 'wb') as outfile:

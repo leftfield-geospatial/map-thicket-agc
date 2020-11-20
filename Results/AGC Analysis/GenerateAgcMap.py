@@ -38,11 +38,11 @@ import pickle
 # reload(su)
 
 
-inFile = r"D:\OneDrive\GEF Essentials\Source Images\WorldView3 Oct 2017\WorldView3_Oct2017_OrthoNgiDem_AtcorSrtmAdjCorr_PanAndPandSharpMs.tif"
+inFile = r"D:/OneDrive/GEF Essentials/Source Images/WorldView3 Oct 2017/WorldView3_Oct2017_OrthoNgiDem_AtcorSrtmAdjCorr_PanAndPandSharpMs.tif"
 
-outFile = r"C:\Data\Development\Projects\GEF-5 SLM\Data\Outputs\Geospatial\GEF5 SLM - WV3 Oct 2017 - Univariate AGC - 10m.tif"
-modelFile = r'C:\Data\Development\Projects\PhD GeoInformatics\Docs\Funding\GEF5\Invoices, Timesheets and Reports\Final Report\bestSingleTermModel.pickle'
-# modelFile = r'C:\Data\Development\Projects\PhD GeoInformatics\Docs\Funding\GEF5\Invoices, Timesheets and Reports\Final Report\bestModelPy38Cv5v1.pickle'
+outFile = r"C:/Data/Development/Projects/GEF-5 SLM/Data/outputs/geospatial/GEF5 SLM - WV3 Oct 2017 - Univariate AGC - 10m.tif"
+modelFile = r'C:/Data/Development/Projects/PhD GeoInformatics/Docs/Funding/GEF5/Invoices, Timesheets and Reports/Final Report/bestSingleTermModel.pickle'
+# modelFile = r'C:\data\Development\Projects\PhD GeoInformatics\docs\Funding\GEF5\Invoices, Timesheets and Reports\Final Report\best_model_py38_cv5v1.pickle'
 
 # gdal command lines (gdal v3+ to work with qgis)
 # build pan and pansharp vrt with nodata

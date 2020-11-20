@@ -18,14 +18,14 @@ sys.path.append(str(root_path.joinpath('Code')))
 
 # Most DGSPS plot locations were corrected / post-processed to ~30cm accuracy = corr_*,
 #  some could not be post-processed and are corrected manually here using GCPs = uncorr_*
-corr_plot_loc_root_path = root_path.joinpath(r'Data\Sampling Inputs\Plot locations\Corrected')
-uncorr_plot_loc_root_path = root_path.joinpath(r'Data\Sampling Inputs\Plot locations\Uncorrected\March 2019')
+corr_plot_loc_root_path = root_path.joinpath(r'data/sampling_inputs/plot_locations/corrected')
+uncorr_plot_loc_root_path = root_path.joinpath(r'data/sampling_inputs/plot_locations/uncorrected/march_2019')
 
 corr_shapefile_names = [sub_item.joinpath('Point_ge.shp') for sub_item in corr_plot_loc_root_path.iterdir() if sub_item.is_dir()]   # corrected dgps locs
 uncorr_shapefile_names = [pathlib.Path(p) for p in glob.glob(str(uncorr_plot_loc_root_path.joinpath('GEF_FIELD*.shp')))]            # uncorrected locs
-gcp_shapefile_name = uncorr_plot_loc_root_path.joinpath('GeomaxFieldReferencePts.shp')
-plot_agc_allom_filename = root_path.joinpath(r'Data\Outputs\Allometry\Plot AGC.csv')
-plot_agc_shapefile_name = root_path.joinpath(r'Data\Outputs\Geospatial\GEF Plot Polygons with AGC v2.shp')
+gcp_shapefile_name = uncorr_plot_loc_root_path.joinpath('geomax_field_reference_pts.shp')
+plot_agc_allom_filename = root_path.joinpath(r'data/outputs/allometry/plot_agc.csv')
+plot_agc_shapefile_name = root_path.joinpath(r'data/outputs/geospatial/gef_plot_polygonswith_agc_v2.shp')
 
 if not plot_agc_allom_filename.exists():
     warnings.warn(f'{plot_agc_allom_filename} does not exist.  You need to run generate_agc_ground_truth')

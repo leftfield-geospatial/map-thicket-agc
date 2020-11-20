@@ -41,13 +41,13 @@ from sklearn import linear_model
 
 # reload(su)
 
-samplingPlotGtFile = r"C:\Data\Development\Projects\GEF-5 SLM\Data\Outputs\Geospatial\GEF Plot Polygons with AGC.shp"
+samplingPlotGtFile = r"C:/Data/Development/Projects/GEF-5 SLM/Data/outputs/geospatial/GEF Plot Polygons with AGC.shp"
 
 # new py 3 May 2020 files
-imageFiles = [r"D:\OneDrive\GEF Essentials\Source Images\WorldView3 Oct 2017\WorldView3_Oct2017_OrthoNgiDem_AtcorSrtmAdjCorr_PanAndPandSharpMs.tif",
-              r"D:\OneDrive\GEF Essentials\Source Images\WorldView3 Nov 2018\WorldView3_Nov2018_OrthoThinSpline_NoAtcor_PanSharpMs.tif",
-              r"D:\OneDrive\GEF Essentials\Source Images\WorldView3 Aug 2017\WorldView3_Aug2017_OrthoThinSpline_NoAtcor_PanSharpMs.tif",
-              r"D:\OneDrive\GEF Essentials\Source Images\NGI April 2015\Ngi_May2015_OrthoNgiDem_Xcalib_Rgbn_Mosaic.vrt"]
+imageFiles = [r"D:/OneDrive/GEF Essentials/Source Images/WorldView3 Oct 2017/WorldView3_Oct2017_OrthoNgiDem_AtcorSrtmAdjCorr_PanAndPandSharpMs.tif",
+              r"D:/OneDrive/GEF Essentials/Source Images/WorldView3 Nov 2018/WorldView3_Nov2018_OrthoThinSpline_NoAtcor_PanSharpMs.tif",
+              r"D:/OneDrive/GEF Essentials/Source Images/WorldView3 Aug 2017/WorldView3_Aug2017_OrthoThinSpline_NoAtcor_PanSharpMs.tif",
+              r"D:/OneDrive/GEF Essentials\Source Images\NGI April 2015\Ngi_May2015_OrthoNgiDem_Xcalib_Rgbn_Mosaic.vrt"]
 
 vr = su.GdalVectorReader(samplingPlotGtFile)
 ld = vr.read()

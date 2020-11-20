@@ -21,15 +21,14 @@ else:
 sys.path.append(str(root_path.joinpath('Code')))
 logging.basicConfig(format='%(levelname)s %(name)s: %(message)s')
 
-image_filename = r"D:\OneDrive\GEF Essentials\Source Images\WorldView3 Oct 2017\WorldView3_Oct2017_OrthoNgiDem_AtcorSrtmAdjCorr_PanAndPandSharpMs.tif"
+image_filename = r"D:/OneDrive/GEF Essentials\Source Images\WorldView3 Oct 2017\WorldView3_Oct2017_OrthoNgiDem_AtcorSrtmAdjCorr_PanAndPandSharpMs.tif"
 
 if False:
-    map_filename = root_path.joinpath(r'Data\Outputs\Geospatial\GEF5 SLM - WV3 Oct 2017 - Univariate AGC - 10m.tif')
-    model_filename = root_path.joinpath(r'Data\Outputs\Models\BestSingleFeatModelPy38Cv5v2.joblib')
+    map_filename = root_path.joinpath(r'data\outputs\geospatial\gef5_slm_wv3_oct_2017_univariate_agc_10m.tif')
+    model_filename = root_path.joinpath(r'data\outputs\Models\best_single_feat_model_py38_cv5v2.joblib')
 else:
-    map_filename = root_path.joinpath(r'Data\Outputs\Geospatial\GEF5 SLM - WV3 Oct 2017 - Multivariate AGC - 10m.tif')
-    model_filename = root_path.joinpath(r'Data\Outputs\Models\BestMultiFeatModelPy38Cv5v2.joblib')
-# model_filename = r'C:\Data\Development\Projects\PhD GeoInformatics\Docs\Funding\GEF5\Invoices, Timesheets and Reports\Final Report\bestSingleTermModel.pickle'
+    map_filename = root_path.joinpath(r'data\outputs\geospatial\gef5_slm_wv3_oct_2017_multivariate_agc_10m.tif')
+    model_filename = root_path.joinpath(r'data\outputs\Models\best_multi_feat_model_py38_cv5v2.joblib')
 
 # gdal command lines (gdal v3+ to work with qgis)
 # build pan and pansharp vrt with nodata
