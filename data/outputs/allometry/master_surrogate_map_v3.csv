@@ -133,12 +133,12 @@ H.gracilis,P.incana,P.incana,Hermannia gracilis
 H.holosericea,P.incana,P.incana,Hermannia holosericea
 H.pulverata,P.incana,P.incana,Hermannia pulverata
 Hermania sp1,P.incana,P.incana,Hermannia sp
-I.sylvatica,B.capensis,,Isoglossa sylvatica
+I.sylvatica,B.capensis,P.incana,Isoglossa sylvatica
 L.afrum,L.ferocissimum,L.ferocissimum,lycium afrum
 L.americanum,L.ferocissimum,L.ferocissimum,Lycium americanum
 L.horridum,L.ferocissimum,L.ferocissimum,Lycium horridum
 L.ferossiumum,L.ferocissimum,L.ferocissimum,Lycium ferossiumum
-L.ocymifolia,B.capensis,,Leonotis ocymifolia
+L.ocymifolia,B.capensis,L.ferocissimum,Leonotis ocymifolia
 Limeum hairy shrub,none,,Limeum hairy shrub sp
 Lycium c.f. schizocalyx,L.cinereum,L.ferocissimum,Lycium c.f. schizocalyx need flowers
 Lycium horidum,L.ferocissimum,L.ferocissimum,Lycium horidum
@@ -154,7 +154,7 @@ P.leptophylla,P.pyracantha,G.capitata,Polygala leptophylla
 P.myrtifolia,P.pyracantha,G.capitata,Polygala myrtifolia
 P.peltatum,B.capensis,,Pelargonium peltatum
 P.rubra,P.incana,P.incana,Passerina rubra
-P.tetragonum,B.capensis,,Pelargonium tetragonum
+P.tetragonum,B.capensis,P.incana,Pelargonium tetragonum
 Pollichia sp1,G.filiformis,G.filiformis,Pollichia sp1
 P.asbestina c.f.,P.pyracantha,G.capitata,Polygala asbestina c.f.
 Pteronia sp1,P.incana,P.incana,Pteronia sp

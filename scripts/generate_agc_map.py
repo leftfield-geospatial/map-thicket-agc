@@ -21,14 +21,14 @@ else:
 sys.path.append(str(root_path.joinpath('Code')))
 logging.basicConfig(format='%(levelname)s %(name)s: %(message)s')
 
-image_filename = r"D:/OneDrive/GEF Essentials\Source Images\WorldView3 Oct 2017\WorldView3_Oct2017_OrthoNgiDem_AtcorSrtmAdjCorr_PanAndPandSharpMs.tif"
+image_filename = r"D:/OneDrive/GEF Essentials/Source Images/WorldView3 Oct 2017/WorldView3_Oct2017_OrthoNgiDem_AtcorSrtmAdjCorr_PanAndPandSharpMs.tif"
 
 if True:
-    map_filename = root_path.joinpath(r'data\outputs\geospatial\gef5_slm_wv3_oct_2017_univariate_agc_10m.tif')
-    model_filename = root_path.joinpath(r'data\outputs\Models\best_univariate_model_py38_cv5v2.joblib')
+    map_filename = root_path.joinpath(r'data/outputs/geospatial/gef5_slm_wv3_oct_2017_univariate_agc_10m.tif')
+    model_filename = root_path.joinpath(r'data/outputs/Models/best_univariate_model_py38_cv5v2.joblib')
 else:
-    map_filename = root_path.joinpath(r'data\outputs\geospatial\gef5_slm_wv3_oct_2017_multivariate_agc_10m.tif')
-    model_filename = root_path.joinpath(r'data\outputs\Models\best_multivariate_model_py38_cv5v2.joblib')
+    map_filename = root_path.joinpath(r'data/outputs/geospatial/gef5_slm_wv3_oct_2017_multivariate_agc_10m.tif')
+    model_filename = root_path.joinpath(r'data/outputs/Models/best_multivariate_model_py38_cv5v2.joblib')
 
 # gdal command lines (gdal v3+ to work with qgis)
 # build pan and pansharp vrt with nodata

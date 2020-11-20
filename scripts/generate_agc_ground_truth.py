@@ -65,7 +65,7 @@ if True:
     ax.set_title('(b)')
     f1.tight_layout()
     f1.waitforbuttonpress(.5)
-    f1.savefig(root_path.joinpath('data/outputs/allometry/vol_vs_agc_scatter.png'), dpi=300)
+    f1.savefig(root_path.joinpath('data/outputs/plots/vol_vs_agc_scatter.png'), dpi=300)
 
     f2 = pyplot.figure('Relation between Litter C and ABC')
     f2.set_size_inches(5, 4, forward=True)
@@ -73,7 +73,7 @@ if True:
                    x_label='Litter C (t C ha$^{-1}$)', y_label='ABC (t C ha$^{-1}$)')
     f2.tight_layout()
     f2.waitforbuttonpress(.5)
-    f2.savefig(root_path.joinpath('data/outputs/allometry/litter_c_vs_abc_scatter.png'), dpi=300)
+    f2.savefig(root_path.joinpath('data/outputs/plots/litter_c_vs_abc_scatter.png'), dpi=300)
 
 
 if True:
@@ -133,7 +133,7 @@ if True:
         pyplot.tight_layout()
 
     f1.waitforbuttonpress(0.2)
-    f1.savefig(root_path.joinpath('data/outputs/allometry/species_abc_per_stratum.png'), dpi=300)
+    f1.savefig(root_path.joinpath('data/outputs/plots/species_abc_per_stratum.png'), dpi=300)
     degr_species_abc_df.to_excel(root_path.joinpath('data/outputs/allometry/species_abc_contributions_per_stratum.xlsx'))
 
     # ------------------------------------------------------------------------------------------------------------------
@@ -168,7 +168,7 @@ if True:
         pyplot.tight_layout()
 
     f.waitforbuttonpress(0.2)
-    f.savefig(root_path.joinpath('data/outputs/allometry/plant_height_distribution_by_stratum.png'), dpi=300)
+    f.savefig(root_path.joinpath('data/outputs/plots/plant_height_distribution_by_stratum.png'), dpi=300)
 
     # ------------------------------------------------------------------------------------------------------------------
     # Plot plant height contribution to ABC per stratum
@@ -199,7 +199,7 @@ if True:
         pyplot.tight_layout()
 
     f.waitforbuttonpress(-1)    # wait before closing all windows
-    f.savefig(root_path.joinpath('data/outputs/allometry/plant_height_contribution_to_abc_by_stratum.png'), dpi=300)
+    f.savefig(root_path.joinpath('data/outputs/plots/plant_height_contribution_to_abc_by_stratum.png'), dpi=300)
 
 # TODO  - we can simulate what the "error" is when we increase the height cutoff idx (exclude heights less than x in
 #  containing plot, and extrap heights < x from nested plot, then compare to x=50)
