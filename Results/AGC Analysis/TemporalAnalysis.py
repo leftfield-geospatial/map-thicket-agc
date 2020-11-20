@@ -81,17 +81,17 @@ if False:   # find best single feat models so that we know which feats to try ca
     r2 = []
     rmse = []
     from collections import OrderedDict
-    single_feat_model_scores = OrderedDict()
+    univariate_model_scores = OrderedDict()
     for ki, key in enumerate(feat_keys):
         xv = X[:, ki]
         scores, predicted = su.FeatureSelector.score_model( X[:, ki].reshape(-1, 1), y / 1000.,
                                                            model=linear_model.LinearRegression(),
                                                            find_predicted=True, cv=10, print_scores=False)
-        single_feat_model_scores[key] = {'r2': scores['R2_stacked'], 'rmse': -scores['test_user'].mean()}
+        univariate_model_scores[key] = {'r2': scores['R2_stacked'], 'rmse': -scores['test_user'].mean()}
         print('.', end=' ')
 
-    r2 = np.array([sfms['r2'] for sfms in list(single_feat_model_scores.values())])
-    rmse = np.array([sfms['rmse'] for sfms in list(single_feat_model_scores.values())])
+    r2 = np.array([sfms['r2'] for sfms in list(univariate_model_scores.values())])
+    rmse = np.array([sfms['rmse'] for sfms in list(univariate_model_scores.values())])
     idx = np.argsort(-r2)
     print('\nWV2017 feats sorted by best single feat model')
     print(list(zip(feat_keys[idx[:50]], r2[idx[:50]])))
@@ -103,7 +103,7 @@ if False:
     feat_scores = OrderedDict()
     fd_labels = ['WV3 2017', 'WV3 2018', 'NGI 2015']
     for ki, key in enumerate(keys_of_interest):
-        feat_scores[key] = OrderedDict({'WV3 2017 AGC R2':single_feat_model_scores[key]['r2']})
+        feat_scores[key] = OrderedDict({'WV3 2017 AGC R2':univariate_model_scores[key]['r2']})
 
     for fi, feat_dict in enumerate(implot_feat_dicts[1:]):
         # keys_of_interest = np.array(['Std(pan)', 'Std(NDVI)', 'R', 'G', 'B', 'NIR', 'R/pan', 'G/pan', 'B/pan', 'NIR/pan', 'NDVI', 'SAVI', 'NIR/R', 'pan'])

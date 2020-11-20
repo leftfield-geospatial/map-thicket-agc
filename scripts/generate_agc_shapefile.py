@@ -10,9 +10,9 @@ import geopandas as gpd, pandas as pd
 import pathlib, sys, os, glob, warnings
 
 if '__file__' in globals():
-    root_path = pathlib.Path(__file__).absolute().parents[2]
+    root_path = pathlib.Path(__file__).absolute().parents[1]
 else:
-    root_path = pathlib.Path(os.getcwd()).parents[0]
+    root_path = pathlib.Path(os.getcwd())
 
 sys.path.append(str(root_path.joinpath('Code')))
 
@@ -25,7 +25,7 @@ corr_shapefile_names = [sub_item.joinpath('Point_ge.shp') for sub_item in corr_p
 uncorr_shapefile_names = [pathlib.Path(p) for p in glob.glob(str(uncorr_plot_loc_root_path.joinpath('GEF_FIELD*.shp')))]            # uncorrected locs
 gcp_shapefile_name = uncorr_plot_loc_root_path.joinpath('geomax_field_reference_pts.shp')
 plot_agc_allom_filename = root_path.joinpath(r'data/outputs/allometry/plot_agc.csv')
-plot_agc_shapefile_name = root_path.joinpath(r'data/outputs/geospatial/gef_plot_polygonswith_agc_v2.shp')
+plot_agc_shapefile_name = root_path.joinpath(r'data/outputs/geospatial/gef_plot_polygons_with_agc_v2.shp')
 
 if not plot_agc_allom_filename.exists():
     warnings.warn(f'{plot_agc_allom_filename} does not exist.  You need to run generate_agc_ground_truth')

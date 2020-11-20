@@ -18,9 +18,9 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
 if '__file__' in globals():
-    root_path = pathlib.Path(__file__).absolute().parents[2]
+    root_path = pathlib.Path(__file__).absolute().parents[1]
 else:
-    root_path = pathlib.Path(os.getcwd()).parents[0]
+    root_path = pathlib.Path(os.getcwd())
 
 sys.path.append(str(root_path.joinpath('Code')))
 logging.basicConfig(format='%(levelname)s %(name)s: %(message)s')
@@ -118,19 +118,18 @@ logger.info(selected_feats_df.columns[:best_model_idx+1].to_numpy())
 fig = pyplot.figure()
 fig.set_size_inches(5, 4, forward=True)
 img.scatter_y_actual_vs_pred(y/1000., predicted, scores)
-fig.savefig(root_path.joinpath(r'data/outputs/Plots/meas_vs_pred_agc_multi_feat_model_b.png'), dpi=300)
+fig.savefig(root_path.joinpath(r'data/outputs/Plots/meas_vs_pred_agc_multivariate_model_b.png'), dpi=300)
 
-# fitting
-best_multi_feat_model = linear_model.LinearRegression()
-best_multi_feat_model.fit(selected_feats_df.iloc[:, :best_model_idx+1], y/1000)
+best_multivariate_model = linear_model.LinearRegression()
+best_multivariate_model.fit(selected_feats_df.iloc[:, :best_model_idx+1], y/1000)
 logger.info('Multi feat model coefficients:')
-logger.info(np.array(best_multi_feat_model.coef_))
+logger.info(np.array(best_multivariate_model.coef_))
 logger.info('Multi feat model intercept:')
-logger.info(np.array(best_multi_feat_model.intercept_))
+logger.info(np.array(best_multivariate_model.intercept_))
 
 if True:
-    joblib.dump([best_multi_feat_model, selected_feats_df.columns[:best_model_idx+1].to_numpy(), scores], root_path.joinpath(r'data/outputs/Models/best_multi_feat_model_py38_cv5v2.joblib'))
-    pickle.dump([best_multi_feat_model, selected_feats_df.columns[:best_model_idx+1].to_numpy(), scores], open(root_path.joinpath(r'data/outputs/Models/best_multi_feat_model_py38_cv5v2.pickle'), 'wb'))
+    joblib.dump([best_multivariate_model, selected_feats_df.columns[:best_model_idx+1].to_numpy(), scores], root_path.joinpath(r'data/outputs/Models/best_multivariate_model_py38_cv5v2.joblib'))
+    pickle.dump([best_multivariate_model, selected_feats_df.columns[:best_model_idx+1].to_numpy(), scores], open(root_path.joinpath(r'data/outputs/Models/best_multivariate_model_py38_cv5v2.pickle'), 'wb'))
 
 # single feat model
 logger.info('Single feat model scores:')
@@ -143,17 +142,17 @@ logger.info(selected_feats_df.columns[:1].to_numpy())
 fig = pyplot.figure()
 fig.set_size_inches(5, 4, forward=True)
 img.scatter_y_actual_vs_pred(y/1000., predicted, scores)
-fig.savefig(root_path.joinpath(r'data/outputs/Plots/meas_vs_pred_agc_single_feat_model_b.png'), dpi=300)
+fig.savefig(root_path.joinpath(r'data/outputs/Plots/meas_vs_pred_agc_univariate_model_b.png'), dpi=300)
 
 # fitting
-best_single_feat_model = linear_model.LinearRegression(fit_intercept=True)
-best_single_feat_model.fit(selected_feats_df.iloc[:, :1], y/1000)
+best_univariate_model = linear_model.LinearRegression(fit_intercept=True)
+best_univariate_model.fit(selected_feats_df.iloc[:, :1], y/1000)
 logger.info('Single feat model coefficient:')
-logger.info(np.array(best_single_feat_model.coef_))
+logger.info(np.array(best_univariate_model.coef_))
 logger.info('Single feat model intercept:')
-logger.info(np.array(best_single_feat_model.intercept_))
+logger.info(np.array(best_univariate_model.intercept_))
 
 if True:
-    joblib.dump([best_single_feat_model, selected_feats_df.columns[:1].to_numpy(), scores], root_path.joinpath(r'data/outputs/Models/best_single_feat_model_py38_cv5v2.joblib'))
-    pickle.dump([best_single_feat_model, selected_feats_df.columns[:1].to_numpy(), scores], open(root_path.joinpath(r'data/outputs/Models/best_single_feat_model_py38_cv5v2.pickle'), 'wb'))
+    joblib.dump([best_univariate_model, selected_feats_df.columns[:1].to_numpy(), scores], root_path.joinpath(r'data/outputs/Models/best_univariate_model_py38_cv5v2.joblib'))
+    pickle.dump([best_univariate_model, selected_feats_df.columns[:1].to_numpy(), scores], open(root_path.joinpath(r'data/outputs/Models/best_univariate_model_py38_cv5v2.pickle'), 'wb'))
 

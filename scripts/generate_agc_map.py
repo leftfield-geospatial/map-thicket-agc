@@ -14,21 +14,21 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
 if '__file__' in globals():
-    root_path = pathlib.Path(__file__).absolute().parents[2]
+    root_path = pathlib.Path(__file__).absolute().parents[1]
 else:
-    root_path = pathlib.Path(os.getcwd()).parents[0]
+    root_path = pathlib.Path(os.getcwd())
 
 sys.path.append(str(root_path.joinpath('Code')))
 logging.basicConfig(format='%(levelname)s %(name)s: %(message)s')
 
 image_filename = r"D:/OneDrive/GEF Essentials\Source Images\WorldView3 Oct 2017\WorldView3_Oct2017_OrthoNgiDem_AtcorSrtmAdjCorr_PanAndPandSharpMs.tif"
 
-if False:
+if True:
     map_filename = root_path.joinpath(r'data\outputs\geospatial\gef5_slm_wv3_oct_2017_univariate_agc_10m.tif')
-    model_filename = root_path.joinpath(r'data\outputs\Models\best_single_feat_model_py38_cv5v2.joblib')
+    model_filename = root_path.joinpath(r'data\outputs\Models\best_univariate_model_py38_cv5v2.joblib')
 else:
     map_filename = root_path.joinpath(r'data\outputs\geospatial\gef5_slm_wv3_oct_2017_multivariate_agc_10m.tif')
-    model_filename = root_path.joinpath(r'data\outputs\Models\best_multi_feat_model_py38_cv5v2.joblib')
+    model_filename = root_path.joinpath(r'data\outputs\Models\best_multivariate_model_py38_cv5v2.joblib')
 
 # gdal command lines (gdal v3+ to work with qgis)
 # build pan and pansharp vrt with nodata

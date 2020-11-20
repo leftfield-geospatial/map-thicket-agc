@@ -15,9 +15,9 @@ from scipy.stats import gaussian_kde
 import logging
 
 if '__file__' in globals():
-    root_path = pathlib.Path(__file__).absolute().parents[2]
+    root_path = pathlib.Path(__file__).absolute().parents[1]
 else:
-    root_path = pathlib.Path(os.getcwd()).parents[0]
+    root_path = pathlib.Path(os.getcwd())
 
 sys.path.append(str(root_path.joinpath('Code')))
 logging.basicConfig(format='%(levelname)s %(name)s: %(message)s')
