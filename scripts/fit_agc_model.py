@@ -37,10 +37,23 @@ fex = img.MsImageFeatureExtractor(image_filename=image_filename, plot_data_gdf=p
 im_plot_data_gdf = fex.extract_image_features()
     # im_plot_data_gdf.pop('ST49')
 
+# calculate versions of ABC and AGC normalised by actual polygon area, rather than theoretical plot sizes, and append to im_plot_data_gdf
+carbon_polynorm_dict = {}
+for plot_id, plot in im_plot_data_gdf['data'].iterrows():
+    if 'Abc' in plot and 'LitterCHa' in plot:
+        litter_c_ha = np.max([plot['LitterCHa'], 0.])
+        abc = np.max([plot['Abc'], 0.])
+        abc_ha = abc * (100. ** 2) / plot['geometry'].area
+        carbon_polynorm_dict[plot_id] = {'AbcHa2': abc_ha, 'AgcHa2': litter_c_ha + abc_ha}
+
+carbon_polynorm_df = pd.DataFrame.from_dict(carbon_polynorm_dict, orient='index')
+
+for key in ['AbcHa2', 'AgcHa2']:
+    im_plot_data_gdf[('data', key)] = carbon_polynorm_df[key]
+
 # fix stratum labels
 im_plot_data_gdf.loc[im_plot_data_gdf['data']['Stratum'] == 'Degraded', ('data', 'Stratum')] = 'Severe'
 im_plot_data_gdf.loc[im_plot_data_gdf['data']['Stratum'] == 'Intact', ('data', 'Stratum')] = 'Pristine'
-
 
 # make some scatter plots of features vs AGC/ABC
 pyplot.figure()
@@ -56,7 +69,8 @@ img.scatter_ds(im_plot_data_gdf, x_col=('feats', '(mean(pan/R))'), y_col=('data'
                xfn=lambda x: np.log10(x), do_regress=True, thumbnail_col=('data','thumbnail'), label_col=('data', 'ID'))
 
 # select best features for predicting AGC with linear regression
-# TODO - experiment with different cv vals here and below - it has a big effect on what is selected and how it is scored.  Likewise, so do small numerical differences in feats.
+# TODO - experiment with different cv vals here and below - it has a big effect on what is selected and how it is scored.
+#  Likewise, so do small numerical differences in feats.
 y = im_plot_data_gdf['data']['AgcHa']
 selected_feats_df, selected_scores =  img.FeatureSelector.forward_selection(im_plot_data_gdf['feats'], y, max_num_feats=25, cv=5,  #cv=X.shape[0] / 5
                                                                                         score_fn=None)

@@ -13,7 +13,6 @@ from matplotlib import patches
 from scipy import stats as stats
 from sklearn import linear_model, metrics
 from sklearn.model_selection import cross_val_predict, cross_validate
-from sklearn.preprocessing import PolynomialFeatures
 import rasterio
 from rasterio.features import sieve
 from rasterio.windows import Window
@@ -246,9 +245,9 @@ def scatter_y_actual_vs_pred(y, pred, scores, xlabel='Measured AGC (t C ha$^{-1}
 
 
 class PatchFeatureExtractor():
-    def __init__(self, apply_rolling_window=False, rolling_window_xsize=None, rolling_window_xstep=None):
+    def __init__(self, num_bands=1, apply_rolling_window=False, rolling_window_xsize=None, rolling_window_xstep=None):
         """
-        Virtual class for features from image patches.
+        Virtual class for extracting features from image patches, that hides extraction details from user.
         Optional application of rolling window (x direction only)
 
         Parameters
@@ -264,6 +263,7 @@ class PatchFeatureExtractor():
         if apply_rolling_window==True:
             if rolling_window_xsize is None or rolling_window_xstep is None:
                 raise Exception("rolling_window_xsize and rolling_window_xstep must be specified")
+        self._num_bands = num_bands
         self._apply_rolling_window = apply_rolling_window
         self._rolling_window_xsize = rolling_window_xsize
         self._rolling_window_xstep = rolling_window_xstep
@@ -312,7 +312,7 @@ class PatchFeatureExtractor():
 
 
 class MsPatchFeatureExtractor(PatchFeatureExtractor):
-    # TODO: PatchFeatureExtractor and MsPatchFeatureExtractor could use some refactoring that gets around the
+    # TODO: PatchFeatureExtractor and MsPatchFeatureExtractor may benefit from refactoring that gets around the
     #  necessity for apply_rolling_window which is confusing e.g. rolling_window_xsize and rolling_window_xstep are
     #  always passed to extract_features(), and not to __init__. extract_features() then passes to feature functions in
     #  fn_dict.  If there is no rolling window then rolling_window_xsize and rolling_window_xstep are set to the patch x
@@ -333,9 +333,8 @@ class MsPatchFeatureExtractor(PatchFeatureExtractor):
         rolling_window_xstep : int
             Number of pixels to step in x direction (optional).
         """
-        self._num_bands = num_bands
         self._pan_bands, self._band_dict = self.get_band_info(num_bands)
-        PatchFeatureExtractor.__init__(self, apply_rolling_window=apply_rolling_window, rolling_window_xsize=rolling_window_xsize,
+        PatchFeatureExtractor.__init__(self, num_bands=num_bands, apply_rolling_window=apply_rolling_window, rolling_window_xsize=rolling_window_xsize,
                                        rolling_window_xstep=rolling_window_xstep)
 
     @staticmethod
@@ -418,7 +417,7 @@ class MsPatchFeatureExtractor(PatchFeatureExtractor):
                 fn_key = '({0}({1}))'.format(win_key, inner_key)
                 fn = lambda pan, bands, win_fn=win_fn, inner_fn=inner_fn: win_fn(inner_fn(pan, bands))
                 self.fn_dict[fn_key] = fn
-                if win_key == 'mean':   # for backward compatibility - TODO: apply scaling to all windows
+                if win_key == 'mean':   # for backward compatibility - TODO: try apply scaling to all windows, not only mean
                     for scale_key, scale_fn in self.scale_dict.items():
                         fn_key = '{0}({1}({2}))'.format(scale_key, win_key, inner_key)
                         fn = lambda pan, bands, scale_fn=scale_fn, win_fn=win_fn, inner_fn=inner_fn: scale_fn(win_fn(inner_fn(pan, bands)))
@@ -453,7 +452,7 @@ class MsPatchFeatureExtractor(PatchFeatureExtractor):
         im_patch_mask[:, ~mask] = np.nan
         if self._num_bands != im_patch.shape[0]:
             raise Exception("im_patch must have the same number of bands as passed to MsPatchFeatureExtractor(...)")
-        pan_mask = im_patch_mask[self._pan_bands, :].mean(axis=0)      # TODO: fix for len(pan_bands)=1
+        pan_mask = im_patch_mask[self._pan_bands, :].mean(axis=0)
 
         feat_dict = OrderedDict()
         for fn_key in fn_keys:
@@ -461,12 +460,31 @@ class MsPatchFeatureExtractor(PatchFeatureExtractor):
 
         return feat_dict
 
+# def __init__(self, image_filename=None, plot_data_gdf=gpd.GeoDataFrame()):
+#     """
+#     Class to extract features from patches (e.g. ground truth plots) in an image
+# 
+#     Parameters
+#     ----------
+#     image_filename : str
+#         path to image file from which to extract features
+#     plot_data_gdf : geopandas.GeoDataFrame
+#         plot polygons with optional ground truth and index of plot ID strings
+#     """
+#     self.im_plot_data_gdf = gpd.GeoDataFrame()  # geodataframe of features in subindex 'feats' and data in 'data'
+#     self._image_reader = rasterio.open(image_filename, 'r')
+#     self._plot_data_gdf = plot_data_gdf
+#     self._patch_feature_extractor = MsPatchFeatureExtractor(num_bands=self._image_reader.count)
+# 
+# def __del__(self):
+#     self._image_reader.close()
 
-class MsImageFeatureExtractor(object):
-    # TODO: this doesn't need to be a class - refactor as function
+
+class ImageFeatureExtractor(object):
+    # Note: this could be a function rather than a class but have made it a class in line with PatchFeatureExtractor etc above
     def __init__(self, image_filename=None, plot_data_gdf=gpd.GeoDataFrame()):
         """
-        Class to extract features from patches (e.g. ground truth plots) in an image
+        Virtual base class to extract features from patches (e.g. ground truth plots) in an image
 
         Parameters
         ----------
@@ -478,20 +496,19 @@ class MsImageFeatureExtractor(object):
         self.im_plot_data_gdf = gpd.GeoDataFrame()  # geodataframe of features in subindex 'feats' and data in 'data'
         self._image_reader = rasterio.open(image_filename, 'r')
         self._plot_data_gdf = plot_data_gdf
-        self._patch_feature_extractor = MsPatchFeatureExtractor(num_bands=self._image_reader.count)
+        self._patch_feature_extractor = None     # not implemented, to be specified in derived class constructor
 
     def __del__(self):
         self._image_reader.close()
 
     def extract_image_features(self):
         """
-        Extract features from plot polygons specified by self.plot_data_gdf in image
+        Extract features from plot polygons specified by plot_data_gdf in image
 
         Returns
         -------
         geopandas.GeoDataFrame of features in subindex 'feats' and data in 'data'
         """
-
         self._plot_data_gdf = self._plot_data_gdf.to_crs(self._image_reader.crs)   # convert plot co-ordinates to image projection
 
         im_plot_data_dict = {}      # dict to store plot features etc
@@ -519,7 +536,7 @@ class MsImageFeatureExtractor(object):
 
             plot_mask = plot_mask & np.all(im_buf > 0, axis=0) & np.all(~np.isnan(im_buf), axis=0)  # exclude any nan or -ve pixels
 
-            # create plot thumbnail for visualisation
+            # create plot thumbnail for visualisation in numpy format
             thumbnail = np.float32(np.moveaxis(im_buf, 0, 2))
             thumbnail[~plot_mask] = 0.
 
@@ -527,13 +544,6 @@ class MsImageFeatureExtractor(object):
 
             im_data_dict = {**im_feat_dict, **plot}     # combine features and other plot data
             im_data_dict['thumbnail'] = thumbnail
-
-            # calculate versions of ABC and AGC normalised by actual polygon area, rather than theoretical plot sizes
-            if 'Abc' in plot and 'LitterCHa' in plot:
-                litterCHa = np.max([plot['LitterCHa'], 0.])
-                abc = np.max([plot['Abc'], 0.])
-                im_data_dict['AbcHa2'] = abc * (100. ** 2) /  plot['geometry'].area
-                im_data_dict['AgcHa2'] = litterCHa + im_data_dict['AbcHa2']
 
             im_plot_data_dict[plot_id] = im_data_dict       # add to dict of all plots
 
@@ -566,6 +576,22 @@ class MsImageFeatureExtractor(object):
         self.im_plot_data_gdf[('data','ID')] = self.im_plot_data_gdf.index
 
         return self.im_plot_data_gdf
+
+
+class MsImageFeatureExtractor(ImageFeatureExtractor):
+    def __init__(self, image_filename=None, plot_data_gdf=gpd.GeoDataFrame()):
+        """
+        Class to extract multi-spectra; features from patches (e.g. ground truth plots) in an image
+
+        Parameters
+        ----------
+        image_filename : str
+            path to image file from which to extract features
+        plot_data_gdf : geopandas.GeoDataFrame
+            plot polygons with optional ground truth and index of plot ID strings
+        """
+        ImageFeatureExtractor.__init__(self, image_filename=image_filename, plot_data_gdf=plot_data_gdf)
+        self._patch_feature_extractor = MsPatchFeatureExtractor(num_bands=self._image_reader.count)
 
 
 class FeatureSelector(object):
