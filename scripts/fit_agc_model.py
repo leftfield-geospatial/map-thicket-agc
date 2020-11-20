@@ -7,9 +7,9 @@
 
 import numpy as np
 import geopandas as gpd, pandas as pd
-import pathlib, sys, os, glob, warnings
+import pathlib, sys, os
 from sklearn import linear_model
-from modules import modelling as mdl
+from agc_estimation import imaging as img
 from matplotlib import pyplot
 import logging
 import joblib, pickle
@@ -33,7 +33,7 @@ image_filename = r"D:\OneDrive\GEF Essentials\Source Images\WorldView3 Oct 2017\
 plot_agc_gdf = gpd.GeoDataFrame.from_file(plot_agc_shapefile_name)
 plot_agc_gdf = plot_agc_gdf.set_index('ID').sort_index()
 
-fex = mdl.MsImageFeatureExtractor(image_filename=image_filename, plot_data_gdf=plot_agc_gdf)
+fex = img.MsImageFeatureExtractor(image_filename=image_filename, plot_data_gdf=plot_agc_gdf)
 im_plot_data_gdf = fex.extract_image_features()
     # im_plot_data_gdf.pop('ST49')
 
@@ -44,29 +44,29 @@ im_plot_data_gdf.loc[im_plot_data_gdf['data']['Stratum'] == 'Intact', ('data', '
 
 # make some scatter plots of features vs AGC/ABC
 pyplot.figure()
-# mdl.scatter_ds(im_plot_data_gdf, x_col=('feats', 'pan/R'), y_col=('data', 'AgcHa'), class_col=('data', 'Stratum'),
+# img.scatter_ds(im_plot_data_gdf, x_col=('feats', 'pan/R'), y_col=('data', 'AgcHa'), class_col=('data', 'Stratum'),
 #                xfn=lambda x: np.log10(x), do_regress=True)
-mdl.scatter_ds(im_plot_data_gdf, x_col=('feats', '(mean(pan/R))'), y_col=('data', 'AgcHa'), class_col=('data', 'Stratum'),
+img.scatter_ds(im_plot_data_gdf, x_col=('feats', '(mean(pan/R))'), y_col=('data', 'AgcHa'), class_col=('data', 'Stratum'),
                xfn=lambda x: np.log10(x), do_regress=True)
 pyplot.figure()
-mdl.scatter_ds(im_plot_data_gdf, x_col=('feats', 'sqr(mean(R/G))'), y_col=('data', 'AbcHa'), class_col=('data', 'Stratum'),
+img.scatter_ds(im_plot_data_gdf, x_col=('feats', 'sqr(mean(R/G))'), y_col=('data', 'AbcHa'), class_col=('data', 'Stratum'),
                xfn=lambda x: np.log10(x), do_regress=True)
 pyplot.figure()
-mdl.scatter_ds(im_plot_data_gdf, x_col=('feats', '(mean(pan/R))'), y_col=('data', 'AbcHa'), class_col=('data', 'Stratum'),
+img.scatter_ds(im_plot_data_gdf, x_col=('feats', '(mean(pan/R))'), y_col=('data', 'AbcHa'), class_col=('data', 'Stratum'),
                xfn=lambda x: np.log10(x), do_regress=True, thumbnail_col=('data','thumbnail'), label_col=('data', 'ID'))
 
 # select best features for predicting AGC with linear regression
 # TODO - experiment with different cv vals here and below - it has a big effect on what is selected and how it is scored.  Likewise, so do small numerical differences in feats.
 y = im_plot_data_gdf['data']['AgcHa']
-selected_feats_df, selected_scores =  mdl.FeatureSelector.forward_selection(im_plot_data_gdf['feats'], y, max_num_feats=25, cv=5,  #cv=X.shape[0] / 5
+selected_feats_df, selected_scores =  img.FeatureSelector.forward_selection(im_plot_data_gdf['feats'], y, max_num_feats=25, cv=5,  #cv=X.shape[0] / 5
                                                                                         score_fn=None)
-# feat_scores = mdl.FeatureSelector.ranking(im_plot_data_gdf['feats'], y, cv=5, score_fn=None)
+# feat_scores = img.FeatureSelector.ranking(im_plot_data_gdf['feats'], y, cv=5, score_fn=None)
 
 # calculate scores of selected features with LOOCV
 selected_loocv_scores = []
 num_feats = range(0, len(selected_scores))
 for i in num_feats:
-    scores, predicted = mdl.FeatureSelector.score_model(selected_feats_df.to_numpy()[:, :i + 1], y, model=linear_model.LinearRegression(), find_predicted=True, cv=len(selected_feats_df))
+    scores, predicted = img.FeatureSelector.score_model(selected_feats_df.to_numpy()[:, :i + 1], y, model=linear_model.LinearRegression(), find_predicted=True, cv=len(selected_feats_df))
     loocv_scores = {'R2': scores['R2_stacked'], 'RMSE': np.abs(scores['test_-RMSE']).mean()/1000., 'RMSE CI': np.percentile(np.abs(scores['test_-RMSE']), [5, 95])}
     selected_loocv_scores.append(loocv_scores)
     print('Scored model {0} of {1}'.format(i+1, len(selected_scores)))
@@ -110,14 +110,14 @@ fig.savefig(root_path.joinpath(r'Data\Outputs\Plots\AgcAccVsNumFeats2b_Py38Cv10.
 # multiple feat model
 logger.info('Multi feat model scores:')
 best_model_idx = np.argmin(selected_loocv_scores_df['RMSE'])
-scores, predicted = mdl.FeatureSelector.score_model(selected_feats_df.iloc[:, :best_model_idx + 1], y/1000, model=linear_model.LinearRegression(),
+scores, predicted = img.FeatureSelector.score_model(selected_feats_df.iloc[:, :best_model_idx + 1], y/1000, model=linear_model.LinearRegression(),
                                                     find_predicted=True, cv=selected_feats_df.shape[0], print_scores=True)
 logger.info('Multi feat model features:')
 logger.info(selected_feats_df.columns[:best_model_idx+1].to_numpy())
 
 fig = pyplot.figure()
 fig.set_size_inches(5, 4, forward=True)
-mdl.scatter_y_actual_vs_pred(y/1000., predicted, scores)
+img.scatter_y_actual_vs_pred(y/1000., predicted, scores)
 fig.savefig(root_path.joinpath(r'Data\Outputs\Plots\MeasVsPredAgcMultiFeatModel_b.png'), dpi=300)
 
 # fitting
@@ -134,7 +134,7 @@ if True:
 
 # single feat model
 logger.info('Single feat model scores:')
-scores, predicted = mdl.FeatureSelector.score_model(selected_feats_df.iloc[:, :1], y/1000, model=linear_model.LinearRegression(),
+scores, predicted = img.FeatureSelector.score_model(selected_feats_df.iloc[:, :1], y/1000, model=linear_model.LinearRegression(),
                                                     find_predicted=True, cv=selected_feats_df.shape[0], print_scores=True)
 
 logger.info('Single feat model features:')
@@ -142,7 +142,7 @@ logger.info(selected_feats_df.columns[:1].to_numpy())
 
 fig = pyplot.figure()
 fig.set_size_inches(5, 4, forward=True)
-mdl.scatter_y_actual_vs_pred(y/1000., predicted, scores)
+img.scatter_y_actual_vs_pred(y/1000., predicted, scores)
 fig.savefig(root_path.joinpath(r'Data\Outputs\Plots\MeasVsPredAgcSingleFeatModel_b.png'), dpi=300)
 
 # fitting
@@ -193,14 +193,14 @@ if False:
     from sklearn import pipeline
 
     pl = pipeline.make_pipeline(StandardScaler(), SVR(kernel='rbf', C=100, gamma=1.))
-    scores, predicted = mdl.FeatureSelector.score_model(Xselected_feats, old_div(y, 1000), model=pl,
+    scores, predicted = img.FeatureSelector.score_model(Xselected_feats, old_div(y, 1000), model=pl,
                                                         find_predicted=True, cv=X.shape[0], print_scores=True)
 
-    scores, predicted = mdl.FeatureSelector.score_model(Xselected_feats[:, :best_model_idx + 1], old_div(y, 1000), model=KernelRidge(kernel='rbf', alpha=.1), find_predicted=True, cv=X.shape[0], print_scores=True)
+    scores, predicted = img.FeatureSelector.score_model(Xselected_feats[:, :best_model_idx + 1], old_div(y, 1000), model=KernelRidge(kernel='rbf', alpha=.1), find_predicted=True, cv=X.shape[0], print_scores=True)
 
-    scores, predicted = mdl.FeatureSelector.score_model(Xs, y, model=SVR(kernel='linear', C=200), cv=10)
+    scores, predicted = img.FeatureSelector.score_model(Xs, y, model=SVR(kernel='linear', C=200), cv=10)
 
-    scores, predicted = mdl.FeatureSelector.score_model(Xselected_feats_s, y, model=SVR(kernel='linear', C=1000000, gamma='auto'), cv=10)
+    scores, predicted = img.FeatureSelector.score_model(Xselected_feats_s, y, model=SVR(kernel='linear', C=1000000, gamma='auto'), cv=10)
 
 
 # su.scatter_plot(y/1000., predicted/1000., labels=implot_feat_dict.keys())
@@ -211,7 +211,7 @@ fig.savefig(r'C:\Data\Development\Projects\PhD GeoInformatics\Docs\Funding\GEF5\
 
 if False:
     fig = pyplot.figure()
-    mdl.scatter_plot(y / 1000., predicted, labels=list(implot_feat_dict.keys()))
+    img.scatter_plot(y / 1000., predicted, labels=list(implot_feat_dict.keys()))
 
 fig = pyplot.figure()
 fig.set_size_inches(10, 4, forward=True)
@@ -220,7 +220,7 @@ scatter_y_pred(y/1000., predicted, scores)
 pyplot.title('(a)')
 pyplot.subplot(1,2,2)
 print('\nBest single feature model scores:')
-scores, predicted = mdl.FeatureSelector.score_model(Xselected_feats[:, :1], y / 1000., model=linear_model.LinearRegression(),
+scores, predicted = img.FeatureSelector.score_model(Xselected_feats[:, :1], y / 1000., model=linear_model.LinearRegression(),
                                                     find_predicted=True, cv=X.shape[0], print_scores=True)
 scatter_y_pred(y/1000., predicted, scores)
 pyplot.title('(b)')
@@ -228,21 +228,21 @@ fig.savefig(r'C:\Data\Development\Projects\PhD GeoInformatics\Docs\Funding\GEF5\
 
 #------------------------------------------------------------------------------------------------------------------------
 # Correlation analysis of the ground cover classification
-import modules.modelling as mdl
+import agc_estimation.imaging as img
 import pyplot
 import numpy as np
 from sklearn import linear_model, metrics
-reload(mdl)
+reload(img)
 
 plot_agc_shapefile_name = "C:/Data/Development/Projects/PhD GeoInformatics/Data/GEF Sampling/GEF Plot Polygons with Agc v5.shp"
 # imageFile = r"D:/Data/Development/Projects/PhD GeoInformatics/Data/Digital Globe/058217622010_01/PCI Output/ATCOR/SRTM+AdjCorr Aligned Photoscan DEM/ATCORCorrected_o17OCT01084657-P2AS_R1C12-058217622010_01_P001_PhotoscanDEM_14128022_PanSharp.pix"
 clf_file = r"D:\Data\Development\Projects\PhD GeoInformatics\Data\NGI\GEF DEM\DSM Working\ground_clf2.tif"
 
-vr = mdl.GdalVectorReader(plot_agc_shapefile_name)
+vr = img.GdalVectorReader(plot_agc_shapefile_name)
 ld = vr.read()
-imr_clf = mdl.GdalImageReader(clf_file)
-fex_clf = mdl.MsImageFeatureExtractor(image_reader=imr_clf, plot_feat_dict=ld['GEF Plot Polygons with Agc v5'])
-implot_feat_dict_clf = fex_clf.extract_image_features(patch_fn=mdl.MsImageFeatureExtractor.extract_patch_clf_features)
+imr_clf = img.GdalImageReader(clf_file)
+fex_clf = img.MsImageFeatureExtractor(image_reader=imr_clf, plot_feat_dict=ld['GEF Plot Polygons with Agc v5'])
+implot_feat_dict_clf = fex_clf.extract_image_features(patch_fn=img.MsImageFeatureExtractor.extract_patch_clf_features)
 
 # set DegrClass field in implot_feat_dict using plot ID
 for f in list(implot_feat_dict_clf.values()):
@@ -257,7 +257,7 @@ for f in list(implot_feat_dict_clf.values()):
         f['DegrClass'] = '?'
 
 X_clf, y_clf, feat_keys_clf = fex_clf.get_feat_array_ex(y_data_key='AgcHa')
-feat_scores = mdl.FeatureSelector.ranking(X_clf, y_clf, feat_keys=feat_keys_clf)
+feat_scores = img.FeatureSelector.ranking(X_clf, y_clf, feat_keys=feat_keys_clf)
 classes = [plot['DegrClass'] for plot in list(implot_feat_dict_clf.values())]
 
 pyplot.figure()
@@ -267,9 +267,9 @@ pyplot.ylabel('AGC (tC/ha)')
 pyplot.tight_layout()
 
 # feature selection and model plot
-Xselected_feats, selected_scores, selected_keys = mdl.FeatureSelector.forward_selection(X_clf, y_clf, feat_keys=feat_keys_clf, max_num_feats=4, cv=5,
+Xselected_feats, selected_scores, selected_keys = img.FeatureSelector.forward_selection(X_clf, y_clf, feat_keys=feat_keys_clf, max_num_feats=4, cv=5,
                                                                                         score_fn = lambda y, pred: -np.sqrt(metrics.mean_squared_error(y, pred)))
-scores, predicted = mdl.FeatureSelector.score_model(Xselected_feats[:, :np.argmax(selected_scores) + 1], y_clf, model=linear_model.LinearRegression(),
+scores, predicted = img.FeatureSelector.score_model(Xselected_feats[:, :np.argmax(selected_scores) + 1], y_clf, model=linear_model.LinearRegression(),
                                                     find_predicted=True, cv=X_clf.shape[0], print_scores=True)
 
 scatter_y_pred(y_clf/1000., predicted/1000., scores)
@@ -283,13 +283,13 @@ plot_agc_shapefile_name = "C:/Data/Development/Projects/PhD GeoInformatics/Data/
 image_filename = r"D:\Data\Development\Projects\PhD GeoInformatics\Data\NGI\Rectified\3322D_2015_1001\RGBN\XCALIB\AutoGcpWv3\o3323D_2015_1001_GEF_RGBN_XCALIb_v2.vrt"
 # imageFile = r"D:\Data\Development\Projects\PhD GeoInformatics\Data\NGI\Rectified\3322D_2015_1001\RGBN\AutoGcpWv3\3323d_2015_OrthoRect.vrt"
 
-reload(mdl)
+reload(img)
 
-vr = mdl.GdalVectorReader(plot_agc_shapefile_name)
+vr = img.GdalVectorReader(plot_agc_shapefile_name)
 ld = vr.read()
-imr = mdl.GdalImageReader(image_filename)
-fex = mdl.MsImageFeatureExtractor(image_reader=imr, plot_feat_dict=ld['GEF Plot Polygons with Agc v5'])
-implot_feat_dict = fex.extract_image_features(patch_fn=mdl.MsImageFeatureExtractor.extract_patch_ms_features_ex)
+imr = img.GdalImageReader(image_filename)
+fex = img.MsImageFeatureExtractor(image_reader=imr, plot_feat_dict=ld['GEF Plot Polygons with Agc v5'])
+implot_feat_dict = fex.extract_image_features(patch_fn=img.MsImageFeatureExtractor.extract_patch_ms_features_ex)
 
 # set DegrClass field in implot_feat_dict using plot ID
 for f in list(implot_feat_dict.values()):
@@ -319,7 +319,7 @@ vr.cleanup()
 imr.cleanup()
 
 X, y, feat_keys = fex.get_feat_array_ex(y_data_key='AgcHa')
-Xselected_feats, selected_scores, selected_keys = mdl.FeatureSelector.forward_selection(X, y, feat_keys=feat_keys, max_num_feats=30, cv=5,
+Xselected_feats, selected_scores, selected_keys = img.FeatureSelector.forward_selection(X, y, feat_keys=feat_keys, max_num_feats=30, cv=5,
                                                                                         score_fn=lambda y,pred: -np.sqrt(metrics.mean_squared_error(y, pred)))
 
 #------------------------------------------------------------------------------------------------------------------------
@@ -329,7 +329,7 @@ rmse = np.zeros(selected_scores.__len__())
 rmse_ci = np.zeros((selected_scores.__len__(),2))
 num_feats = np.arange(1, len(selected_scores)+1)
 for i in range(0, selected_scores.__len__()):
-    scores, predicted = mdl.FeatureSelector.score_model(Xselected_feats[:, :i + 1], y, model=linear_model.LinearRegression(), find_predicted=True, cv=X.shape[0])
+    scores, predicted = img.FeatureSelector.score_model(Xselected_feats[:, :i + 1], y, model=linear_model.LinearRegression(), find_predicted=True, cv=X.shape[0])
     r2[i] = scores['R2_stacked']
     rmse_v = np.abs(scores['test_user'])/1000.
     rmse[i] = rmse_v.mean()
@@ -379,7 +379,7 @@ fig.savefig(r'C:\Data\Development\Projects\PhD GeoInformatics\Docs\Funding\GEF5\
 # report scatter plots for best and single feature models
 print('\nBest model scores:')
 best_model_idx = np.argmin(rmse)
-scores, predicted = mdl.FeatureSelector.score_model(Xselected_feats[:, :best_model_idx + 1], old_div(y, 1000), model=linear_model.LinearRegression(),
+scores, predicted = img.FeatureSelector.score_model(Xselected_feats[:, :best_model_idx + 1], old_div(y, 1000), model=linear_model.LinearRegression(),
                                                     find_predicted=True, cv=X.shape[0], print_scores=True)
 
 print('\nBest model features:')
@@ -400,7 +400,7 @@ pyplot.title('(a)')
 pyplot.subplot(1, 2, 2)
 
 print('\nBest single feature model scores:')
-scores, predicted = mdl.FeatureSelector.score_model(Xselected_feats[:, :1], old_div(y, 1000), model=linear_model.LinearRegression(),
+scores, predicted = img.FeatureSelector.score_model(Xselected_feats[:, :1], old_div(y, 1000), model=linear_model.LinearRegression(),
                                                     find_predicted=True, cv=X.shape[0], print_scores=True)
 scatter_y_pred(y/1000., predicted, scores)
 pyplot.title('(b)')

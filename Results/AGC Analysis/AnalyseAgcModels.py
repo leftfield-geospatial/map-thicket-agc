@@ -41,12 +41,12 @@ from past.utils import old_div
 # os.environ['GDAL_DATA'] ="C:\Miniconda3\envs\geospatial\Library\share\gdal"
 # os.environ['PROJ_LIB']= "C:\Miniconda3\envs\geospatial\Library\share\proj"
 
-from modules import modelling as su
+from agc_estimation import imaging as su
 import pylab
 import numpy as np
 from sklearn import linear_model
 import rasterio
-from sklearn import metrics
+
 
 # reload(su)
 
@@ -262,7 +262,7 @@ fig.savefig(r'C:\Data\Development\Projects\PhD GeoInformatics\Docs\Funding\GEF5\
 
 #------------------------------------------------------------------------------------------------------------------------
 # Correlation analysis of the ground cover classification
-import modules.modelling as su
+import agc_estimation.imaging as su
 import pylab
 import numpy as np
 from sklearn import linear_model, metrics

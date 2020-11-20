@@ -48,7 +48,7 @@ from collections import OrderedDict
 # from PIL import Image
 # from PIL import ImageDraw
 # sys.path.append("C:\Data\Development\Projects\PhD GeoInformatics\Code\Misc Tools")
-from modules import modelling as su
+from agc_estimation import imaging as su
 
 # |layerid=0|subset="Comment" LIKE 'H%'
 correctedShapeFileNames = [

@@ -17,7 +17,7 @@ import warnings, logging
 import numpy as np
 import rasterio
 from sklearn import linear_model, metrics
-from modules import modelling as mdl
+from agc_estimation import imaging as img
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)

@@ -569,7 +569,7 @@ class MsImageFeatureExtractor(object):
 
 
 class FeatureSelector(object):
-    # TODO: again, this does not need to be a class, perhaps separate files (modules) makes better sense
+    # TODO: again, this does not need to be a class, perhaps separate files (agc_estimation) makes better sense
     def __init__(self):
         return
 

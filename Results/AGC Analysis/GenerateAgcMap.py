@@ -30,7 +30,7 @@
 
 
 import sys
-from modules import modelling as su
+from agc_estimation import imaging as su
 import numpy as np
 import pickle
 

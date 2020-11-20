@@ -5,12 +5,8 @@
   Email: dugalh@gmail.com
 """
 
-
-import sys
-from modules import modelling as mdl
-import numpy as np
-import pickle
-import pathlib, sys, os, glob, warnings
+from agc_estimation import imaging as img
+import pathlib, sys, os
 import logging
 import joblib
 
@@ -50,7 +46,7 @@ model, model_keys, model_scores = joblib.load(model_filename)
 #     model_keys = [sk.decode() for sk in model_keys]       # convert bytes to unicode for py 3
 # print([(i,key) for i,key in enumerate(model_keys)])
 
-mapper = mdl.ApplyLinearModel(in_file_name=image_filename, out_file_name=map_filename, model=model, model_keys=model_keys,
+mapper = img.ApplyLinearModel(in_file_name=image_filename, out_file_name=map_filename, model=model, model_keys=model_keys,
                              save_feats=False)
 
 mapper.create(win_size=(33, 33), step_size=(33, 33))
@@ -61,6 +57,6 @@ mapper.post_proc()
 
 # tmp = np.ones((3,3))
 # tmp2 = np.hstack((tmp,tmp*2,tmp*3,tmp*4,tmp*5))
-# pfe = mdl.PatchFeatureExtractor(num_bands=9, rolling_window_xsize=3, rolling_window_xstep=3)
+# pfe = img.PatchFeatureExtractor(num_bands=9, rolling_window_xsize=3, rolling_window_xstep=3)
 # pfe.__rolling_window_view(tmp2)
 

@@ -22,8 +22,8 @@ else:
 sys.path.append(str(root_path.joinpath('Code')))
 logging.basicConfig(format='%(levelname)s %(name)s: %(message)s')
 
-from modules import allometry as allom
-from modules import modelling as mdl
+from agc_estimation import allometry as allom
+from agc_estimation import imaging as img
 
 #
 
@@ -55,12 +55,12 @@ if True:
     f1 = pyplot.figure('Relation between plant vol. and C stocks')
     f1.set_size_inches(10, 4, forward=True)
     ax = pyplot.subplot(1, 2, 1, aspect='equal')
-    mdl.scatter_ds(agc_plot_est.plot_summary_agc_df, x_col='VolHa', y_col='AbcHa', xfn=lambda x: x / 1000., yfn=lambda y: y / 1000.,
+    img.scatter_ds(agc_plot_est.plot_summary_agc_df, x_col='VolHa', y_col='AbcHa', xfn=lambda x: x / 1000., yfn=lambda y: y / 1000.,
                    x_label='Biomass volume ($10^3$ m$^{3}$ ha$^{-1}$)', y_label='ABC (t C ha$^{-1}$)')
     ax.set_title('(a)')
 
     ax = pyplot.subplot(1, 2, 2, aspect='equal')
-    mdl.scatter_ds(agc_plot_est.plot_summary_agc_df, x_col='VolHa', y_col='AgcHa', xfn=lambda x: x / 1000., yfn=lambda y: y / 1000.,
+    img.scatter_ds(agc_plot_est.plot_summary_agc_df, x_col='VolHa', y_col='AgcHa', xfn=lambda x: x / 1000., yfn=lambda y: y / 1000.,
                    x_label='Biomass volume ($10^3$ m$^{3}$ ha$^{-1}$)', y_label='AGC (t C ha$^{-1}$)')
     ax.set_title('(b)')
     f1.tight_layout()
@@ -69,7 +69,7 @@ if True:
 
     f2 = pyplot.figure('Relation between Litter C and ABC')
     f2.set_size_inches(5, 4, forward=True)
-    mdl.scatter_ds(agc_plot_est.plot_summary_agc_df, x_col='VolHa', y_col='AgcHa', xfn=lambda x: x / 1000., yfn=lambda y: y / 1000.,
+    img.scatter_ds(agc_plot_est.plot_summary_agc_df, x_col='VolHa', y_col='AgcHa', xfn=lambda x: x / 1000., yfn=lambda y: y / 1000.,
                    x_label='Litter C (t C ha$^{-1}$)', y_label='ABC (t C ha$^{-1}$)')
     f2.tight_layout()
     f2.waitforbuttonpress(.5)
