@@ -5,24 +5,16 @@
   Email: dugalh@gmail.com
 """
 
-import sys, warnings, logging, os
+import logging, os
 from collections import OrderedDict
 import numpy as np
-import matplotlib.pyplot as pyplot
-from matplotlib import patches
-from scipy import stats as stats
-from sklearn import linear_model, metrics
-from sklearn.model_selection import cross_val_predict, cross_validate
+from sklearn import linear_model
 import rasterio
 from rasterio.features import sieve
 from rasterio.windows import Window
 from rasterio.mask import raster_geometry_mask
+from rasterio import fill
 import geopandas as gpd, pandas as pd
-
-if sys.version_info.major == 3:
-    from sklearn.metrics import make_scorer
-else:
-    from sklearn.metrics.scorer import make_scorer
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -74,175 +66,6 @@ def nanentropy(x, axis=None):
                 raise Exception('along_axis > 2 or < 0')
             e[slice] = nanentropy(xa, axis=None)
         return e
-
-def scatter_ds(data, x_col=None, y_col=None, class_col=None, label_col=None, thumbnail_col=None, do_regress=True,
-               x_label=None, y_label=None, xfn=lambda x: x, yfn=lambda y: y):
-    """
-    2D scatter plot of pandas dataframe with annotations etc
-
-    Parameters
-    ----------
-    data : pandas.DataFrame
-    x_col : str
-        column to use for x axis
-    y_col : str
-        column to use for y axis
-    class_col : str
-        column to use for colouring classes (optional)
-    label_col : str
-        column to use for text labels of data points (optional)
-    thumbnail_col : str
-        columnt to use for image thumbnails (optional)
-    do_regress : bool
-        display regression accuracies (default = False)
-    x_label : str
-        text string for x axis label, (default = None uses x_col)
-    y_label : str
-        text string for y axis label, (default = None uses y_col)
-    xfn : function
-        function for modifying x data (e.g. lambda x: np.log10(x)) (optional)
-    yfn : function
-        function for modifying y data (e.g. lambda x: np.log10(x)) (optional)
-
-    Returns
-    -------
-    R2, RMSE statistics
-    """
-
-    ims = 20.       # scale factor for thumbnails
-    if x_col is None:
-        x_col = data.columns[0]
-    if y_col is None:
-        y_col = data.columns[1]
-
-    x = xfn(data[x_col])
-    y = yfn(data[y_col])
-
-    if class_col is None:
-        data['class_col'] = np.zeros((data.shape[0],1))
-        class_col = 'class_col'
-
-    classes = np.array([class_name for class_name, class_group in data.groupby(by=class_col)])
-    n_classes =  len(classes)
-    if n_classes == 1:
-        colours = [(0., 0., 0.)]
-    else:
-        colours = ['tab:orange', 'g', 'r', 'b', 'y', 'k', 'm']
-
-    xlim = [x.min(), x.max()]
-    ylim = [y.min(), y.max()]
-    xd = np.diff(xlim)[0]
-    yd = np.diff(ylim)[0]
-
-    pyplot.axis('tight')
-    pyplot.axis(xlim + ylim)
-    ax = pyplot.gca()
-    handles = [0] * n_classes
-
-    # loop through data grouped by class (strata) if any
-    for class_i, (class_label, class_data) in enumerate(data.groupby(by=class_col)):
-        colour = colours[class_i]
-        if thumbnail_col is None:   # plot data points
-            pyplot.plot(xfn(class_data[x_col]), yfn(class_data[y_col]), markerfacecolor=colour, marker='.', label=class_label, linestyle='None',
-                       markeredgecolor=colour, markersize=5)
-        for rowi, row in class_data.iterrows():
-            xx = xfn(row[x_col])
-            yy = yfn(row[y_col])
-            if label_col is not None:   # add a text label for each point
-                pyplot.text(xx - .0015, yy - .0015, row[label_col],
-                           fontdict={'size': 9, 'color': colour, 'weight': 'bold'})
-
-            if thumbnail_col is not None:   # add a thumbnail for each point
-                imbuf = np.array(row[thumbnail_col])
-                band_idx = [0, 1, 2]
-                if imbuf.shape[2] == 8:  # wv3
-                    band_idx = [4, 2, 1]
-                elif imbuf.shape[2] >= 8:  # wv3 + pan
-                    band_idx = [5, 3, 2]
-
-                extent = [xx - xd/(2 * ims), xx + xd/(2 * ims), yy - yd/(2 * ims), yy + yd/(2 * ims)]
-                pyplot.imshow(imbuf[:, :, band_idx], extent=extent, aspect='auto')
-                handles[class_i] = ax.add_patch(patches.Rectangle((extent[0], extent[2]), xd/ims, yd/ims,
-                                                fill=False, edgecolor=colour, linewidth=2.))
-
-    if do_regress:  # find and display regression error stats
-        (slope, intercept, r, p, stde) = stats.linregress(x, y)
-        scores, predicted = FeatureSelector.score_model(x.to_numpy().reshape(-1,1), y.to_numpy().reshape(-1,1), model=linear_model.LinearRegression(),
-                                                        find_predicted=True, cv=len(x), print_scores=False, score_fn=None)
-
-        pyplot.text((xlim[0] + xd * 0.7), (ylim[0] + yd * 0.05), '$R^2$ = {0:.2f}'.format(np.round(scores['R2_stacked'], 2)),
-                   fontdict={'size': 12})
-        yr = np.array(xlim)*slope + intercept
-        pyplot.plot(xlim, yr, 'k--', lw=2, zorder=-1)
-
-        yhat = x * slope + intercept
-        rmse = np.sqrt(np.mean((y - yhat) ** 2))
-        logger.info('Regression scores')
-        logger.info('RMSE: {0:.4f}'.format(rmse))
-        logger.info('RMSE LOOCV: {0:.4f}'.format(-scores['test_-RMSE'].mean()))
-        logger.info('R^2:  {0:.4f}'.format(r ** 2))
-        logger.info('R^2 stacked: {0:.4f}'.format(scores['R2_stacked']))
-        logger.info('P (slope=0): {0:.4f}'.format(p))
-        logger.info('Slope: {0:.4f}'.format(slope))
-        logger.info('Std error of slope: {0:.4f}'.format(stde))
-    else:
-        r = np.nan
-        rmse = np.nan
-
-    if x_label is not None:
-        pyplot.xlabel(x_label, fontdict={'size': 12})
-    else:
-        pyplot.xlabel(x_col[-1], fontdict={'size': 12})
-
-    if y_label is not None:
-        pyplot.ylabel(y_label, fontdict={'size': 12})
-    else:
-        pyplot.ylabel(y_col[-1], fontdict={'size': 12})
-
-    if n_classes > 1:
-        if not thumbnail_col is None:
-            pyplot.legend(handles, classes, fontsize=12)
-        else:
-            pyplot.legend(classes, fontsize=12)
-    pyplot.show()
-    return r ** 2, rmse
-
-
-def scatter_y_actual_vs_pred(y, pred, scores, xlabel='Measured AGC (t C ha$^{-1}$)', ylabel='Predicted AGC (t C ha$^{-1}$)'):
-    """
-    Scatter plot of predicted vs actual data in format for reporting
-
-    Parameters
-    ----------
-    y : numpy.array_like
-        actual data
-    pred : numpy.array_like
-        predicted data
-    scores : dict
-        scores dict as returned by FeatureSelector.score_model()
-    xlabel : str
-        label for x axis (optional)
-    ylabel : str
-        label for y axis (optional)
-    """
-
-    df = pd.DataFrame({xlabel: y, ylabel: pred})    # form a datafram for scatter_ds
-    scatter_ds(df, do_regress=False)
-
-    mn = np.min([y, pred])
-    mx = np.max([y, pred])
-    h, = pyplot.plot([0, mx], [0, mx], 'k--', lw=2, zorder=-1, label='1:1')
-    pyplot.xlim(0, mx)
-    pyplot.ylim(0, mx)
-    pyplot.text(26, 5, str.format('$R^2$ = {0:.2f}', scores['R2_stacked']),
-               fontdict={'size': 11})
-    pyplot.text(26, 2, str.format('RMSE = {0:.2f} t C ha{1}',np.abs(scores['test_-RMSE']).mean(),'$^{-1}$'),
-               fontdict={'size': 11})
-    pyplot.show()
-    pyplot.tight_layout()
-    pyplot.legend([h], ['1:1'], frameon=False)
-    pyplot.pause(0.1)   # hack to get around pyplot bug when saving figure
-
 
 class PatchFeatureExtractor():
     def __init__(self, num_bands=1, apply_rolling_window=False, rolling_window_xsize=None, rolling_window_xstep=None):
@@ -304,7 +127,7 @@ class PatchFeatureExtractor():
         """
         raise NotImplementedError()
 
-    def extract_features(self, im_patch, mask=None):
+    def extract_features(self, im_patch, mask=None, fn_keys=None):
         """
         Virtual method to extract features from image patch with optional mask
         """
@@ -460,24 +283,6 @@ class MsPatchFeatureExtractor(PatchFeatureExtractor):
 
         return feat_dict
 
-# def __init__(self, image_filename=None, plot_data_gdf=gpd.GeoDataFrame()):
-#     """
-#     Class to extract features from patches (e.g. ground truth plots) in an image
-# 
-#     Parameters
-#     ----------
-#     image_filename : str
-#         path to image file from which to extract features
-#     plot_data_gdf : geopandas.GeoDataFrame
-#         plot polygons with optional ground truth and index of plot ID strings
-#     """
-#     self.im_plot_data_gdf = gpd.GeoDataFrame()  # geodataframe of features in subindex 'feats' and data in 'data'
-#     self._image_reader = rasterio.open(image_filename, 'r')
-#     self._plot_data_gdf = plot_data_gdf
-#     self._patch_feature_extractor = MsPatchFeatureExtractor(num_bands=self._image_reader.count)
-# 
-# def __del__(self):
-#     self._image_reader.close()
 
 
 class ImageFeatureExtractor(object):
@@ -581,7 +386,7 @@ class ImageFeatureExtractor(object):
 class MsImageFeatureExtractor(ImageFeatureExtractor):
     def __init__(self, image_filename=None, plot_data_gdf=gpd.GeoDataFrame()):
         """
-        Class to extract multi-spectra; features from patches (e.g. ground truth plots) in an image
+        Class to extract multi-spectral features from patches (e.g. ground truth plots) in an image
 
         Parameters
         ----------
@@ -594,381 +399,117 @@ class MsImageFeatureExtractor(ImageFeatureExtractor):
         self._patch_feature_extractor = MsPatchFeatureExtractor(num_bands=self._image_reader.count)
 
 
-class FeatureSelector(object):
-    # TODO: again, this does not need to be a class, perhaps separate files (agc_estimation) makes better sense
-    def __init__(self):
-        return
-
-    @staticmethod
-    def forward_selection(feat_df, y, max_num_feats=0, model=linear_model.LinearRegression(),
-                          score_fn=None, cv=None):
+class ImageMapper(object):
+    def __init__(self, image_file_name='', map_file_name='', model=linear_model.LinearRegression, model_feat_keys=[],
+                 save_feats=False, feature_extractor_type=MsPatchFeatureExtractor):
         """
-        Forward selection of features from a pandas dataframe, using cross-validation
+        Class to generate raster map by applying a fitted model to an image
 
         Parameters
         ----------
-        feat_df : pandas.DataFrame
-            features data only
-        y : numpy.array_like
-            target/output values corresponding to feat_df
-        max_num_feats : int
-            maximum number of features to select (default = select all)
+        image_file_name : str
+            path to input image file
+        map_file_name: str
+            output map file path to create
         model : sklearn.BaseEstimator
-            model for feature evaluation (default = LinearRegression)
-        score_fn : function in form score = score_fn(y_true, y_pred)
-            a model score function in the form of a sklearn metric (eg RMSE) to evaluate model (default = -RMSE)
-        cv : int
-            number of cross-validated folds to use (default = )
-
-        Returns
-        -------
-        (selected_feats_df, selected_scores)
-        selected_feats_df : pandas.DataFrame
-            selected features
-        selected_scores : list
-            list of score dicts
+            trained/ fitted model to apply to image_file_name (currently must be linear model)
+        model_feat_keys : list
+            list of descriptive strings specifying features to extract from image_file_name and to feed to model,
+            (as understood by feature_extractor_type)
+        save_feats : bool
+            include extracted features as bands in map_file_name (default = False)
+        feature_extractor_type : PatchFeatureExtractor
+            class to use to extract features (default = MsPatchFeatureExtractor)
         """
-
-        if max_num_feats == 0:
-            max_num_feats = feat_df.shape[1]
-        selected_feats_df = gpd.GeoDataFrame(index=feat_df.index)   # remember order items are added
-        selected_scores = []
-        available_feats_df = feat_df.copy()
-
-        logger.info('Forward selection: ')
-        if score_fn is None:
-            logger.info('Using negative RMSE score')
-        else:
-            logger.info('Using user score')
-        while selected_feats_df.shape[1] < max_num_feats:
-            best_score = -np.inf
-            best_feat = []
-            for feat_key, feat_vec in available_feats_df.iteritems():
-                test_feats_df = pd.concat((selected_feats_df, feat_vec), axis=1, ignore_index=False) # list(selected_feats.values()) + [feat_vec]
-                scores, predicted = FeatureSelector.score_model(test_feats_df, y, model=model,
-                                                                score_fn=score_fn, cv=cv, find_predicted=False)
-                if score_fn is None:
-                    score = -np.sqrt((scores['test_-RMSE']**2).mean())       # NB not mean(sqrt(RMSE))
-                else:
-                    score = scores['test_user'].mean()
-
-                if score > best_score:
-                    best_score = score
-                    best_feat = list(feat_vec)
-                    best_key = feat_key
-            selected_feats_df[best_key] = best_feat
-            selected_scores.append(best_score)
-            available_feats_df.pop(best_key)
-            logger.info('Feature {0} of {1}: {2}, Score: {3:.1f}'.format(selected_feats_df.shape[1], max_num_feats, best_key, best_score))
-        # logger.info(' ')
-        selected_scores = np.array(selected_scores)
-        selected_feat_keys = selected_feats_df.columns
-        best_selected_feat_keys = selected_feat_keys[:np.argmax(selected_scores) + 1]
-        logger.info('Best score: {0}'.format(selected_scores.max()))
-        logger.info('Num feats at best score: {0}'.format(np.argmax(selected_scores) + 1))
-        logger.info('Feat keys at best score: {0}'.format(best_selected_feat_keys))
-
-        return selected_feats_df, selected_scores
-
-
-    @staticmethod
-    def ranking(feat_df, y, model=linear_model.LinearRegression(), score_fn=None, cv=None):
-
-        logger.info('Ranking: ')
-        if score_fn is None:
-            logger.info('Using negative RMSE score')
-        else:
-            logger.info('Using user score')
-
-        feat_scores = []
-        for i, (feat_key, feat_vec) in enumerate(feat_df.iteritems()):
-            logger.info('Scoring feature {0} of {1}'.format(i+1, feat_df.shape[1]))
-
-            scores, predicted = FeatureSelector.score_model(pd.DataFrame(feat_vec), y, model=model, score_fn=score_fn, cv=cv, find_predicted=False)
-
-            if score_fn == None:
-                score = -np.sqrt((scores['test_-RMSE']**2).mean())
-            else:
-                score = scores['test_user'].mean()
-            feat_scores.append(score)
-
-        feat_scores = np.array(feat_scores)
-
-        logger.info('Best score: {0}'.format(feat_scores.max()))
-        logger.info('Best feat: {0}'.format(feat_df.columns[np.argmax(feat_scores)]))
-        return feat_scores
-
-    @staticmethod
-    def score_model(X, y, model=linear_model.LinearRegression(), score_fn=None,
-                    cv=None, find_predicted=True, print_scores=False):
-
-        predicted = None
-        if cv is None:
-            cv = len(y)        # Leave one out
-
-        if score_fn is not None:
-            scoring = {#'R2': make_scorer(metrics.r2_score),        # R2 in cross validation is suspect
-                       '-RMSE': make_scorer(lambda y, pred: -np.sqrt(metrics.mean_squared_error(y, pred))),
-                       'user': make_scorer(score_fn)}
-        else:
-            scoring = {'-RMSE': make_scorer(lambda y, pred: -np.sqrt(metrics.mean_squared_error(y, pred)))}
-
-        # TO DO: this does k-fold.  We should try stratified k-fold with degradation strata.
-        scores = cross_validate(model, X, y, scoring=scoring, cv=cv, n_jobs=-1)
-
-        if print_scores:
-            rmse_ci = np.percentile(-scores['test_-RMSE'], [5, 95])
-            # r2_ci = np.percentile(-scores['test_R2'], [5, 95])
-            logger.info('RMSE mean: {0:.4f}, std: {1:.4f}, 5-95%: {2:.4f} - {3:.4f}'.format(-scores['test_-RMSE'].mean(),
-                    scores['test_-RMSE'].std(), rmse_ci[0], rmse_ci[1]))
-            # logger.info('R2 mean: {0:.4f}, std: {1:.4f}, 5-95%: {2:.4f} - {3:.4f}'.format(scores['test_R2'].mean(), scores['test_R2'].std(),
-            #                                                                               r2_ci[0], r2_ci[1]))
-        if find_predicted:
-            predicted = cross_val_predict(model, X, y, cv=cv)  #)
-            scores['R2_stacked'] = metrics.r2_score(y, predicted)   # Also suspect for validation, but better than cross validated R2
-            if print_scores:
-                logger.info('R2 (stacked): {0:.4f}'.format(scores['R2_stacked']))
-        return scores, predicted
-
-
-
-
-# params: calib_plots from >1 data set
-#       model_data_plots from >1 data set
-#       (for now the above are the same thing)
-#       1 data_set is specified as fitted one, the rest are tests, this can also be done sort of cross-validated
-#       a model spec i.e. feature indices and model type
-#       num calib plots to use
-
-
-class ApplyLinearModel(object):
-    def __init__(self, in_file_name='', out_file_name='', model=linear_model.LinearRegression, model_keys=[],
-                 save_feats=False):
-        self.in_file_name = in_file_name
-        self.out_file_name = out_file_name
-        self.model = model
-        self.model_keys = model_keys
-        self.pan_bands = []
-        self.band_dict = {}
+        self._image_file_name = image_file_name
+        self._map_file_name = map_file_name
+        self._model = model
+        self._model_keys = model_feat_keys
         self.save_feats = save_feats
-        self.nodata = np.nan
+        self.nodata = np.nan        # nodata value to use for map raster
+        self._feature_extractor_type = feature_extractor_type
 
-        input_ds = None
-        output_ds = None
-
-    # def __del__(self):
-    #     self.Close()
-
-    # Contruct fn ptrs for each feature from strings
-    # (so we don't have to find the entire feature library)
-    # Examples:
-    #     'Log(R/pan)',
-    #     'Std(pan/NIR2)',
-    #     'Log(B)',
-    #     'Entropy(NIR/Y)',
-    #     '(NIR/Y)^2',
-    # def ConstructFeatEx(self, model_keys=[], num_bands=9):
-    @staticmethod
-    def construct_feat_ex_fn(model_key='', pan_bands=None, band_dict=None):
-        win_fn_list = []
-        inner_str_list = []
-        inner_fn_list = []
-        # find outer fn
-        ks = re.split('\(|\)', model_key.lower())
-        if len(ks) == 1:    # no brackets
-            inner_str = ks[0]
-            win_fn = lambda x: np.nanmean(x, axis=(0, 2))
-        else:
-            inner_str = ks[1]
-            # outer fn
-            if not ks[0]:  # nothing before (
-                if ks[-1]:  # raise to power
-                    kp = re.split('\^', ks[-1])
-                    win_fn = lambda x: np.power(np.nanmean(x, axis=(0,2)), eval(kp[1]))
-                else:  # straight mean
-                    win_fn = lambda x: np.nanmean(x, axis=(0,2))
-            elif ks[0] == 'std':
-                win_fn = lambda x: np.nanstd(x, axis=(0,2))
-            elif ks[0] == 'entropy':
-                win_fn = lambda x: nanentropy(x, axis=(0,2)).astype('float32')
-            elif ks[0] == 'log':
-                win_fn = lambda x: np.log10(np.nanmean(x, axis=(0,2)))
-
-        # find inner fn i.e. band ratio
-        iss = re.split('/', inner_str)
-        if len(iss) > 1:
-            if iss[0] == 'pan':
-                inner_fn = lambda pan, x: pan / x[band_dict[iss[1].upper()], :, :]
-            elif iss[1] == 'pan':
-                inner_fn = lambda pan, x: x[band_dict[iss[0].upper()], :, :] / pan
-            else:
-                inner_fn = lambda pan, x: x[band_dict[iss[0].upper()], :, :] / x[band_dict[iss[1].upper()], :, :]
-        elif 'savi' in inner_str:   # TO DO: add in underscore options
-            if 'nir2' in inner_str:
-                inner_fn = lambda pan, x: (1 + 0.05) * (x[band_dict['NIR2'], :, :] - x[band_dict['R'], :, :]) / (
-                            0.05 + x[band_dict['NIR2'], :, :] + x[band_dict['R'], :, :])
-            elif 're' in inner_str:
-                inner_fn = lambda pan, x: (1 + 0.05) * (x[band_dict['RE'], :, :] - x[band_dict['R'], :, :]) / (0.05 + x[band_dict['RE'], :, :] + x[band_dict['R'], :, :])
-            else:
-                inner_fn = lambda pan, x: (1 + 0.05) * (x[band_dict['NIR'], :, :] - x[band_dict['R'], :, :]) / (0.05 + x[band_dict['NIR'], :, :] + x[band_dict['R'], :, :])
-
-        elif 'ndvi' in inner_str:
-            if 'nir2' in inner_str:
-                inner_fn = lambda pan, x: (x[band_dict['NIR2'], :, :] - x[band_dict['R'], :, :]) / (x[band_dict['NIR2'], :, :] + x[band_dict['R'], :, :])
-            elif 're' in inner_str:
-                inner_fn = lambda pan, x: (x[band_dict['RE'], :, :] - x[band_dict['R'], :, :]) / (x[band_dict['RE'], :, :] + x[band_dict['R'], :, :])
-            else:
-                inner_fn = lambda pan, x: (x[band_dict['NIR'], :, :] - x[band_dict['R'], :, :]) / (x[band_dict['NIR'], :, :] + x[band_dict['R'], :, :])
-        else:
-            if iss[0] == 'pan':
-                inner_fn = lambda pan, x: pan
-            else:
-                inner_fn = lambda pan, x: x[band_dict[iss[0].upper()], :, :]
-
-        return inner_str, win_fn, inner_fn
-
-    @staticmethod
-    def construct_feat_ex_fns(model_keys=[], num_bands=9):
-        import re
-        pan_bands, band_dict = MsImageFeatureExtractor.get_band_info(num_bands)
-
-        win_fn_list = []
-        inner_str_list = []
-        inner_fn_list = []
-        for model_key in model_keys:
-            # find outer fn
-            inner_str, win_fn, inner_fn = ApplyLinearModel.construct_feat_ex_fn(model_key, pan_bands=pan_bands, band_dict=band_dict)
-            win_fn_list.append(win_fn)
-            inner_str_list.append(inner_str)
-            inner_fn_list.append(inner_fn)
-        # inner fn
-        return win_fn_list, inner_fn_list
-
-    # @staticmethod
-    # def rolling_window(a, window, step_size=1):
-    #     shape = a.shape[:-1] + (a.shape[-1] - window + 1 - step_size + 1, window)
-    #     strides = a.strides + (a.strides[-1] * step_size,)
-    #     return np.lib.stride_tricks.as_strided(a, shape=shape, strides=strides, writeable=False)
-
-    @staticmethod
-    def rolling_window(a, window, step_size=1):
-        if True:
-            shape = a.shape[:-1] + (int(1 + (a.shape[-1] - window) / step_size), window)
-            strides = a.strides[:-1] + (step_size * a.strides[-1], a.strides[-1])
-        else:
-            shape = a.shape[:-1] + (window, int(1 + (a.shape[-1] - window) / step_size))
-            strides = a.strides[:-1] + (a.strides[-1], step_size * a.strides[-1])
-        return np.lib.stride_tricks.as_strided(a, shape=shape, strides=strides, writeable=False)
-
-    def feat_ex(self, im_buf=[]):
-        return
-
-    def create(self, win_size=(1, 1), step_size=(1, 1)):
+    def map(self, win_size=(1, 1), step_size=(1, 1)):
         with rasterio.Env():
-            with rasterio.open(self.in_file_name, 'r') as in_ds:
-                # pan_bands, band_dict = MsPatchFeatureExtractor.get_band_info(in_ds.count)
-                patch_feature_extractor = MsPatchFeatureExtractor(num_bands=in_ds.count, apply_rolling_window=True,
-                                                                  rolling_window_xsize=win_size[0], rolling_window_xstep=step_size[0])
+            with rasterio.open(self._image_file_name, 'r') as image:
+                # create the feature extraction class
+                feature_extractor = self._feature_extractor_type(num_bands=image.count, apply_rolling_window=True,
+                                                                          rolling_window_xsize=win_size[0], rolling_window_xstep=step_size[0])
                 win_off = np.floor(np.array(win_size) / (2 * step_size[0])).astype('int32')
                 prog_update = 10
 
                 if self.save_feats:
-                    out_bands = len(self.model_keys) + 1
+                    out_bands = len(self._model_keys) + 1
                 else:
                     out_bands = 1
-                out_profile = in_ds.profile
-                out_size = np.floor([1 + (in_ds.width - win_size[0])/step_size[0], 1 + (in_ds.height - win_size[1])/step_size[1]]).astype('int32')
-                out_profile.update(dtype=rasterio.float32, count=out_bands, compress='deflate', driver='GTiff', width=out_size[0], height=out_size[1], nodata=self.nodata)
 
-                out_profile['transform'] = out_profile['transform']*rasterio.Affine.scale(step_size[0])
-                if (out_size[0]/out_profile['blockxsize'] < 10) | (out_size[1]/out_profile['blockysize'] < 10):
-                    out_profile['tiled'] = False
-                    out_profile['blockxsize'] = out_size[0]
-                    out_profile['blockysize'] = 1
-                # out_transform = np.array(rasterio.Affine(out_profile['transform']).to_gdal())
-                # out_transform[0] = ['transform'][4] * step_size[0]
-                # out_transform[4] = ['transform'][4] * step_size[1]
-                # to do: find geotransform based on out width/height
+                # setup the output raster metadata based on image metadata and specified win_size and step_size
+                map_profile = image.profile
+                map_size = np.floor([1 + (image.width - win_size[0])/step_size[0], 1 + (image.height - win_size[1])/step_size[1]]).astype('int32')
+                map_profile.update(dtype=rasterio.float32, count=out_bands, compress='deflate', driver='GTiff', width=map_size[0],
+                                   height=map_size[1], nodata=self.nodata)
 
-                # self.win_fn_list, self.band_ratio_list = AgcMap.construct_feat_ex_fns(self.model_keys, num_bands=in_ds.count)
+                map_profile['transform'] = map_profile['transform']*rasterio.Affine.scale(step_size[0])
+                if (map_size[0]/map_profile['blockxsize'] < 10) | (map_size[1]/map_profile['blockysize'] < 10):
+                    map_profile['tiled'] = False
+                    map_profile['blockxsize'] = map_size[0]
+                    map_profile['blockysize'] = 1
 
-                with rasterio.open(self.out_file_name, 'w', **out_profile) as out_ds:
-                    for cy in range(0, in_ds.height - win_size[1] + 1, step_size[1]):     #12031): #
-                        # read row of windows into mem and slide the win on this rather than the actual file
-                        # NB rasterio index is x,y, numpy index is row, col (i.e. y,x)
+                with rasterio.open(self._map_file_name, 'w', **map_profile) as map:
+                    # read image by groups of N rows where N = win_size[1]
+                    # Note: rasterio index is x,y, numpy index is row, col (i.e. y,x)
+                    for cy in range(0, image.height - win_size[1] + 1, step_size[1]):
+                        image_win = Window(0, cy, map_size[0]*win_size[0], win_size[1])
+                        bands = list(range(1, image.count + 1))
+                        image_buf = image.read(bands, window=image_win).astype(rasterio.float32)  # NB bands along first dim
 
-                        # in_buf = np.zeros((win_size[1], in_ds.width), dtype=in_ds.dtypes[0])
-                        in_win = Window(0, cy, out_size[0]*win_size[0], win_size[1])
-                        bands = list(range(1, in_ds.count + 1))
-                        in_buf = in_ds.read(bands, window=in_win).astype(rasterio.float32)  # NB bands along first dim
+                        pan = image_buf[feature_extractor._pan_bands, :, :].mean(axis=0)
+                        map_buf = self._model.intercept_ * np.ones((map_size[0]), dtype=map.dtypes[0])
+                        map_win = Window(win_off[0], int(cy/step_size[0]) + win_off[1], map_size[0], 1)
 
-                        # TO DO:  deal with -ve vals i.e. make all nans, mask out or something
-                        pan = in_buf[patch_feature_extractor._pan_bands, :, :].mean(axis=0)
-                        # agc_buf = self.model.intercept_ * np.ones((1, in_ds.width - win_size[0] + 1), dtype=out_ds.dtypes[0])
-                        agc_buf = self.model.intercept_ * np.ones((out_size[0]), dtype=out_ds.dtypes[0])
-                        out_win = Window(win_off[0], int(cy/step_size[0]) + win_off[1], out_size[0], 1)
-                        # for i, (win_fn, band_ratio_fn) in enumerate(zip(self.win_fn_list, self.band_ratio_list)):
-                        if False:
-                            in_nan_mask = np.any(in_buf <= 0, axis=0) | np.any(pan == 0,
-                                                                               axis=0)  # this is overly conservative but neater/faster
-                            in_buf[:, in_nan_mask] = np.nan
-                            pan[in_nan_mask] = np.nan
-                        else:
-                            in_nan_mask = np.all(in_buf > 0, axis=0) & np.all(pan != 0,
-                                                                               axis=0)  # this is overly conservative but neater/faster
-                            feat_dict = patch_feature_extractor.extract_features(in_buf, mask=in_nan_mask, fn_keys=self.model_keys)
+                        # mask out negative and zero values to prevent NaN outptus - overly conservative but neater & faster than other options
+                        image_nan_mask = np.all(image_buf > 0, axis=0) & np.all(pan != 0, axis=0)
+                        # extract features (model features only - not entire library) from image_buf
+                        feat_dict = feature_extractor.extract_features(image_buf, mask=image_nan_mask, fn_keys=self._model_keys)
 
-                        for i, model_key in enumerate(self.model_keys):
-                            if False:
-                                feat_buf = patch_feature_extractor.fn_dict[model_key](pan, in_buf) * self.model.coef_[i]
-                                agc_buf += feat_buf
-                            else:
-                                feat_buf = feat_dict[model_key]
-                                agc_buf += feat_buf * self.model.coef_[i]
-                            if i==0:
-                                first_feat_buf = feat_buf
+                        for i, model_key in enumerate(self._model_keys):     # assuming a linear model, sum scaled features
+                            feat_buf = feat_dict[model_key]
+                            map_buf += feat_buf * self._model.coef_[i]
                             if self.save_feats:
                                 if feat_buf.size == 1:
-                                    feat_buf = np.zeros((1, out_size[0]), dtype=out_ds.dtypes[0])
+                                    feat_buf = np.zeros((1, map_size[0]), dtype=map.dtypes[0])
                                 else:
                                     feat_buf[np.isinf(feat_buf) | np.isnan(feat_buf)] = 0
-                                out_ds.write(feat_buf.reshape(1,-1), indexes=2+i, window=out_win)
+                                map.write(feat_buf.reshape(1,-1), indexes=2+i, window=map_win)
 
-                        if True:    # lower limit of 0, and set noisy/invalid pixels to nodata, so that they can be filled in a post-processing step
-                            nodata_mask = np.isinf(agc_buf) | np.isnan(agc_buf) # | (agc_buf > 70)        # 55/70 comes from looking ta the histogram
-                            agc_buf[nodata_mask] = self.nodata
-                            # agc_buf = sig.medfilt(agc_buf, kernel_size=3).astype(np.float32)
-                            # agc_buf[(agc_buf < 0)] = 0
-                        else:   # inelegant hack for suspect values
-                            nodata_mask = np.isinf(agc_buf) | np.isnan(agc_buf) | (agc_buf < 0) | (agc_buf > 100)
-                            agc_buf[nodata_mask] = first_feat_buf[nodata_mask]
-                        # out_win = Window(win_off[0], cy + win_off[1], in_ds.width - win_size[0] + 1, 1)
-                        out_ds.write(agc_buf.reshape(1,-1), indexes=1, window=out_win)
+                        # set invalid map pixels to nodata
+                        nodata_mask = np.isinf(map_buf) | np.isnan(map_buf)
+                        map_buf[nodata_mask] = self.nodata
+                        map.write(map_buf.reshape(1,-1), indexes=1, window=map_win)
 
                         # TODO: proper progress bar
-                        if np.floor(100*cy/ in_ds.height) > prog_update:
-                            print('.', end=' ')
+                        if np.floor(100*cy/ image.height) > prog_update:
                             prog_update += 10
-                            # break
-                    print(' ')
+                            logger.info(f'Progress {prog_update}%')
 
-    def post_proc(self):
-        from rasterio.windows import Window
-        from rasterio import fill
+    def _post_proc(self):
+        """
+        For AGC maps - writes out a cleaned version of map generated by map(...) than fills nodata and places
+        sensible limits on AGC values
+
+        """
         with rasterio.Env():
-            with rasterio.open(self.out_file_name, 'r') as in_ds:
+            with rasterio.open(self._map_file_name, 'r') as in_ds:
                 out_profile = in_ds.profile
                 out_profile.update(count=1)
-                split_ext = os.path.splitext(self.out_file_name)
+                split_ext = os.path.splitext(self._map_file_name)
                 out_file_name = '{0}_postproc{1}'.format(split_ext[0], split_ext[1])
                 with rasterio.open(out_file_name, 'w', **out_profile) as out_ds:
-
                     if (not out_profile['tiled']) or (np.prod(in_ds.shape) < 10e6):
-                        in_windows = enumerate([Window(0,0,in_ds.width, in_ds.height)])        # read whole raster at once
+                        in_windows = enumerate([Window(0,0,in_ds.width, in_ds.height)])    # read whole raster at once
                     else:
-                        in_windows = in_ds.block_windows(1)                         # read in blocks
-                    # in_masks = in_ds.read_masks()
-                    # sieved_msk = sieve(in_mask, size=500)
+                        in_windows = in_ds.block_windows(1)                                # read in blocks
+
                     for ji, block_win in in_windows:
                         in_block = in_ds.read(1, window=block_win, masked=True)
 
@@ -980,9 +521,4 @@ class ApplyLinearModel(object):
 
                         out_block = fill.fillnodata(in_block, mask=None, max_search_distance=20, smoothing_iterations=1)
                         out_block[sieved_msk.astype(np.bool)] = self.nodata
-                        # out_block = signal.medfilt2d(in_block, kernel_size=3)
                         out_ds.write(out_block, indexes=1, window=block_win)
-                        # out_ds.write_mask(~sieved_msk, window=block_win)
-
-                # with rasterio.open(out_file_name, 'r+', **out_profile) as out_ds:
-                #     tmp_masks = out_ds.read_masks()

@@ -132,7 +132,7 @@ fex.scatter_plot(x_feat_key='(R/G)^2', y_feat_key='AgcHa', class_key='DegrClass'
 
 # forward selection of features use RMSE criterion (R2 is potentially suspect in CV scenario)
 # reload(su)
-Xselected_feats, selected_scores, selected_keys = su.FeatureSelector.forward_selection(X, y, feat_keys=feat_keys, max_num_feats=41, cv=5,  #cv=X.shape[0] / 5
+Xselected_feats, selected_scores, selected_keys = su.feature_selection.forward_selection(X, y, feat_keys=feat_keys, max_num_feats=41, cv=5,  #cv=X.shape[0] / 5
                                                                                        score_fn=lambda y,pred: -np.sqrt(metrics.mean_squared_error(y, pred)))
 
 
@@ -143,7 +143,7 @@ rmse = np.zeros(selected_scores.__len__())
 rmse_ci = np.zeros((selected_scores.__len__(),2))
 num_feats = np.arange(1, len(selected_scores)+1)
 for i in range(0, selected_scores.__len__()):
-    scores, predicted = su.FeatureSelector.score_model(Xselected_feats[:, :i+1], y, model=linear_model.LinearRegression(), find_predicted=True, cv=X.shape[0])
+    scores, predicted = su.feature_selection.score_model(Xselected_feats[:, :i+1], y, model=linear_model.LinearRegression(), find_predicted=True, cv=X.shape[0])
     r2[i] = scores['R2_stacked']
     rmse_v = np.abs(scores['test_user'])/1000.
     rmse[i] = rmse_v.mean()
@@ -193,7 +193,7 @@ fig.savefig(r'C:\Data\Development\Projects\PhD GeoInformatics\Docs\Funding\GEF5\
 # report scatter plots for best and single feature models
 print('\nBest model scores:')
 best_model_idx = np.argmin(rmse)
-scores, predicted = su.FeatureSelector.score_model(Xselected_feats[:, :best_model_idx+1], old_div(y,1000), model=linear_model.LinearRegression(),
+scores, predicted = su.feature_selection.score_model(Xselected_feats[:, :best_model_idx+1], old_div(y,1000), model=linear_model.LinearRegression(),
                                                    find_predicted=True, cv=X.shape[0], print_scores=True)
 
 print('\nBest model features:')
@@ -227,14 +227,14 @@ if False:
     from sklearn import pipeline
 
     pl = pipeline.make_pipeline(StandardScaler(), SVR(kernel='rbf', C=100, gamma=1.))
-    scores, predicted = su.FeatureSelector.score_model(Xselected_feats, old_div(y,1000), model=pl,
+    scores, predicted = su.feature_selection.score_model(Xselected_feats, old_div(y,1000), model=pl,
                                                        find_predicted=True, cv=X.shape[0], print_scores=True)
 
-    scores, predicted = su.FeatureSelector.score_model(Xselected_feats[:, :best_model_idx+1], old_div(y,1000), model=KernelRidge(kernel='rbf', alpha=.1), find_predicted=True, cv=X.shape[0], print_scores=True)
+    scores, predicted = su.feature_selection.score_model(Xselected_feats[:, :best_model_idx+1], old_div(y,1000), model=KernelRidge(kernel='rbf', alpha=.1), find_predicted=True, cv=X.shape[0], print_scores=True)
 
-    scores, predicted = su.FeatureSelector.score_model(Xs, y, model=SVR(kernel='linear', C=200), cv=10)
+    scores, predicted = su.feature_selection.score_model(Xs, y, model=SVR(kernel='linear', C=200), cv=10)
 
-    scores, predicted = su.FeatureSelector.score_model(Xselected_feats_s, y, model=SVR(kernel='linear', C=1000000, gamma='auto'), cv=10)
+    scores, predicted = su.feature_selection.score_model(Xselected_feats_s, y, model=SVR(kernel='linear', C=1000000, gamma='auto'), cv=10)
 
 
 # su.scatter_plot(y/1000., predicted/1000., labels=implot_feat_dict.keys())
@@ -254,7 +254,7 @@ scatter_y_pred(y/1000., predicted, scores)
 pylab.title('(a)')
 pylab.subplot(1,2,2)
 print('\nBest single feature model scores:')
-scores, predicted = su.FeatureSelector.score_model(Xselected_feats[:, :1], y/1000., model=linear_model.LinearRegression(),
+scores, predicted = su.feature_selection.score_model(Xselected_feats[:, :1], y/1000., model=linear_model.LinearRegression(),
                                                    find_predicted=True, cv=X.shape[0], print_scores=True)
 scatter_y_pred(y/1000., predicted, scores)
 pylab.title('(b)')
@@ -291,7 +291,7 @@ for f in list(implot_feat_dict_clf.values()):
         f['DegrClass'] = '?'
 
 X_clf, y_clf, feat_keys_clf = fex_clf.get_feat_array_ex(y_data_key='AgcHa')
-feat_scores = su.FeatureSelector.ranking(X_clf, y_clf, feat_keys=feat_keys_clf)
+feat_scores = su.feature_selection.ranking(X_clf, y_clf, feat_keys=feat_keys_clf)
 classes = [plot['DegrClass'] for plot in list(implot_feat_dict_clf.values())]
 
 pylab.figure()
@@ -301,9 +301,9 @@ pylab.ylabel('AGC (tC/ha)')
 pylab.tight_layout()
 
 # feature selection and model plot
-Xselected_feats, selected_scores, selected_keys = su.FeatureSelector.forward_selection(X_clf, y_clf, feat_keys=feat_keys_clf, max_num_feats=4, cv=5,
+Xselected_feats, selected_scores, selected_keys = su.feature_selection.forward_selection(X_clf, y_clf, feat_keys=feat_keys_clf, max_num_feats=4, cv=5,
     score_fn = lambda y, pred: -np.sqrt(metrics.mean_squared_error(y, pred)))
-scores, predicted = su.FeatureSelector.score_model(Xselected_feats[:, :np.argmax(selected_scores)+1], y_clf, model=linear_model.LinearRegression(),
+scores, predicted = su.feature_selection.score_model(Xselected_feats[:, :np.argmax(selected_scores)+1], y_clf, model=linear_model.LinearRegression(),
                                                    find_predicted=True, cv=X_clf.shape[0], print_scores=True)
 
 scatter_y_pred(y_clf/1000., predicted/1000., scores)
@@ -353,7 +353,7 @@ vr.cleanup()
 imr.cleanup()
 
 X, y, feat_keys = fex.get_feat_array_ex(y_data_key='AgcHa')
-Xselected_feats, selected_scores, selected_keys = su.FeatureSelector.forward_selection(X, y, feat_keys=feat_keys, max_num_feats=30, cv=5,
+Xselected_feats, selected_scores, selected_keys = su.feature_selection.forward_selection(X, y, feat_keys=feat_keys, max_num_feats=30, cv=5,
                                                                                        score_fn=lambda y,pred: -np.sqrt(metrics.mean_squared_error(y, pred)))
 
 #------------------------------------------------------------------------------------------------------------------------
@@ -363,7 +363,7 @@ rmse = np.zeros(selected_scores.__len__())
 rmse_ci = np.zeros((selected_scores.__len__(),2))
 num_feats = np.arange(1, len(selected_scores)+1)
 for i in range(0, selected_scores.__len__()):
-    scores, predicted = su.FeatureSelector.score_model(Xselected_feats[:, :i+1], y, model=linear_model.LinearRegression(), find_predicted=True, cv=X.shape[0])
+    scores, predicted = su.feature_selection.score_model(Xselected_feats[:, :i+1], y, model=linear_model.LinearRegression(), find_predicted=True, cv=X.shape[0])
     r2[i] = scores['R2_stacked']
     rmse_v = np.abs(scores['test_user'])/1000.
     rmse[i] = rmse_v.mean()
@@ -413,7 +413,7 @@ fig.savefig(r'C:\Data\Development\Projects\PhD GeoInformatics\Docs\Funding\GEF5\
 # report scatter plots for best and single feature models
 print('\nBest model scores:')
 best_model_idx = np.argmin(rmse)
-scores, predicted = su.FeatureSelector.score_model(Xselected_feats[:, :best_model_idx+1], old_div(y,1000), model=linear_model.LinearRegression(),
+scores, predicted = su.feature_selection.score_model(Xselected_feats[:, :best_model_idx+1], old_div(y,1000), model=linear_model.LinearRegression(),
                                                    find_predicted=True, cv=X.shape[0], print_scores=True)
 
 print('\nBest model features:')
@@ -433,7 +433,7 @@ scatter_y_pred(y/1000., predicted, scores)
 pylab.title('(a)')
 pylab.subplot(1, 2, 2)
 print('\nBest single feature model scores:')
-scores, predicted = su.FeatureSelector.score_model(Xselected_feats[:, :1], old_div(y,1000), model=linear_model.LinearRegression(),
+scores, predicted = su.feature_selection.score_model(Xselected_feats[:, :1], old_div(y,1000), model=linear_model.LinearRegression(),
                                                    find_predicted=True, cv=X.shape[0], print_scores=True)
 scatter_y_pred(y/1000., predicted, scores)
 pylab.title('(b)')

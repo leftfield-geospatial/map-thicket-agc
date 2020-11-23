@@ -7,14 +7,12 @@
 
 import numpy as np
 import geopandas as gpd, pandas as pd
-import pathlib, sys, os, glob, warnings
+import pathlib, os, glob, warnings
 
 if '__file__' in globals():
     root_path = pathlib.Path(__file__).absolute().parents[1]
 else:
     root_path = pathlib.Path(os.getcwd())
-
-sys.path.append(str(root_path.joinpath('Code')))
 
 # Most DGSPS plot locations were corrected / post-processed to ~30cm accuracy = corr_*,
 #  some could not be post-processed and are corrected manually here using GCPs = uncorr_*
@@ -24,7 +22,7 @@ uncorr_plot_loc_root_path = root_path.joinpath(r'data/sampling_inputs/plot_locat
 corr_shapefile_names = [sub_item.joinpath('Point_ge.shp') for sub_item in corr_plot_loc_root_path.iterdir() if sub_item.is_dir()]   # corrected dgps locs
 uncorr_shapefile_names = [pathlib.Path(p) for p in glob.glob(str(uncorr_plot_loc_root_path.joinpath('GEF_FIELD*.shp')))]            # uncorrected locs
 gcp_shapefile_name = uncorr_plot_loc_root_path.joinpath('geomax_field_reference_pts.shp')
-plot_agc_allom_filename = root_path.joinpath(r'data/outputs/allometry/plot_agc.csv')
+plot_agc_allom_filename = root_path.joinpath(r'data/outputs/allometry/plot_agc_v3.csv')
 plot_agc_shapefile_name = root_path.joinpath(r'data/outputs/geospatial/gef_plot_polygons_with_agc_v2.shp')
 
 if not plot_agc_allom_filename.exists():

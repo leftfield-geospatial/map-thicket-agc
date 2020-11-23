@@ -84,7 +84,7 @@ if False:   # find best single feat models so that we know which feats to try ca
     univariate_model_scores = OrderedDict()
     for ki, key in enumerate(feat_keys):
         xv = X[:, ki]
-        scores, predicted = su.FeatureSelector.score_model( X[:, ki].reshape(-1, 1), y / 1000.,
+        scores, predicted = su.feature_selection.score_model( X[:, ki].reshape(-1, 1), y / 1000.,
                                                            model=linear_model.LinearRegression(),
                                                            find_predicted=True, cv=10, print_scores=False)
         univariate_model_scores[key] = {'r2': scores['R2_stacked'], 'rmse': -scores['test_user'].mean()}

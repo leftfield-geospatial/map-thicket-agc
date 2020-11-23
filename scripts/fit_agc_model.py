@@ -9,7 +9,6 @@ import numpy as np
 import geopandas as gpd, pandas as pd
 import pathlib, sys, os
 from sklearn import linear_model
-from agc_estimation import imaging as img
 from matplotlib import pyplot
 import logging
 import joblib, pickle
@@ -22,8 +21,12 @@ if '__file__' in globals():
 else:
     root_path = pathlib.Path(os.getcwd())
 
-sys.path.append(str(root_path.joinpath('Code')))
+sys.path.append(str(root_path.joinpath('agc_estimation')))
 logging.basicConfig(format='%(levelname)s %(name)s: %(message)s')
+
+from agc_estimation import imaging as img
+from agc_estimation import visualisation as vis
+from agc_estimation import feature_selection as fs
 
 #--------------------------------------------------------------------------------------------------------------
 # WV3 im analysis
@@ -57,30 +60,30 @@ im_plot_data_gdf.loc[im_plot_data_gdf['data']['Stratum'] == 'Intact', ('data', '
 
 # make some scatter plots of features vs AGC/ABC
 pyplot.figure()
-# img.scatter_ds(im_plot_data_gdf, x_col=('feats', 'pan/R'), y_col=('data', 'AgcHa'), class_col=('data', 'Stratum'),
+# vis.scatter_ds(im_plot_data_gdf, x_col=('feats', 'pan/R'), y_col=('data', 'AgcHa'), class_col=('data', 'Stratum'),
 #                xfn=lambda x: np.log10(x), do_regress=True)
-img.scatter_ds(im_plot_data_gdf, x_col=('feats', '(mean(pan/R))'), y_col=('data', 'AgcHa'), class_col=('data', 'Stratum'),
+vis.scatter_ds(im_plot_data_gdf, x_col=('feats', '(mean(pan/R))'), y_col=('data', 'AgcHa'), class_col=('data', 'Stratum'),
                xfn=lambda x: np.log10(x), do_regress=True)
 pyplot.figure()
-img.scatter_ds(im_plot_data_gdf, x_col=('feats', 'sqr(mean(R/G))'), y_col=('data', 'AbcHa'), class_col=('data', 'Stratum'),
+vis.scatter_ds(im_plot_data_gdf, x_col=('feats', 'sqr(mean(R/G))'), y_col=('data', 'AbcHa'), class_col=('data', 'Stratum'),
                xfn=lambda x: np.log10(x), do_regress=True)
 pyplot.figure()
-img.scatter_ds(im_plot_data_gdf, x_col=('feats', '(mean(pan/R))'), y_col=('data', 'AbcHa'), class_col=('data', 'Stratum'),
+vis.scatter_ds(im_plot_data_gdf, x_col=('feats', '(mean(pan/R))'), y_col=('data', 'AbcHa'), class_col=('data', 'Stratum'),
                xfn=lambda x: np.log10(x), do_regress=True, thumbnail_col=('data','thumbnail'), label_col=('data', 'ID'))
 
 # select best features for predicting AGC with linear regression
 # TODO - experiment with different cv vals here and below - it has a big effect on what is selected and how it is scored.
 #  Likewise, so do small numerical differences in feats.
 y = im_plot_data_gdf['data']['AgcHa']
-selected_feats_df, selected_scores =  img.FeatureSelector.forward_selection(im_plot_data_gdf['feats'], y, max_num_feats=25, cv=5,  #cv=X.shape[0] / 5
+selected_feats_df, selected_scores =  fs.forward_selection(im_plot_data_gdf['feats'], y, max_num_feats=25, cv=5,  #cv=X.shape[0] / 5
                                                                                         score_fn=None)
-# feat_scores = img.FeatureSelector.ranking(im_plot_data_gdf['feats'], y, cv=5, score_fn=None)
+# feat_scores = fs.ranking(im_plot_data_gdf['feats'], y, cv=5, score_fn=None)
 
 # calculate scores of selected features with LOOCV
 selected_loocv_scores = []
 num_feats = range(0, len(selected_scores))
 for i in num_feats:
-    scores, predicted = img.FeatureSelector.score_model(selected_feats_df.to_numpy()[:, :i + 1], y, model=linear_model.LinearRegression(), find_predicted=True, cv=len(selected_feats_df))
+    scores, predicted = fs.score_model(selected_feats_df.to_numpy()[:, :i + 1], y, model=linear_model.LinearRegression(), find_predicted=True, cv=len(selected_feats_df))
     loocv_scores = {'R2': scores['R2_stacked'], 'RMSE': np.abs(scores['test_-RMSE']).mean()/1000., 'RMSE CI': np.percentile(np.abs(scores['test_-RMSE']), [5, 95])}
     selected_loocv_scores.append(loocv_scores)
     print('Scored model {0} of {1}'.format(i+1, len(selected_scores)))
@@ -124,14 +127,14 @@ fig.savefig(root_path.joinpath(r'data/outputs/agc_acc_vs_num_feats2b_py38_cv10.p
 # multiple feat model
 logger.info('Multi feat model scores:')
 best_model_idx = np.argmin(selected_loocv_scores_df['RMSE'])
-scores, predicted = img.FeatureSelector.score_model(selected_feats_df.iloc[:, :best_model_idx + 1], y/1000, model=linear_model.LinearRegression(),
+scores, predicted = fs.score_model(selected_feats_df.iloc[:, :best_model_idx + 1], y/1000, model=linear_model.LinearRegression(),
                                                     find_predicted=True, cv=selected_feats_df.shape[0], print_scores=True)
 logger.info('Multi feat model features:')
 logger.info(selected_feats_df.columns[:best_model_idx+1].to_numpy())
 
 fig = pyplot.figure()
 fig.set_size_inches(5, 4, forward=True)
-img.scatter_y_actual_vs_pred(y/1000., predicted, scores)
+vis.scatter_y_actual_vs_pred(y/1000., predicted, scores)
 fig.savefig(root_path.joinpath(r'data/outputs/Plots/meas_vs_pred_agc_multivariate_model_b.png'), dpi=300)
 
 best_multivariate_model = linear_model.LinearRegression()
@@ -147,7 +150,7 @@ if True:
 
 # single feat model
 logger.info('Single feat model scores:')
-scores, predicted = img.FeatureSelector.score_model(selected_feats_df.iloc[:, :1], y/1000, model=linear_model.LinearRegression(),
+scores, predicted = fs.score_model(selected_feats_df.iloc[:, :1], y/1000, model=linear_model.LinearRegression(),
                                                     find_predicted=True, cv=selected_feats_df.shape[0], print_scores=True)
 
 logger.info('Single feat model features:')
@@ -155,7 +158,7 @@ logger.info(selected_feats_df.columns[:1].to_numpy())
 
 fig = pyplot.figure()
 fig.set_size_inches(5, 4, forward=True)
-img.scatter_y_actual_vs_pred(y/1000., predicted, scores)
+vis.scatter_y_actual_vs_pred(y/1000., predicted, scores)
 fig.savefig(root_path.joinpath(r'data/outputs/Plots/meas_vs_pred_agc_univariate_model_b.png'), dpi=300)
 
 # fitting

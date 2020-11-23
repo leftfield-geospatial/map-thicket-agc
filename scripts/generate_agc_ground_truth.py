@@ -13,19 +13,16 @@ from csv import DictWriter
 import pandas as pd
 from scipy.stats import gaussian_kde
 import logging
+from agc_estimation import allometry as allom
+from agc_estimation import visualisation as vis
 
 if '__file__' in globals():
     root_path = pathlib.Path(__file__).absolute().parents[1]
 else:
     root_path = pathlib.Path(os.getcwd())
 
-sys.path.append(str(root_path.joinpath('Code')))
+sys.path.append(str(root_path.joinpath('agc_estimation')))
 logging.basicConfig(format='%(levelname)s %(name)s: %(message)s')
-
-from agc_estimation import allometry as allom
-from agc_estimation import imaging as img
-
-#
 
 model_file_name = root_path.joinpath('data/sampling_inputs/allometry/allometric_models.xlsx')
 litter_file_name = root_path.joinpath('data/sampling_inputs/allometry/litter_allometric_data.xlsx')
@@ -35,10 +32,8 @@ plant_abc_file_name = root_path.joinpath('data/outputs/allometry/plant_abc_v3.cs
 plot_agc_file_name = root_path.joinpath('data/outputs/allometry/plot_agc_v3.csv')
 surrogate_file_name = root_path.joinpath('data/outputs/allometry/master_surrogate_map_v3.csv')
 
-
 agc_plot_est = allom.AgcPlotEstimator(model_file_name=model_file_name, correction_method=allom.BiomassCorrectionMethod.NicklessZou)
 agc_plot_est.estimate(woody_file_name=woody_file_name, litter_file_name=litter_file_name)
-
 
 if True:
     # write per-plant and per-plot ABC/AGC etc files
@@ -55,12 +50,12 @@ if True:
     f1 = pyplot.figure('Relation between plant vol. and C stocks')
     f1.set_size_inches(10, 4, forward=True)
     ax = pyplot.subplot(1, 2, 1, aspect='equal')
-    img.scatter_ds(agc_plot_est.plot_summary_agc_df, x_col='VolHa', y_col='AbcHa', xfn=lambda x: x / 1000., yfn=lambda y: y / 1000.,
+    vis.scatter_ds(agc_plot_est.plot_summary_agc_df, x_col='VolHa', y_col='AbcHa', xfn=lambda x: x / 1000., yfn=lambda y: y / 1000.,
                    x_label='Biomass volume ($10^3$ m$^{3}$ ha$^{-1}$)', y_label='ABC (t C ha$^{-1}$)')
     ax.set_title('(a)')
 
     ax = pyplot.subplot(1, 2, 2, aspect='equal')
-    img.scatter_ds(agc_plot_est.plot_summary_agc_df, x_col='VolHa', y_col='AgcHa', xfn=lambda x: x / 1000., yfn=lambda y: y / 1000.,
+    vis.scatter_ds(agc_plot_est.plot_summary_agc_df, x_col='VolHa', y_col='AgcHa', xfn=lambda x: x / 1000., yfn=lambda y: y / 1000.,
                    x_label='Biomass volume ($10^3$ m$^{3}$ ha$^{-1}$)', y_label='AGC (t C ha$^{-1}$)')
     ax.set_title('(b)')
     f1.tight_layout()
@@ -69,7 +64,7 @@ if True:
 
     f2 = pyplot.figure('Relation between Litter C and ABC')
     f2.set_size_inches(5, 4, forward=True)
-    img.scatter_ds(agc_plot_est.plot_summary_agc_df, x_col='VolHa', y_col='AgcHa', xfn=lambda x: x / 1000., yfn=lambda y: y / 1000.,
+    vis.scatter_ds(agc_plot_est.plot_summary_agc_df, x_col='VolHa', y_col='AgcHa', xfn=lambda x: x / 1000., yfn=lambda y: y / 1000.,
                    x_label='Litter C (t C ha$^{-1}$)', y_label='ABC (t C ha$^{-1}$)')
     f2.tight_layout()
     f2.waitforbuttonpress(.5)

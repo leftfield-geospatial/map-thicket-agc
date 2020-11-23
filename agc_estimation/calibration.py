@@ -22,6 +22,14 @@ from agc_estimation import imaging as img
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
+
+# params: calib_plots from >1 data set
+#       model_data_plots from >1 data set
+#       (for now the above are the same thing)
+#       1 data_set is specified as fitted one, the rest are tests, this can also be done sort of cross-validated
+#       a model spec i.e. feature indices and model type
+#       num calib plots to use
+
 class ModelCalibrationTest(object):
     # def __init__(self, plot_featdict_list=[], y_key='', calib_featdict_list=[], feat_keys='', model_feat_keys=['r_n'], model=linear_model.LinearRegression()):
     #     self.plot_data_list = plot_data_list
