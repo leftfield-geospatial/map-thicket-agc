@@ -24,7 +24,7 @@ logging.basicConfig(format='%(levelname)s %(name)s: %(message)s')
 image_filename = r"D:/OneDrive/GEF Essentials/Source Images/WorldView3 Oct 2017/WorldView3_Oct2017_OrthoNgiDem_AtcorSrtmAdjCorr_PanAndPandSharpMs.tif"
 
 if True:
-    map_filename = root_path.joinpath(r'data/outputs/geospatial/gef5_slm_wv3_oct_2017_univariate_agc_10m__.tif')
+    map_filename = root_path.joinpath(r'data/outputs/geospatial/gef5_slm_wv3_oct_2017_univariate_agc_10m_w66s11.tif')
     model_filename = root_path.joinpath(r'data/outputs/Models/best_univariate_model_py38_cv5v2.joblib')
 else:
     map_filename = root_path.joinpath(r'data/outputs/geospatial/gef5_slm_wv3_oct_2017_multivariate_agc_10m.tif')
@@ -35,6 +35,6 @@ model, model_feat_keys, model_scores = joblib.load(model_filename)
 mapper = img.MsImageMapper(image_file_name=image_filename, map_file_name=map_filename, model=model, model_feat_keys=model_feat_keys,
                          save_feats=False)
 
-# mapper.map(win_size=(33, 33), step_size=(33, 33))   # map with ~10m pixels
 mapper.map(win_size=(33, 33), step_size=(33, 33))   # map with ~10m pixels
+# mapper.map(win_size=(66, 66), step_size=(11, 11))
 img.thicket_agc_post_proc(mapper)                   # post process map

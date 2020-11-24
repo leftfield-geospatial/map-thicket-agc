@@ -449,8 +449,7 @@ class ImageMapper(object):
                 # create the feature extraction class
                 feature_extractor = self._feature_extractor_type(num_bands=image.count, apply_rolling_window=True,
                                                                           rolling_window_xsize=win_size[0], rolling_window_xstep=step_size[0])
-                # win_off = np.floor(np.array(win_size) / (2 * step_size[0])).astype('int32')   # what is this?
-                win_off = np.array([0, 0])  # test
+                map_win_off = np.array([0, 0])  # test
                 prog_update = 10
 
                 if self.save_feats:
@@ -461,13 +460,13 @@ class ImageMapper(object):
                 # setup the output raster metadata based on image metadata and specified win_size and step_size
                 map_profile = image.profile
                 map_size = np.floor([1 + (image.width - win_size[0])/step_size[0], 1 + (image.height - win_size[1])/step_size[1]]).astype('int32')
+                # map_size = np.floor([image.width / step_size[0], image.height / step_size[1]]).astype('int32')
                 map_profile.update(dtype=rasterio.float32, count=out_bands, compress='deflate', driver='GTiff', width=map_size[0],
                                    height=map_size[1], nodata=self.nodata)
 
                 map_profile['transform'] = map_profile['transform'] * rasterio.Affine.scale(*step_size)
-                map_profile['transform'] = map_profile['transform'] * rasterio.Affine.translation(
-                    *(np.array(win_size)-np.array(step_size))/(2*np.array(step_size)))
-                if (map_size[0]/map_profile['blockxsize'] < 10) | (map_size[1]/map_profile['blockysize'] < 10):
+                map_profile['transform'] = map_profile['transform'] * rasterio.Affine.translation(*np.floor(np.array(win_size)/(2 * np.array(step_size))))
+                if (map_size[0] / map_profile['blockxsize'] < 10) | (map_size[1] / map_profile['blockysize'] < 10):
                     map_profile['tiled'] = False
                     map_profile['blockxsize'] = map_size[0]
                     map_profile['blockysize'] = 1
@@ -482,7 +481,7 @@ class ImageMapper(object):
 
                         pan = image_buf[feature_extractor._pan_bands, :, :].mean(axis=0)
                         map_buf = self._model.intercept_ * np.ones((map_size[0]), dtype=map.dtypes[0])
-                        map_win = Window(win_off[0], int(cy/step_size[0]) + win_off[1], map_size[0], 1)
+                        map_win = Window(map_win_off[0], int(cy/step_size[0]) + map_win_off[1], map_size[0], 1)
 
                         # mask out negative and zero values to prevent NaN outputs - overly conservative but neater & faster than other options
                         image_nan_mask = np.all(image_buf > 0, axis=0) & np.all(pan != 0, axis=0)
