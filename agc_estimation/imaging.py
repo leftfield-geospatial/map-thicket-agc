@@ -400,10 +400,10 @@ class MsImageFeatureExtractor(ImageFeatureExtractor):
 
 
 class ImageMapper(object):
-    def __init__(self, image_file_name='', map_file_name='', model=linear_model.LinearRegression, model_feat_keys=[],
-                 save_feats=False, feature_extractor_type=MsPatchFeatureExtractor):
+    def __init__(self, image_file_name='', map_file_name='', model=linear_model.LinearRegression(), model_feat_keys=[],
+                 save_feats=False):
         """
-        Class to generate raster map by applying a fitted model to an image
+        Virtual base class to generate raster map by applying a fitted model to an image
 
         Parameters
         ----------
@@ -418,24 +418,39 @@ class ImageMapper(object):
             (as understood by feature_extractor_type)
         save_feats : bool
             include extracted features as bands in map_file_name (default = False)
-        feature_extractor_type : PatchFeatureExtractor
-            class to use to extract features (default = MsPatchFeatureExtractor)
         """
         self._image_file_name = image_file_name
         self._map_file_name = map_file_name
+        if not issubclass(type(model), linear_model._base.LinearModel):
+            raise Exception('model must be derived from sklearn.linear_model._base.LinearModel')
         self._model = model
         self._model_keys = model_feat_keys
         self.save_feats = save_feats
         self.nodata = np.nan        # nodata value to use for map raster
-        self._feature_extractor_type = feature_extractor_type
+        self._feature_extractor_type = PatchFeatureExtractor    # not implemented, to be specified in derived class
 
     def map(self, win_size=(1, 1), step_size=(1, 1)):
+        """
+        Apply model to image features and write to map raster file
+
+        Parameters
+        ----------
+        win_size : numpy.array_like
+            (x, y) rolling window size in pixels (default = (1,1))
+        step_size : numpy.array_like
+            (x, y) rolling window steps in pixels (default = (1,1))
+        """
+        if np.any(np.array(step_size) > np.array(win_size)):
+            logger.warning('step_size <= win_size')
+
+
         with rasterio.Env():
             with rasterio.open(self._image_file_name, 'r') as image:
                 # create the feature extraction class
                 feature_extractor = self._feature_extractor_type(num_bands=image.count, apply_rolling_window=True,
                                                                           rolling_window_xsize=win_size[0], rolling_window_xstep=step_size[0])
-                win_off = np.floor(np.array(win_size) / (2 * step_size[0])).astype('int32')
+                # win_off = np.floor(np.array(win_size) / (2 * step_size[0])).astype('int32')   # what is this?
+                win_off = np.array([0, 0])  # test
                 prog_update = 10
 
                 if self.save_feats:
@@ -449,17 +464,19 @@ class ImageMapper(object):
                 map_profile.update(dtype=rasterio.float32, count=out_bands, compress='deflate', driver='GTiff', width=map_size[0],
                                    height=map_size[1], nodata=self.nodata)
 
-                map_profile['transform'] = map_profile['transform']*rasterio.Affine.scale(step_size[0])
+                map_profile['transform'] = map_profile['transform'] * rasterio.Affine.scale(*step_size)
+                map_profile['transform'] = map_profile['transform'] * rasterio.Affine.translation(
+                    *(np.array(win_size)-np.array(step_size))/(2*np.array(step_size)))
                 if (map_size[0]/map_profile['blockxsize'] < 10) | (map_size[1]/map_profile['blockysize'] < 10):
                     map_profile['tiled'] = False
                     map_profile['blockxsize'] = map_size[0]
                     map_profile['blockysize'] = 1
 
                 with rasterio.open(self._map_file_name, 'w', **map_profile) as map:
-                    # read image by groups of N rows where N = win_size[1]
+                    # read image by groups of N rows where N = win_size[1], then slide window in x direction
                     # Note: rasterio index is x,y, numpy index is row, col (i.e. y,x)
                     for cy in range(0, image.height - win_size[1] + 1, step_size[1]):
-                        image_win = Window(0, cy, map_size[0]*win_size[0], win_size[1])
+                        image_win = Window(0, cy, (map_size[0] - 1)*step_size[0] + win_size[0], win_size[1])
                         bands = list(range(1, image.count + 1))
                         image_buf = image.read(bands, window=image_win).astype(rasterio.float32)  # NB bands along first dim
 
@@ -467,9 +484,9 @@ class ImageMapper(object):
                         map_buf = self._model.intercept_ * np.ones((map_size[0]), dtype=map.dtypes[0])
                         map_win = Window(win_off[0], int(cy/step_size[0]) + win_off[1], map_size[0], 1)
 
-                        # mask out negative and zero values to prevent NaN outptus - overly conservative but neater & faster than other options
+                        # mask out negative and zero values to prevent NaN outputs - overly conservative but neater & faster than other options
                         image_nan_mask = np.all(image_buf > 0, axis=0) & np.all(pan != 0, axis=0)
-                        # extract features (model features only - not entire library) from image_buf
+                        # extract features (model features only - not entire library) from image_buf using rolling window
                         feat_dict = feature_extractor.extract_features(image_buf, mask=image_nan_mask, fn_keys=self._model_keys)
 
                         for i, model_key in enumerate(self._model_keys):     # assuming a linear model, sum scaled features
@@ -488,37 +505,75 @@ class ImageMapper(object):
                         map.write(map_buf.reshape(1,-1), indexes=1, window=map_win)
 
                         # TODO: proper progress bar
-                        if np.floor(100*cy/ image.height) > prog_update:
-                            prog_update += 10
+                        if np.floor(100 * cy / (image.height - win_size[1] + 1)) >= prog_update:
                             logger.info(f'Progress {prog_update}%')
+                            prog_update += 10
+        logger.info(f'Progress 100%')
 
-    def _post_proc(self):
+class MsImageMapper(ImageMapper):
+    def __init__(self, image_file_name='', map_file_name='', model=linear_model.LinearRegression, model_feat_keys=[],
+                 save_feats=False):
         """
-        For AGC maps - writes out a cleaned version of map generated by map(...) than fills nodata and places
-        sensible limits on AGC values
+        Class to generate raster map by applying a fitted model to a multispectral image
 
+        Parameters
+        ----------
+        image_file_name : str
+            path to input image file
+        map_file_name: str
+            output map file path to create
+        model : sklearn.BaseEstimator
+            trained/ fitted model to apply to image_file_name (currently must be linear model)
+        model_feat_keys : list
+            list of descriptive strings specifying features to extract from image_file_name and to feed to model,
+            (as understood by feature_extractor_type)
+        save_feats : bool
+            include extracted features as bands in map_file_name (default = False)
+        feature_extractor_type : PatchFeatureExtractor
+            class to use to extract features (default = MsPatchFeatureExtractor)
         """
-        with rasterio.Env():
-            with rasterio.open(self._map_file_name, 'r') as in_ds:
-                out_profile = in_ds.profile
-                out_profile.update(count=1)
-                split_ext = os.path.splitext(self._map_file_name)
-                out_file_name = '{0}_postproc{1}'.format(split_ext[0], split_ext[1])
-                with rasterio.open(out_file_name, 'w', **out_profile) as out_ds:
-                    if (not out_profile['tiled']) or (np.prod(in_ds.shape) < 10e6):
-                        in_windows = enumerate([Window(0,0,in_ds.width, in_ds.height)])    # read whole raster at once
-                    else:
-                        in_windows = in_ds.block_windows(1)                                # read in blocks
+        ImageMapper.__init__(self, image_file_name=image_file_name, map_file_name=map_file_name, model=model, model_feat_keys=model_feat_keys,
+                 save_feats=save_feats)
+        self._feature_extractor_type = MsPatchFeatureExtractor
 
-                    for ji, block_win in in_windows:
-                        in_block = in_ds.read(1, window=block_win, masked=True)
 
-                        in_block[in_block < 0] = 0
-                        in_block.mask = (in_block.mask.astype(np.bool) | (in_block > 95) | (in_block < 0)).astype(rasterio.uint8)
+def thicket_agc_post_proc(image_mapper = ImageMapper()):
+    """
+    Post process thicket AGC map - helper function for MsImageMapper
+    Writes out a cleaned version of map generated by ImageMapper.map(...), ills nodata and places sensible limits on
+    AGC values.
 
-                        in_mask = in_block.mask.copy()
-                        sieved_msk = sieve(in_mask.astype(rasterio.uint8), size=2000)
+    Parameters
+    ----------
+    image_mapper : ImageMapper
+        instance of ImageMapper that has generated map
 
-                        out_block = fill.fillnodata(in_block, mask=None, max_search_distance=20, smoothing_iterations=1)
-                        out_block[sieved_msk.astype(np.bool)] = self.nodata
-                        out_ds.write(out_block, indexes=1, window=block_win)
+    Returns
+    -------
+    post processed raster file name
+    """
+    with rasterio.Env():
+        with rasterio.open(image_mapper._map_file_name, 'r') as in_ds:
+            out_profile = in_ds.profile
+            out_profile.update(count=1)
+            split_ext = os.path.splitext(image_mapper._map_file_name)
+            out_file_name = '{0}_postproc{1}'.format(split_ext[0], split_ext[1])
+            with rasterio.open(out_file_name, 'w', **out_profile) as out_ds:
+                if (not out_profile['tiled']) or (np.prod(in_ds.shape) < 10e6):
+                    in_windows = enumerate([Window(0,0,in_ds.width, in_ds.height)])    # read whole raster at once
+                else:
+                    in_windows = in_ds.block_windows(1)                                # read in blocks
+
+                for ji, block_win in in_windows:
+                    in_block = in_ds.read(1, window=block_win, masked=True)
+
+                    in_block[in_block < 0] = 0
+                    in_block.mask = (in_block.mask.astype(np.bool) | (in_block > 95) | (in_block < 0)).astype(rasterio.uint8)
+
+                    in_mask = in_block.mask.copy()
+                    sieved_msk = sieve(in_mask.astype(rasterio.uint8), size=2000)
+
+                    out_block = fill.fillnodata(in_block, mask=None, max_search_distance=20, smoothing_iterations=1)
+                    out_block[sieved_msk.astype(np.bool)] = image_mapper.nodata
+                    out_ds.write(out_block, indexes=1, window=block_win)
+        return out_file_name
