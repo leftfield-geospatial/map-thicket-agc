@@ -412,7 +412,7 @@ class ImageMapper(object):
         map_file_name: str
             output map file path to create
         model : sklearn.BaseEstimator
-            trained/ fitted model to apply to image_file_name (currently must be linear model)
+            trained/ fitted model to apply to image_file_name
         model_feat_keys : list
             list of descriptive strings specifying features to extract from image_file_name and to feed to model,
             (as understood by feature_extractor_type)
@@ -421,8 +421,8 @@ class ImageMapper(object):
         """
         self._image_file_name = image_file_name
         self._map_file_name = map_file_name
-        if not issubclass(type(model), linear_model._base.LinearModel):
-            raise Exception('model must be derived from sklearn.linear_model._base.LinearModel')
+        # if not issubclass(type(model), linear_model._base.LinearModel):
+        #     raise Exception('model must be derived from sklearn.linear_model._base.LinearModel')
         self._model = model
         self._model_keys = model_feat_keys
         self.save_feats = save_feats
@@ -488,20 +488,17 @@ class ImageMapper(object):
                         # extract features (model features only - not entire library) from image_buf using rolling window
                         feat_dict = feature_extractor.extract_features(image_buf, mask=image_nan_mask, fn_keys=self._model_keys)
 
-                        for i, model_key in enumerate(self._model_keys):     # assuming a linear model, sum scaled features
-                            feat_buf = feat_dict[model_key]
-                            map_buf += feat_buf * self._model.coef_[i]
-                            if self.save_feats:
-                                if feat_buf.size == 1:
-                                    feat_buf = np.zeros((1, map_size[0]), dtype=map.dtypes[0])
-                                else:
-                                    feat_buf[np.isinf(feat_buf) | np.isnan(feat_buf)] = 0
-                                map.write(feat_buf.reshape(1,-1), indexes=2+i, window=map_win)
+                        feat_buf = np.array([fv for fv in feat_dict.values()]).transpose()
+                        feat_buf_nan_mask = np.any(np.isnan(feat_buf) | np.isinf(feat_buf), axis=1)    # work around for nan's which raise an error in sklearn
+                        feat_buf[feat_buf_nan_mask, :] = 0
+                        map_buf = self._model.predict(feat_buf).astype(map.dtypes[0])
+                        map_buf[feat_buf_nan_mask] = self.nodata
 
-                        # set invalid map pixels to nodata
-                        nodata_mask = np.isinf(map_buf) | np.isnan(map_buf)
-                        map_buf[nodata_mask] = self.nodata
                         map.write(map_buf.reshape(1,-1), indexes=1, window=map_win)
+                        if self.save_feats:
+                            feat_buf[feat_buf_nan_mask, :] = self.nodata
+                            feat_buf = feat_buf.astype(map.dtypes[0]).transpose()[:, np.newaxis, :]   # order axes correctly for rasterio write
+                            map.write(feat_buf, indexes=np.arange(2, 2+len(self._model_keys)), window=map_win)
 
                         # TODO: proper progress bar
                         if np.floor(100 * cy / (image.height - win_size[1] + 1)) >= prog_update:
@@ -522,7 +519,7 @@ class MsImageMapper(ImageMapper):
         map_file_name: str
             output map file path to create
         model : sklearn.BaseEstimator
-            trained/ fitted model to apply to image_file_name (currently must be linear model)
+            trained/ fitted model to apply to image_file_name
         model_feat_keys : list
             list of descriptive strings specifying features to extract from image_file_name and to feed to model,
             (as understood by feature_extractor_type)
