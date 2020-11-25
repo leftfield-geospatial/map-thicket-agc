@@ -37,12 +37,12 @@ plot_agc_gdf = gpd.GeoDataFrame.from_file(plot_agc_shapefile_name)
 plot_agc_gdf = plot_agc_gdf.set_index('ID').sort_index()
 
 fex = img.MsImageFeatureExtractor(image_filename=image_filename, plot_data_gdf=plot_agc_gdf)
-im_plot_data_gdf = fex.extract_image_features()
+im_plot_agc_gdf = fex.extract_image_features()
     # im_plot_data_gdf.pop('ST49')
 
 # calculate versions of ABC and AGC normalised by actual polygon area, rather than theoretical plot sizes, and append to im_plot_data_gdf
 carbon_polynorm_dict = {}
-for plot_id, plot in im_plot_data_gdf['data'].iterrows():
+for plot_id, plot in im_plot_agc_gdf['data'].iterrows():
     if 'Abc' in plot and 'LitterCHa' in plot:
         litter_c_ha = np.max([plot['LitterCHa'], 0.])
         abc = np.max([plot['Abc'], 0.])
@@ -52,31 +52,31 @@ for plot_id, plot in im_plot_data_gdf['data'].iterrows():
 carbon_polynorm_df = pd.DataFrame.from_dict(carbon_polynorm_dict, orient='index')
 
 for key in ['AbcHa2', 'AgcHa2']:
-    im_plot_data_gdf[('data', key)] = carbon_polynorm_df[key]
+    im_plot_agc_gdf[('data', key)] = carbon_polynorm_df[key]
 
 # fix stratum labels
-im_plot_data_gdf.loc[im_plot_data_gdf['data']['Stratum'] == 'Degraded', ('data', 'Stratum')] = 'Severe'
-im_plot_data_gdf.loc[im_plot_data_gdf['data']['Stratum'] == 'Intact', ('data', 'Stratum')] = 'Pristine'
+im_plot_agc_gdf.loc[im_plot_agc_gdf['data']['Stratum'] == 'Degraded', ('data', 'Stratum')] = 'Severe'
+im_plot_agc_gdf.loc[im_plot_agc_gdf['data']['Stratum'] == 'Intact', ('data', 'Stratum')] = 'Pristine'
 
 # make some scatter plots of features vs AGC/ABC
 pyplot.figure()
 # vis.scatter_ds(im_plot_data_gdf, x_col=('feats', 'pan/R'), y_col=('data', 'AgcHa'), class_col=('data', 'Stratum'),
 #                xfn=lambda x: np.log10(x), do_regress=True)
-vis.scatter_ds(im_plot_data_gdf, x_col=('feats', '(mean(pan/R))'), y_col=('data', 'AgcHa'), class_col=('data', 'Stratum'),
+vis.scatter_ds(im_plot_agc_gdf, x_col=('feats', '(mean(pan/R))'), y_col=('data', 'AgcHa'), class_col=('data', 'Stratum'),
                xfn=lambda x: np.log10(x), do_regress=True)
 pyplot.figure()
-vis.scatter_ds(im_plot_data_gdf, x_col=('feats', 'sqr(mean(R/G))'), y_col=('data', 'AbcHa'), class_col=('data', 'Stratum'),
+vis.scatter_ds(im_plot_agc_gdf, x_col=('feats', 'sqr(mean(R/G))'), y_col=('data', 'AbcHa'), class_col=('data', 'Stratum'),
                xfn=lambda x: np.log10(x), do_regress=True)
 pyplot.figure()
-vis.scatter_ds(im_plot_data_gdf, x_col=('feats', '(mean(pan/R))'), y_col=('data', 'AbcHa'), class_col=('data', 'Stratum'),
+vis.scatter_ds(im_plot_agc_gdf, x_col=('feats', '(mean(pan/R))'), y_col=('data', 'AbcHa'), class_col=('data', 'Stratum'),
                xfn=lambda x: np.log10(x), do_regress=True, thumbnail_col=('data','thumbnail'), label_col=('data', 'ID'))
 
 # select best features for predicting AGC with linear regression
 # TODO - experiment with different cv vals here and below - it has a big effect on what is selected and how it is scored.
 #  Likewise, so do small numerical differences in feats.
-y = im_plot_data_gdf['data']['AgcHa']
-selected_feats_df, selected_scores =  fs.forward_selection(im_plot_data_gdf['feats'], y, max_num_feats=25, cv=5,  #cv=X.shape[0] / 5
-                                                                                        score_fn=None)
+y = im_plot_agc_gdf['data']['AgcHa']
+selected_feats_df, selected_scores =  fs.forward_selection(im_plot_agc_gdf['feats'], y, max_num_feats=25, cv=5,  #cv=X.shape[0] / 5
+                                                           score_fn=None)
 # feat_scores = fs.ranking(im_plot_data_gdf['feats'], y, cv=5, score_fn=None)
 
 # calculate scores of selected features with LOOCV

@@ -5,17 +5,8 @@
   Email: dugalh@gmail.com
 """
 
-from __future__ import print_function
-from __future__ import division
-from builtins import zip
-from builtins import str
-from builtins import range
-from builtins import object
-from past.utils import old_div
-
-import warnings, logging
+import logging
 import numpy as np
-import rasterio
 from sklearn import linear_model, metrics
 from agc_estimation import imaging as img
 

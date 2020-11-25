@@ -510,7 +510,7 @@ class MsImageMapper(ImageMapper):
     def __init__(self, image_file_name='', map_file_name='', model=linear_model.LinearRegression, model_feat_keys=[],
                  save_feats=False):
         """
-        Class to generate raster map by applying a fitted model to a multispectral image
+        Class to generate raster map by applying fitted model to a multispectral image
 
         Parameters
         ----------
