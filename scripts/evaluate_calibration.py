@@ -155,5 +155,5 @@ for im_plot_agc_gdf in im_plot_agc_gdfs:
 eval_calib = calib.EvaluateCalibration(model_data_list=model_data_list, y=im_plot_agc_gdfs[0]['data']['AgcHa'] / 1000., strata=im_plot_agc_gdfs[0]['data']['Stratum'],
                                        calib_data_list=model_data_list, model=linear_model.LinearRegression)
 
-model_scores, calib_scores = eval_calib.test(n_bootstraps=10, n_calib_plots=3)
+model_scores, calib_scores = eval_calib.test(n_bootstraps=100, n_calib_plots=8)
 eval_calib.print_scores()

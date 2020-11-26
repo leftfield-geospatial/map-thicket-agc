@@ -8,45 +8,28 @@
 import logging
 import numpy as np
 from sklearn import linear_model, metrics
-from agc_estimation import imaging as img
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
 
-# params: calib_plots from >1 data set
-#       model_data_plots from >1 data set
-#       (for now the above are the same thing)
-#       1 data_set is specified as fitted one, the rest are tests, this can also be done sort of cross-validated
-#       a model spec i.e. feature indices and model type
-#       num calib plots to use
-
-
 class EvaluateCalibration(object):
-    # def __init__(self, plot_featdict_list=[], y_key='', calib_featdict_list=[], feat_keys='', model_feat_keys=['r_n'], model=linear_model.LinearRegression()):
-    #     self.model_data_list = model_data_list
-    #     self.calib_data_list = calib_data_list
-    #     self.feat_keys = feat_keys
-    #     self.model_feat_idx = model_feat_idx
-    #     self.model = model
-    #     self.y = y
-    #     self.fitted_models = []
-
     def __init__(self, model_data_list=[], y=[], strata=None, calib_data_list=[], model=linear_model.LinearRegression):
         """
-        Evaluate calibration by testing model performance in calibrated images
+        Evaluate calibration by testing model performance over calibrated image data
+
         Parameters
         ----------
         model_data_list : list
-            list of numpy.array_like's containing model feature(s)
+            each element is a numpy.array_like containing model feature(s) from a single image
         y : numpy.array_like
-            model target / dependent variables
+            target / ground truth values for model
         strata : numpy.array_like
             strata for stratified bootstrap of calibration plots (optional)
         calib_data_list : list
-            list of numpy.array_like's containing calibration feature(s)
+            each element is a numpy.array_like containing calibration feature(s) from a single image
         model : sklearn.BaseEstimator
-            model type to test with
+            model type to test
         """
         self.model_data_list = model_data_list
         self.calib_data_list = calib_data_list
@@ -57,54 +40,97 @@ class EvaluateCalibration(object):
         self.model_scores_array = None
         self.calib_scores_array = None
 
-    def bootstrap(self, fit_model, fit_model_data, fit_calib_data, test_model_data, test_calib_data,
-                  n_bootstraps=10, n_calib_plots=10):
+    def bootstrap(self, fit_model, fit_model_data, fit_calib_data, test_model_data, test_calib_data, n_bootstraps=10, n_calib_plots=10):
+        """
+        Repeated two-image calibration evaluations on random resamplings of image data.
+        NOTE: Here, the image from which the model is derived is termed the "fit" image, and the new image to which model is
+        applied is termed the "test" image.  Data used for modelling eg AGC in a single image is called "model" data.  Data
+        used for fitting calibration transforms is termed "calib" data.  This terminology is used in naming the variables below.
+
+        Parameters
+        ----------
+        fit_model : sklearn.BaseEstimator
+            fitted model to test calibration of
+        fit_model_data : numpy.array_like
+            model image features from which fit_model is derived
+        fit_calib_data : numpy.array_like
+            calib image features to use for fitting calibration transform
+        test_model_data : numpy.array_like
+            model image features to use for testing model (should be independent of fit_model_data)
+        test_calib_data : numpy.array_like
+            calib image features to use for fitting calibration transform
+        n_bootstraps : int
+            number of times to bootstrap the fitting of the calibration transform
+        n_calib_plots : int
+            number of image plots (rows from fit_calib_data etc) to fit calibration transform to
+
+        Returns
+        -------
+        model_scores : dict
+            model accuracies over bootstraps {'r2':[...], 'rmse': [...]}
+        calib_scores : dict
+            calibration accuracies over bootstraps {'r2':[...], 'rmse': [...]}
+        """
+
         r2_model = np.zeros((n_bootstraps, 1))
         rmse_model = np.zeros((n_bootstraps, 1))
 
         r2_calib = np.zeros((n_bootstraps, test_calib_data.shape[1]))
         rmse_calib = np.zeros((n_bootstraps, test_calib_data.shape[1]))
-        # TO DO: make a sub-function
+
         # sample with bootstrapping the calib plots, fit calib models, apply to model_data and test
         for bi in range(0, n_bootstraps):
             if self.strata is None:
                 calib_plot_idx = np.random.permutation(len(test_model_data))[:n_calib_plots]
-            else:
+            else:   # stratified random sampling balanced over strata
                 calib_plot_idx = []
-                strata_list = np.unique(self.strata)    # TODO: groupby
+                strata_list = np.unique(self.strata)
                 for strata_i in strata_list:
                     strata_idx = np.int32(np.where(strata_i == self.strata)[0])
                     calib_plot_idx += np.random.permutation(strata_idx)[
                                       :np.round(n_calib_plots / len(strata_list)).astype('int')].tolist()
 
                 calib_plot_idx = np.array(calib_plot_idx)
+
             # test_plot_idx = np.setdiff1d(np.arange(0, len(self.y)), calib_plot_idx)   # exclude the calib plots
             test_plot_idx = np.arange(0, len(self.y))   # include the calib plots
-            calib_feats = []
-            # loop through features in model_feat_idx and calibrate each one
-            # calib_feats = np.zeros((test_calib_data.shape[0], test_calib_data.shape[1]))
             calib_feats = np.zeros((len(test_plot_idx), test_calib_data.shape[1]))
-            for fi in range(0, test_calib_data.shape[1]):
-                calib_model = linear_model.LinearRegression()
+            for fi in range(0, test_calib_data.shape[1]):   # loop through features and calibrate each one
+                calib_model = linear_model.LinearRegression()   # fit calibration transform between test and fit images
                 calib_model.fit(test_calib_data[calib_plot_idx, fi].reshape(-1, 1),
                                 fit_calib_data[calib_plot_idx, fi].reshape(-1, 1))
 
-                calib_feat = calib_model.predict(test_model_data[test_plot_idx, fi].reshape(-1, 1))
-                r2_calib[bi, fi] = metrics.r2_score(fit_model_data[test_plot_idx, fi], calib_feat)
-                rmse_calib[bi, fi] = np.sqrt(
-                    metrics.mean_squared_error(fit_model_data[test_plot_idx, fi], calib_feat))
-                calib_feats[:, fi] = calib_feat.flatten()
+                calib_feat = calib_model.predict(test_model_data[test_plot_idx, fi].reshape(-1, 1))     # calibrate test feature
+                r2_calib[bi, fi] = metrics.r2_score(fit_model_data[test_plot_idx, fi], calib_feat)      # find R2 between fit and calibrated test feature
+                rmse_calib[bi, fi] = np.sqrt(metrics.mean_squared_error(fit_model_data[test_plot_idx, fi], calib_feat)) # find RMSE between fit and calibrated test feature
+                calib_feats[:, fi] = calib_feat.flatten()   # store calibrated feature for model eval below
 
-            # calib_feats = np.array(calib_feats).transpose()
-            predicted = fit_model.predict(calib_feats)
-            r2_model[bi] = metrics.r2_score(self.y[test_plot_idx], predicted)
-            rmse_model[bi] = np.sqrt(metrics.mean_squared_error(self.y[test_plot_idx], predicted))
+            predicted = fit_model.predict(calib_feats)      # find model prediction on calibrated test features
+            r2_model[bi] = metrics.r2_score(self.y[test_plot_idx], predicted)   # find R2 between model predictions and ground truth
+            rmse_model[bi] = np.sqrt(metrics.mean_squared_error(self.y[test_plot_idx], predicted))  # find RMSE on model predictions  and ground truth
 
         model_scores = {'r2':r2_model, 'rmse': rmse_model}
         calib_scores = {'r2':r2_calib, 'rmse': rmse_calib}
         return model_scores, calib_scores
 
     def test(self, n_bootstraps=10, n_calib_plots=10):
+        """
+        Bootstrapped testing of model and calibration accuracies over provided images
+
+        Parameters
+        ----------
+        n_bootstraps : int
+            number of bootstraps (random resamplings) to test over
+        n_calib_plots : int
+            number of plots to use for fitting calibration transform
+
+        Returns
+        -------
+        model_scores_array: numpy.array_like
+            model_scores_array[i,j] is the score of the model derived from the ith image and calibrated to the jth image
+        model_scores_array: numpy.array_like
+            calib_scores_array[i,j] is the score of the calibration transform from the ith image to the jth image
+        """
         np.set_printoptions(precision=4)
         self.fitted_models = []
         for model_data in self.model_data_list:
@@ -135,23 +161,21 @@ class EvaluateCalibration(object):
                 self.calib_scores_array[fmi, tmi] = {'mean(r2)': calib_scores['r2'].mean(axis=0), 'std(r2)': calib_scores['r2'].std(axis=0),
                                                 'mean(rmse)': calib_scores['rmse'].mean(axis=0), 'std(rmse)': calib_scores['rmse'].std(axis=0)}
                 logger.info('Model scores (fit model {0}, calib model {1})'.format(fmi, tmi))
-                logger.info('mean(R^2): {0:.4f}'.format(model_scores['r2'].mean()))
-                logger.info('std(R^2): {0:.4f}'.format(model_scores['r2'].std()))
+                logger.info('mean(R^2) : {0:.4f}'.format(model_scores['r2'].mean()))
+                logger.info('std(R^2)  : {0:.4f}'.format(model_scores['r2'].std()))
                 logger.info('mean(RMSE): {0:.4f}'.format(model_scores['rmse'].mean()))
-                logger.info('std(RMSE): {0:.4f}'.format(model_scores['rmse'].std()))
-                logger.info(' ')
+                logger.info('std(RMSE) : {0:.4f}'.format(model_scores['rmse'].std()))
                 logger.info('Calib scores (fit model {0}, calib model {1})'.format(fmi, tmi))
-                logger.info('mean(R^2): {0}'.format(calib_scores['r2'].mean(axis=0)))
-                logger.info('std(R^2): {0}'.format(calib_scores['r2'].std(axis=0)))
-                logger.info('mean(RMSE): {0}'.format(calib_scores['rmse'].mean(axis=0)))
-                logger.info('std(RMSE): {0}'.format(calib_scores['rmse'].std(axis=0)))
-                logger.info(' ')
+                logger.info('mean(R^2) : {0:.4f}'.format(calib_scores['r2'].mean(axis=0)))
+                logger.info('std(R^2)  : {0:.4f}'.format(calib_scores['r2'].std(axis=0)))
+                logger.info('mean(RMSE): {0:.4f}'.format(calib_scores['rmse'].mean(axis=0)))
+                logger.info('std(RMSE) : {0:.4f}'.format(calib_scores['rmse'].std(axis=0)))
         return self.model_scores_array, self.calib_scores_array
 
     def print_scores(self):
         for scores_array, label in zip([self.model_scores_array, self.calib_scores_array], ['Model', 'Calib']):
             for key in ['mean(r2)', 'std(r2)', 'mean(rmse)', 'std(rmse)']:
-                logger.info('{0} {1}:'.format(label, key))
+                print('{0} {1}:'.format(label, key))
                 score_array = np.zeros(scores_array.shape)
                 for ri in range(scores_array.shape[0]):
                     for ci in range(scores_array.shape[1]):
@@ -159,10 +183,8 @@ class EvaluateCalibration(object):
                             score_array[ri, ci] = 0.
                         else:
                             score_array[ri, ci] = scores_array[ri, ci][key]
-                logger.info(score_array)
+                print(score_array)
                 overall_mean = np.diag(np.flipud(score_array)).mean()
-                logger.info('Overall mean({0} {1}): {2:0.4f}'.format(label, key, overall_mean))
-                logger.info(' ')
-
-        return
+                print('Overall mean({0} {1}): {2:0.4f}'.format(label, key, overall_mean))
+                print(' ')
 
