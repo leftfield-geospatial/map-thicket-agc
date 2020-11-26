@@ -26,17 +26,16 @@ logging.basicConfig(format='%(levelname)s %(name)s: %(message)s')
 image_root_path = pathlib.Path(r"D:/OneDrive/GEF Essentials/Source Images")
 sampling_plot_gt_file = root_path.joinpath(r"data/outputs/geospatial/gef_plot_polygons_with_agc_v2.shp")
 
-image_files = [image_root_path.joinpath(r"WorldView3 Oct 2017/WorldView3_Oct2017_OrthoNgiDem_AtcorSrtmAdjCorr_PanAndPandSharpMs.tif"),
-               image_root_path.joinpath(r"WorldView3 Nov 2018/WorldView3_Nov2018_OrthoThinSpline_NoAtcor_PanSharpMs.tif"),
-               image_root_path.joinpath(r"WorldView3 Aug 2017/WorldView3_Aug2017_OrthoThinSpline_NoAtcor_PanSharpMs.tif"),
-               image_root_path.joinpath(r"NGI April 2015/Ngi_May2015_OrthoNgiDem_Xcalib_Rgbn_Mosaic.vrt")]
-
+image_files_dict = {'WV3 Oct 2017': image_root_path.joinpath(r"WorldView3 Oct 2017/WorldView3_Oct2017_OrthoNgiDem_AtcorSrtmAdjCorr_PanAndPandSharpMs.tif"),
+               'WV3 Nov 2018': image_root_path.joinpath(r"WorldView3 Nov 2018/WorldView3_Nov2018_OrthoThinSpline_NoAtcor_PanSharpMs.tif"),
+               'WV3 Aug 2017': image_root_path.joinpath(r"WorldView3 Aug 2017/WorldView3_Aug2017_OrthoThinSpline_NoAtcor_PanSharpMs.tif"),
+               'NGI April 2015': image_root_path.joinpath(r"NGI April 2015/Ngi_May2015_OrthoNgiDem_Xcalib_Rgbn_Mosaic.vrt")}
 
 plot_agc_gdf = gpd.GeoDataFrame.from_file(sampling_plot_gt_file)
-im_plot_agc_gdfs = []
+im_plot_agc_gdf_dict = {}
 
 # extract features from images into geodataframes
-for image_file in image_files:
+for image_key, image_file in image_files_dict.items():
     fex = img.MsImageFeatureExtractor(image_file, plot_data_gdf=plot_agc_gdf)
     im_plot_agc_gdf = fex.extract_image_features()
     del(fex)
@@ -59,7 +58,7 @@ for image_file in image_files:
     im_plot_agc_gdf.loc[im_plot_agc_gdf['data']['Stratum'] == 'Degraded', ('data', 'Stratum')] = 'Severe'
     im_plot_agc_gdf.loc[im_plot_agc_gdf['data']['Stratum'] == 'Intact', ('data', 'Stratum')] = 'Pristine'
 
-    im_plot_agc_gdfs.append(im_plot_agc_gdf)
+    im_plot_agc_gdf_dict[image_key] = im_plot_agc_gdf
 
 # find the best single features for Wv3 2017 AGC modelling
 
@@ -148,12 +147,14 @@ if False:
         print(list(zip(keys_of_interest[sort_idx], r2[sort_idx])))
 
 calib_feat_keys = ['log(mean(R/pan))']
-model_data_list = []
-for im_plot_agc_gdf in im_plot_agc_gdfs:
-    model_data_list.append(im_plot_agc_gdf['feats'][calib_feat_keys])
+model_data_dict = {}
+for image_key, im_plot_agc_gdf in im_plot_agc_gdf_dict.items():
+    model_data_dict[image_key]  = im_plot_agc_gdf['feats'][calib_feat_keys]
+y = im_plot_agc_gdf_dict['WV3 Oct 2017']['data']['AgcHa'] / 1000
+strata = im_plot_agc_gdf_dict['WV3 Oct 2017']['data']['Stratum']
 
-eval_calib = calib.EvaluateCalibration(model_data_list=model_data_list, y=im_plot_agc_gdfs[0]['data']['AgcHa'] / 1000., strata=im_plot_agc_gdfs[0]['data']['Stratum'],
-                                       calib_data_list=model_data_list, model=linear_model.LinearRegression)
+eval_calib = calib.EvaluateCalibration(model_data_dict=model_data_dict, y=y, strata=strata,
+                                       calib_data_dict=model_data_dict, model=linear_model.LinearRegression)
 
 model_scores, calib_scores = eval_calib.test(n_bootstraps=100, n_calib_plots=8)
 eval_calib.print_scores()
