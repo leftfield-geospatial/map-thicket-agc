@@ -172,5 +172,5 @@ classes = np.array([plot['DegrClass'] for plot in list(implot_feat_dicts[0].valu
 # reload(su)
 mct = su.ModelCalibrationTestEx(plot_data_list=X_list, y=old_div(y,1000), strata=classes, calib_data_list=X_list, model=linear_model.LinearRegression)
 
-model_scores, calib_scores = mct.TestCalibration(n_bootstraps=100, n_calib_plots=9)
-mct.PrintScores()
+model_scores, calib_scores = mct.test(n_bootstraps=100, n_calib_plots=9)
+mct.print_scores()

@@ -4,11 +4,13 @@
   Released under GNU Affero General Public License (AGPL) (https://www.gnu.org/licenses/agpl.html)
   email dugalh@gmail.com
 """
-from agc_estimation import imaging as img
 import pathlib, sys, os
 import logging
 import geopandas as gpd, pandas as pd
 import numpy as np
+from sklearn import linear_model
+from agc_estimation import imaging as img
+from agc_estimation import calibration as calib
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -63,18 +65,6 @@ for image_file in image_files:
 
 # check correlation of features between 2018 WV3 and other images to see which are best
 
-# set DegrClass field in implot_feat_dict using plot ID
-for feat_dict in implot_feat_dicts:
-    for f in list(feat_dict.values()):
-        id = f['ID']
-        if id[0] == 'S' or id[:3] == 'TCH':
-            f['DegrClass'] = 'Severe'
-        elif id[0] == 'M':
-            f['DegrClass'] = 'Moderate'
-        elif id[0] == 'P' or id[:3] == 'INT':
-            f['DegrClass'] = 'Pristine'
-        else:
-            f['DegrClass'] = '?'
 
 if False:   # find best single feat models so that we know which feats to try calibrate with
     X, y, feat_keys = feature_extractors[0].get_feat_array_ex(y_data_key='AgcHa')
@@ -157,20 +147,13 @@ if False:
         sort_idx = np.argsort(-r2)
         print(list(zip(keys_of_interest[sort_idx], r2[sort_idx])))
 
-X_list = []
-calib_feat_keys = ['Log(R/pan)']
-for fex in feature_extractors:
-    X, y, feat_keys = fex.get_feat_array_ex(y_data_key='AgcHa')
-    feat_idx = []
-    for calib_feat_key in calib_feat_keys:
-        feat_idx.append(np.argwhere(feat_keys == calib_feat_key)[0][0])
-    X_list.append(X[:, feat_idx])
+calib_feat_keys = ['log(mean(R/pan))']
+model_data_list = []
+for im_plot_agc_gdf in im_plot_agc_gdfs:
+    model_data_list.append(im_plot_agc_gdf['feats'][calib_feat_keys])
 
-classes = np.array([plot['DegrClass'] for plot in list(implot_feat_dicts[0].values())])
+eval_calib = calib.EvaluateCalibration(model_data_list=model_data_list, y=im_plot_agc_gdfs[0]['data']['AgcHa'] / 1000., strata=im_plot_agc_gdfs[0]['data']['Stratum'],
+                                       calib_data_list=model_data_list, model=linear_model.LinearRegression)
 
-    # feat_idx = [13, 19]
-# reload(su)
-mct = su.ModelCalibrationTestEx(plot_data_list=X_list, y=old_div(y,1000), strata=classes, calib_data_list=X_list, model=linear_model.LinearRegression)
-
-model_scores, calib_scores = mct.TestCalibration(n_bootstraps=100, n_calib_plots=9)
-mct.PrintScores()
+model_scores, calib_scores = eval_calib.test(n_bootstraps=10, n_calib_plots=3)
+eval_calib.print_scores()
