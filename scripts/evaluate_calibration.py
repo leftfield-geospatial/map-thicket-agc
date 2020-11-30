@@ -6,11 +6,16 @@
 """
 import pathlib, sys, os
 import logging
+from collections import OrderedDict
 import geopandas as gpd, pandas as pd
 import numpy as np
+from matplotlib import pyplot
 from sklearn import linear_model
+from scipy import stats as stats
 from agc_estimation import imaging as img
+from agc_estimation import feature_selection as fs
 from agc_estimation import calibration as calib
+from agc_estimation import visualisation as vis
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -60,92 +65,49 @@ for image_key, image_file in image_files_dict.items():
 
     im_plot_agc_gdf_dict[image_key] = im_plot_agc_gdf
 
-# find the best single features for Wv3 2017 AGC modelling
 
-# check correlation of features between 2018 WV3 and other images to see which are best
-
-
-if False:   # find best single feat models so that we know which feats to try calibrate with
-    X, y, feat_keys = feature_extractors[0].get_feat_array_ex(y_data_key='AgcHa')
-    r2 = []
-    rmse = []
-    from collections import OrderedDict
-    univariate_model_scores = OrderedDict()
-    for ki, key in enumerate(feat_keys):
-        xv = X[:, ki]
-        scores, predicted = su.feature_selection.score_model( X[:, ki].reshape(-1, 1), y / 1000.,
-                                                           model=linear_model.LinearRegression(),
-                                                           find_predicted=True, cv=10, print_scores=False)
-        univariate_model_scores[key] = {'r2': scores['R2_stacked'], 'rmse': -scores['test_user'].mean()}
-        print('.', end=' ')
-
-    r2 = np.array([sfms['r2'] for sfms in list(univariate_model_scores.values())])
-    rmse = np.array([sfms['rmse'] for sfms in list(univariate_model_scores.values())])
-    idx = np.argsort(-r2)
-    print('\nWV2017 feats sorted by best single feat model')
-    print(list(zip(feat_keys[idx[:50]], r2[idx[:50]])))
-
-# plots for report
-if False:
-    # based on above results, these are keys of interest i.e. good single term models that are not too redundant and are common between NGI and WV3
-    keys_of_interest = np.array(['Log(R/pan)', 'Log(G/R)', 'Log(R/NIR)', 'NDVI', 'SAVI', 'Log(B/R)'])
+# find the best features for AGC modelling for each image
+image_feat_scores = OrderedDict()
+feats_of_interest = ['log(mean(R/pan))', 'log(mean(G/R))', 'log(mean(R/NIR))', '(mean(NDVI))', '(mean(SAVI))', 'log(mean(B/R))']
+for image_key, im_plot_agc_gdf in im_plot_agc_gdf_dict.items():
     feat_scores = OrderedDict()
-    fd_labels = ['WV3 2017', 'WV3 2018', 'NGI 2015']
-    for ki, key in enumerate(keys_of_interest):
-        feat_scores[key] = OrderedDict({'WV3 2017 AGC R2':univariate_model_scores[key]['r2']})
+    for feat_key, feat_df in im_plot_agc_gdf['feats'][feats_of_interest].iteritems():
+        scores, predicted = fs.score_model(feat_df.to_numpy().reshape(-1, 1), im_plot_agc_gdf['data', 'AgcHa'],
+                                           model=linear_model.LinearRegression(), cv=5, find_predicted=True)
+        feat_scores[feat_key] = {'-RMSE': scores['test_-RMSE'].mean(), 'R2': scores['R2_stacked']}
+    image_feat_scores[image_key] = feat_scores
+    print(f'{image_key}:')
+    print(pd.DataFrame.from_dict(feat_scores, orient='index').sort_values(by='R2', ascending=False),'\n')
 
-    for fi, feat_dict in enumerate(implot_feat_dicts[1:]):
-        # keys_of_interest = np.array(['Std(pan)', 'Std(NDVI)', 'R', 'G', 'B', 'NIR', 'R/pan', 'G/pan', 'B/pan', 'NIR/pan', 'NDVI', 'SAVI', 'NIR/R', 'pan'])
-        r2 = np.zeros(keys_of_interest.__len__())
-        for ki, key in enumerate(keys_of_interest):
-            xv = np.array([x['feats'][key] for x in list(implot_feat_dicts[0].values())])
-            yv = np.array([x['feats'][key] for x in list(feat_dict.values())])
-            # local_scatter_plot(xv, yv, xlabel=key+'_2017', ylabel=key+'_2018')
-            (slope, intercept, r2[ki], p, stde) = stats.linregress(xv, yv)
-            feat_scores[key][fd_labels[fi+1]] = r2[ki]
+# find correlation of (select) features between images
+image_feat_corr = OrderedDict()
+feats_of_interest = ['log(mean(R/pan))', 'log(mean(G/R))', 'log(mean(R/NIR))', '(mean(NDVI))', '(mean(SAVI))', 'log(mean(B/R))']
+for image_i, (image_key, im_plot_agc_gdf) in enumerate(im_plot_agc_gdf_dict.items()):
+    if image_key == 'WV3 Oct 2017':
+        ref_im_plot_agc_gdf = im_plot_agc_gdf
+        continue
+    r2 = np.zeros(len(im_plot_agc_gdf_dict))
+    feat_corr = OrderedDict()
+    for feat_i, feat_key in enumerate(feats_of_interest):
+        ref_feat = ref_im_plot_agc_gdf['feats'][feat_key]
+        feat = im_plot_agc_gdf['feats'][feat_key]
+        (slope, intercept, r2, p, stde) = stats.linregress(ref_feat, feat)
+        feat_corr[feat_key] = r2
+        if False:
+            pyplot.figure(feat_i)
+            pyplot.subplot(2, 2, image_i)
+            xlabel = f'WV3 Oct 2017 - {feat_key}'
+            ylabel = f'{image_key} - {feat_key}'
+            vis.scatter_ds(pd.DataFrame(data=np.array([ref_feat, feat]).transpose(), columns=[xlabel, ylabel]))
+    image_feat_corr[f'+{image_key}'] = feat_corr
 
-            # r2[ki], rmse = su.scatter_plot(xv, yv, xlabel=key+fd_labels[0], ylabel=key+fd_labels[fi+1], class_labels=None, labels=None)
-        print('{0} features sorted by R2:'.format(fd_labels[fi+1]))
-        sort_idx = np.argsort(-r2)
-        print(list(zip(keys_of_interest[sort_idx], r2[sort_idx])))
-        import pandas as pd
-        df = pd.DataFrame(feat_scores).transpose()
-        df['Mean'] = df.mean(axis=1)
-        df.to_excel(r'C:\Data\Development\Projects\PhD GeoInformatics\Docs\Funding\GEF5\Invoices, Timesheets and Reports\Final Report\temporalCalibFeats.xlsx')
-        print(df)
+image_feat_corr_df = pd.DataFrame.from_dict(image_feat_corr)
+print('Correlation of features between WV3 Oct 2017 and...')
+print(image_feat_corr_df)
+print('Average correlation of features over images')
+print(image_feat_corr_df.mean(axis=1))
 
-if False:
-    doPlots = True
-    fd_labels = ['WV3 2017', 'WV3 2018', 'NGI 2015']
-    ref_feat_keys = list(implot_feat_dicts[0].values())[0]['feats'].keys()
-    for fi, feat_dict in enumerate(implot_feat_dicts[1:]):
-        feat_keys = list(feat_dict.values())[0]['feats'].keys()
-        if doPlots:
-            pylab.figure()
-        ip = 1
-        keys_of_interest = np.intersect1d(ref_feat_keys, feat_keys)
-        keys_of_interest = np.array(['R/pan', 'NDVI', 'R', 'NIR/pan'])
-        keys_of_interest = np.array(['Log(R/pan)', 'G/R', 'Log(R/NIR)', 'NDVI'])
-        labels = keys_of_interest
-        r2 = np.zeros(keys_of_interest.__len__())
-        for ki, key in enumerate(keys_of_interest):
-            xv = np.array([x['feats'][key] for x in list(implot_feat_dicts[0].values())])
-            yv = np.array([x['feats'][key] for x in list(feat_dict.values())])
-            # local_scatter_plot(xv, yv, xlabel=key+'_2017', ylabel=key+'_2018')
-            (slope, intercept, r2[ki], p, stde) = stats.linregress(xv, yv)
-            if doPlots:
-                pylab.subplot(2, 2, ip)
-                xlabel = '{0} - {1}'.format(fd_labels[0], labels[ki])
-                ylabel = '{0} - {1}'.format(fd_labels[fi+1], labels[ki])
-                su.scatter_plot(xv, yv, xlabel=xlabel, ylabel=ylabel, class_labels=None,
-                                labels=None)
-                pylab.tight_layout()
-            ip += 1
-            # r2[ki], rmse = su.scatter_plot(xv, yv, xlabel=key+fd_labels[0], ylabel=key+fd_labels[fi+1], class_labels=None, labels=None)
-        print('{0} features sorted by R2:'.format(fd_labels[fi + 1]))
-        sort_idx = np.argsort(-r2)
-        print(list(zip(keys_of_interest[sort_idx], r2[sort_idx])))
-
+# run the temporal calibration accuracy test with univariate log(mean(R/pan) feature
 calib_feat_keys = ['log(mean(R/pan))']
 model_data_dict = {}
 for image_key, im_plot_agc_gdf in im_plot_agc_gdf_dict.items():

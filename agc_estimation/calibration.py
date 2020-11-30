@@ -13,7 +13,6 @@ import pandas as pd
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
-
 class EvaluateCalibration(object):
     def __init__(self, model_data_dict=[], y=[], strata=None, calib_data_dict=[], model=linear_model.LinearRegression):
         """

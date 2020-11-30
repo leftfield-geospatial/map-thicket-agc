@@ -71,8 +71,8 @@ def scatter_ds(data, x_col=None, y_col=None, class_col=None, label_col=None, thu
     else:
         colours = ['tab:orange', 'g', 'r', 'b', 'y', 'k', 'm']
 
-    xlim = [x.min(), x.max()]
-    ylim = [y.min(), y.max()]
+    xlim = [np.nanmin(x), np.nanmax(x)]
+    ylim = [np.nanmin(y), np.nanmax(y)]
     xd = np.diff(xlim)[0]
     yd = np.diff(ylim)[0]
 
@@ -134,12 +134,12 @@ def scatter_ds(data, x_col=None, y_col=None, class_col=None, label_col=None, thu
     if x_label is not None:
         pyplot.xlabel(x_label, fontdict={'size': 12})
     else:
-        pyplot.xlabel(x_col[-1], fontdict={'size': 12})
+        pyplot.xlabel(x_col, fontdict={'size': 12})
 
     if y_label is not None:
         pyplot.ylabel(y_label, fontdict={'size': 12})
     else:
-        pyplot.ylabel(y_col[-1], fontdict={'size': 12})
+        pyplot.ylabel(y_col, fontdict={'size': 12})
 
     if n_classes > 1:
         if not thumbnail_col is None:
