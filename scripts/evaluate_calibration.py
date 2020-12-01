@@ -16,7 +16,9 @@
     You should have received a copy of the GNU Affero General Public License
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
-
+import matplotlib
+matplotlib.use("TkAgg")
+matplotlib.interactive(True)
 import pathlib, sys, os
 import logging
 from collections import OrderedDict

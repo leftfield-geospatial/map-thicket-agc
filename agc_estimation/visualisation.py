@@ -17,9 +17,9 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
-import matplotlib
-matplotlib.use("TkAgg")
-matplotlib.interactive(True)
+# import matplotlib
+# matplotlib.use("TkAgg")
+# matplotlib.interactive(True)
 import logging
 import numpy as np
 import matplotlib.pyplot as pyplot
