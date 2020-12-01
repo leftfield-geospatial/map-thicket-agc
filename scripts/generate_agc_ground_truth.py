@@ -1,12 +1,28 @@
 """
-  GEF5-SLM: Above ground carbon estimation in thicket using multi-spectral images
-  Copyright (C) 2020 Dugal Harris
-  Released under GNU Affero General Public License (AGPL) (https://www.gnu.org/licenses/agpl.html)
-  Email: dugalh@gmail.com
+    GEF5-SLM: Above ground carbon estimation in thicket using multi-spectral images
+    Copyright (C) 2020 Dugal Harris
+    Email: dugalh@gmail.com
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU Affero General Public License as
+    published by the Free Software Foundation, either version 3 of the
+    License, or any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU Affero General Public License for more details.
+
+    You should have received a copy of the GNU Affero General Public License
+    along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
+import matplotlib
+matplotlib.use("TkAgg")
+matplotlib.interactive(True)
+
 from builtins import zip
-import matplotlib.pyplot as pyplot
+from matplotlib import pyplot
 import numpy as np
 import pathlib, sys, os
 from csv import DictWriter
@@ -59,7 +75,7 @@ if True:
                    x_label='Biomass volume ($10^3$ m$^{3}$ ha$^{-1}$)', y_label='AGC (t C ha$^{-1}$)')
     ax.set_title('(b)')
     f1.tight_layout()
-    f1.waitforbuttonpress(.5)
+    f1.waitforbuttonpress(.2)
     f1.savefig(root_path.joinpath('data/outputs/plots/vol_vs_agc_scatter.png'), dpi=300)
 
     f2 = pyplot.figure('Relation between Litter C and ABC')
@@ -67,7 +83,7 @@ if True:
     vis.scatter_ds(agc_plot_est.plot_summary_agc_df, x_col='VolHa', y_col='AgcHa', xfn=lambda x: x / 1000., yfn=lambda y: y / 1000.,
                    x_label='Litter C (t C ha$^{-1}$)', y_label='ABC (t C ha$^{-1}$)')
     f2.tight_layout()
-    f2.waitforbuttonpress(.5)
+    f2.waitforbuttonpress(.2)
     f2.savefig(root_path.joinpath('data/outputs/plots/litter_c_vs_abc_scatter.png'), dpi=300)
 
 
@@ -193,7 +209,7 @@ if True:
         pyplot.title(degr_class)
         pyplot.tight_layout()
 
-    f.waitforbuttonpress(-1)    # wait before closing all windows
+    f.waitforbuttonpress(.2)    # wait before closing all windows
     f.savefig(root_path.joinpath('data/outputs/plots/plant_height_contribution_to_abc_by_stratum.png'), dpi=300)
 
 # TODO  - we can simulate what the "error" is when we increase the height cutoff idx (exclude heights less than x in

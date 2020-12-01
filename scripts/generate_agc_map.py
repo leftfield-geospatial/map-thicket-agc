@@ -1,9 +1,22 @@
 """
-  GEF5-SLM: Above ground carbon estimation in thicket using multi-spectral images
-  Copyright (C) 2020 Dugal Harris
-  Released under GNU Affero General Public License (AGPL) (https://www.gnu.org/licenses/agpl.html)
-  Email: dugalh@gmail.com
+    GEF5-SLM: Above ground carbon estimation in thicket using multi-spectral images
+    Copyright (C) 2020 Dugal Harris
+    Email: dugalh@gmail.com
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU Affero General Public License as
+    published by the Free Software Foundation, either version 3 of the
+    License, or any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU Affero General Public License for more details.
+
+    You should have received a copy of the GNU Affero General Public License
+    along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
+
 
 from agc_estimation import imaging as img
 import pathlib, sys, os
@@ -19,7 +32,7 @@ if '__file__' in globals():
 else:
     root_path = pathlib.Path(os.getcwd())
 
-sys.path.append(str(root_path.joinpath('agc_estimation')))
+sys.path.append(str(root_path))
 logging.basicConfig(format='%(levelname)s %(name)s: %(message)s')
 
 image_filename = r"D:/OneDrive/GEF Essentials/Source Images/WorldView3 Oct 2017/WorldView3_Oct2017_OrthoNgiDem_AtcorSrtmAdjCorr_PanAndPandSharpMs.tif"
@@ -38,5 +51,4 @@ mapper = img.MsImageMapper(image_file_name=image_filename, map_file_name=map_fil
 start = time.time()
 mapper.map(win_size=(33, 33), step_size=(33, 33))   # map with ~10m pixels
 print(f'Mapping duration: {(time.time()-start):.2f}s')
-# mapper.map(win_size=(66, 66), step_size=(11, 11))
-img.thicket_agc_post_proc(mapper)                   # post process map
+img.thicket_agc_post_proc(mapper)                   # remove noise and place sensible limits on AGC

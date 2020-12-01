@@ -1,8 +1,20 @@
 """
-  GEF5-SLM: Above ground carbon estimation in thicket using multi-spectral images
-  Copyright (C) 2020 Dugal Harris
-  Released under GNU Affero General Public License (AGPL) (https://www.gnu.org/licenses/agpl.html)
-  Email: dugalh@gmail.com
+    GEF5-SLM: Above ground carbon estimation in thicket using multi-spectral images
+    Copyright (C) 2020 Dugal Harris
+    Email: dugalh@gmail.com
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU Affero General Public License as
+    published by the Free Software Foundation, either version 3 of the
+    License, or any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU Affero General Public License for more details.
+
+    You should have received a copy of the GNU Affero General Public License
+    along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
 import numpy as np
@@ -21,7 +33,7 @@ if '__file__' in globals():
 else:
     root_path = pathlib.Path(os.getcwd())
 
-sys.path.append(str(root_path.joinpath('agc_estimation')))
+sys.path.append(str(root_path))
 logging.basicConfig(format='%(levelname)s %(name)s: %(message)s')
 
 from agc_estimation import imaging as img
@@ -58,18 +70,19 @@ for key in ['AbcHa2', 'AgcHa2']:
 im_plot_agc_gdf.loc[im_plot_agc_gdf['data']['Stratum'] == 'Degraded', ('data', 'Stratum')] = 'Severe'
 im_plot_agc_gdf.loc[im_plot_agc_gdf['data']['Stratum'] == 'Intact', ('data', 'Stratum')] = 'Pristine'
 
-# make some scatter plots of features vs AGC/ABC
-pyplot.figure()
-# vis.scatter_ds(im_plot_data_gdf, x_col=('feats', 'pan/R'), y_col=('data', 'AgcHa'), class_col=('data', 'Stratum'),
-#                xfn=lambda x: np.log10(x), do_regress=True)
-vis.scatter_ds(im_plot_agc_gdf, x_col=('feats', '(mean(pan/R))'), y_col=('data', 'AgcHa'), class_col=('data', 'Stratum'),
-               xfn=lambda x: np.log10(x), do_regress=True)
-pyplot.figure()
-vis.scatter_ds(im_plot_agc_gdf, x_col=('feats', 'sqr(mean(R/G))'), y_col=('data', 'AbcHa'), class_col=('data', 'Stratum'),
-               xfn=lambda x: np.log10(x), do_regress=True)
-pyplot.figure()
-vis.scatter_ds(im_plot_agc_gdf, x_col=('feats', '(mean(pan/R))'), y_col=('data', 'AbcHa'), class_col=('data', 'Stratum'),
-               xfn=lambda x: np.log10(x), do_regress=True, thumbnail_col=('data','thumbnail'), label_col=('data', 'ID'))
+if False:
+    # make some scatter plots of features vs AGC/ABC
+    pyplot.figure()
+    # vis.scatter_ds(im_plot_data_gdf, x_col=('feats', 'pan/R'), y_col=('data', 'AgcHa'), class_col=('data', 'Stratum'),
+    #                xfn=lambda x: np.log10(x), do_regress=True)
+    vis.scatter_ds(im_plot_agc_gdf, x_col=('feats', '(mean(pan/R))'), y_col=('data', 'AgcHa'), class_col=('data', 'Stratum'),
+                   xfn=lambda x: np.log10(x), do_regress=True)
+    pyplot.figure()
+    vis.scatter_ds(im_plot_agc_gdf, x_col=('feats', 'sqr(mean(R/G))'), y_col=('data', 'AbcHa'), class_col=('data', 'Stratum'),
+                   xfn=lambda x: np.log10(x), do_regress=True)
+    pyplot.figure()
+    vis.scatter_ds(im_plot_agc_gdf, x_col=('feats', '(mean(pan/R))'), y_col=('data', 'AbcHa'), class_col=('data', 'Stratum'),
+                   xfn=lambda x: np.log10(x), do_regress=True, thumbnail_col=('data','thumbnail'), label_col=('data', 'ID'))
 
 # select best features for predicting AGC with linear regression
 # TODO - experiment with different cv vals here and below - it has a big effect on what is selected and how it is scored.
