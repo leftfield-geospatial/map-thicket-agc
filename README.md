@@ -11,9 +11,11 @@ A regression modelling approach was followed for predicting AGC from features in
 
 Spectral, textural, vegetation index features are extracted from a 2017 [WorldView-3](http://worldview3.digitalglobe.com/) (0.34m resolution 8-band) multi-spectral image.  The code fits modelsto a subset of informative features using straightforward linear regression.  
 
+
+
 AGC maps of the study area were produced by applying fitted models to the WorldView-3 image in a memory and processor-efficient routine.
   
-<img src="data/outputs/plots/study_area_map_wv3_aug_2017.png" data-canonical-src="data/outputs/plots/study_area_map_wv3_aug_2017.png" alt="Study area map with ground truth plots" width="800"/>
+<img src="data/outputs/plots/study_area_map_univariate_agc.png" data-canonical-src="data/outputs/plots/study_area_map_univariate_agc.png" alt="Study area map with ground truth plots" width="800"/>
 
 Extending models spatially and temporally is currently a major challenge in remote sensing.  In addition to the snapshot AGC models, a simple temporal calibration method was devised to experiment with repeat mapping of the study area.  This was tested on an additional two WorldView-3 images, and an aerial image mosaic, with encouraging results.  
 
