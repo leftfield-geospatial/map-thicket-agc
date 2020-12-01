@@ -1,4 +1,4 @@
-#Above ground carbon estimation in thicket using multi-spectral images
+# Above ground carbon estimation in thicket using multi-spectral images
 
 Aboveground carbon (AGC) maps are needed for planning and monitoring of thicket restoration in South Africa.  Field methods for measuring biomass are labour-intensive and and only practical for small areas.  To work around these challenges, we developed a method for mapping AGC in thicket using satellite imagery, that can scale to large areas.  The work was undertaken as part of the part of the [GEF5-SLM](https://www.thegef.org/project/securing-multiple-ecosystems-benefit-through-slm-productive-degraded-landscapes-south-africa) (sustainable land management project) project.  You may find the generic modules for allometric calculations, image feature extraction, feature selection and mapping useful for other projects.
 
@@ -9,7 +9,9 @@ A regression modelling approach was followed for predicting AGC from features in
 
 <img align="left" src="data/outputs/plots/meas_vs_pred_agc_multivariate_model_b.png" data-canonical-src="data/outputs/plots/meas_vs_pred_agc_multivariate_model_b.png" alt="Predicted vs actual AGC" width="400"/>
 
-Spectral, textural, vegetation index features are extracted from a 2017 [WorldView-3](http://worldview3.digitalglobe.com/) (0.34m resolution 8-band) multi-spectral image.  The code fits modelsto a subset of informative features using straightforward linear regression.  AGC maps of the study area were produced by applying fitted models to the WorldView-3 image in a memory and processor-efficient routine.
+Spectral, textural, vegetation index features are extracted from a 2017 [WorldView-3](http://worldview3.digitalglobe.com/) (0.34m resolution 8-band) multi-spectral image.  The code fits modelsto a subset of informative features using straightforward linear regression.  
+
+AGC maps of the study area were produced by applying fitted models to the WorldView-3 image in a memory and processor-efficient routine.
   
 <img src="data/outputs/plots/study_area_map_wv3_aug_2017.png" data-canonical-src="data/outputs/plots/study_area_map_wv3_aug_2017.png" alt="Study area map with ground truth plots" width="800"/>
 
