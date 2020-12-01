@@ -1,4 +1,5 @@
 #Above ground carbon estimation in thicket using multi-spectral images
+
 Aboveground carbon (AGC) maps are needed for planning and monitoring of thicket restoration in South Africa.  Field methods for measuring biomass are labour-intensive and and only practical for small areas.  To work around these challenges, we developed a method for mapping AGC in thicket using satellite imagery, that can scale to large areas.  The work was undertaken as part of the part of the [GEF5-SLM](https://www.thegef.org/project/securing-multiple-ecosystems-benefit-through-slm-productive-degraded-landscapes-south-africa) (sustainable land management project) project.  You may find the generic modules for allometric calculations, image feature extraction, feature selection and mapping useful for other projects.
 
 ## Description
@@ -8,11 +9,12 @@ A regression modelling approach was followed for predicting AGC from features in
 
 <img align="left" src="data/outputs/plots/meas_vs_pred_agc_multivariate_model_b.png" data-canonical-src="data/outputs/plots/meas_vs_pred_agc_multivariate_model_b.png" alt="Predicted vs actual AGC" width="400"/>
 
-AGC prediction accuracy was comparatively good using linear models fitted to spectral, textural, and vegetation index features in a 2017 [WorldView-3](http://worldview3.digitalglobe.com/) (0.34m resolution 8-band) multi-spectral image.  Overall AGC maps of the study area were produced by applying fitted models to the WorldView-3 image.
+Spectral, textural, vegetation index features are extracted from a 2017 [WorldView-3](http://worldview3.digitalglobe.com/) (0.34m resolution 8-band) multi-spectral image.  The code fits modelsto a subset of informative features using straightforward linear regression.  AGC maps of the study area were produced by applying fitted models to the WorldView-3 image in a memory and processor-efficient routine.
   
 <img src="data/outputs/plots/study_area_map_wv3_aug_2017.png" data-canonical-src="data/outputs/plots/study_area_map_wv3_aug_2017.png" alt="Study area map with ground truth plots" width="800"/>
 
-Extending models spatially and temporally is currently a major challenge in remote sensing.  In addition to the snapshot AGC models, a simple temporal calibration method was devised to allow repeat mapping of the study area.  This was tested on an additional two WorldView-3 images, and an aerial image mosaic, with encouraging results.  
+Extending models spatially and temporally is currently a major challenge in remote sensing.  In addition to the snapshot AGC models, a simple temporal calibration method was devised to experiment with repeat mapping of the study area.  This was tested on an additional two WorldView-3 images, and an aerial image mosaic, with encouraging results.  
+
 R2 | WV3 Oct 2017 | WV3 Nov 2018 | WV3 Aug 2017 | NGI April 2015
 ---|--------------|--------------|--------------|---------------
 WV3 Oct 2017 | NaN | 0.828057 | 0.798233 | 0.716052
@@ -20,17 +22,13 @@ WV3 Nov 2018 | 0.843411 | NaN | 0.793865 | 0.724454
 WV3 Aug 2017 | 0.836491 | 0.81935 | NaN | 0.704349
 NGI April 2015 | 0.804554 | 0.803056 | 0.749079 | NaN
 
-The [full report](docs/final_report/gef5_slm_final_report_new_c_methodology_dec2019.pdf) describes everything in more detail.
+See the [full report](docs/final_report/gef5_slm_final_report_new_c_methodology_dec2019.pdf) for more detail.
 
 ## Citation
 When using this code, please cite: 
 - Harris, D., Bolus, C., Reeler, J. 2019. *Development of a method for remote sensing of aboveground carbon in subtropical thicket*, GEF-5 SLM, Rhodes University. Internal report.
 
 ## Some Results
-The predicted versus actual AGC for the ground truth plots are shown below with accuracies.
-![Predicted vs actual AGC](data/outputs/Plots/meas_vs_pred_agc_multivariate_model_b.png)
-- AGC map produced by multivariate model. 
-![Model Predicted AGC](data/outputs/plots/study_area__map_univariate_agc.png)
 
 ## Authors
 * **Dugal Harris** - *Method design and development* - [dugalh@gmail.com](mailto:dugalh@gmail.com)
