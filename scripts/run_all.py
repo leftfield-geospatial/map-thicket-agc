@@ -17,20 +17,6 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
-# TODO revise necessity for logging path code below in installed code
-import logging, pathlib, sys, os
-
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
-
-if '__file__' in globals():
-    root_path = pathlib.Path(__file__).absolute().parents[1]
-else:
-    root_path = pathlib.Path(os.getcwd())
-
-sys.path.append(str(root_path))
-logging.basicConfig(format='%(levelname)s %(name)s: %(message)s')
-
 # run all scripts in the right order
 from scripts import generate_agc_ground_truth
 from scripts import generate_agc_shapefile

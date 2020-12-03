@@ -16,9 +16,6 @@
     You should have received a copy of the GNU Affero General Public License
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
-import matplotlib
-matplotlib.use("TkAgg")
-matplotlib.interactive(True)
 import pathlib, sys, os
 import logging
 from collections import OrderedDict
@@ -31,17 +28,8 @@ from agc_estimation import imaging as img
 from agc_estimation import feature_selection as fs
 from agc_estimation import calibration as calib
 from agc_estimation import visualisation as vis
-
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
-
-if '__file__' in globals():
-    root_path = pathlib.Path(__file__).absolute().parents[1]
-else:
-    root_path = pathlib.Path(os.getcwd())
-
-sys.path.append(str(root_path))
-logging.basicConfig(format='%(levelname)s %(name)s: %(message)s')
+from agc_estimation import get_logger
+from scripts import root_path
 
 image_root_path = pathlib.Path(r"D:/OneDrive/GEF Essentials/Source Images")
 sampling_plot_gt_file = root_path.joinpath(r"data/outputs/geospatial/gef_plot_polygons_with_agc_v2.shp")
@@ -50,6 +38,9 @@ image_files_dict = {'WV3 Oct 2017': image_root_path.joinpath(r"WorldView3 Oct 20
                'WV3 Nov 2018': image_root_path.joinpath(r"WorldView3 Nov 2018/WorldView3_Nov2018_OrthoThinSpline_NoAtcor_PanSharpMs.tif"),
                'WV3 Aug 2017': image_root_path.joinpath(r"WorldView3 Aug 2017/WorldView3_Aug2017_OrthoThinSpline_NoAtcor_PanSharpMs.tif"),
                'NGI April 2015': image_root_path.joinpath(r"NGI April 2015/Ngi_May2015_OrthoNgiDem_Xcalib_Rgbn_Mosaic.vrt")}
+
+logger = get_logger(__name__)
+logger.info('Starting...')
 
 plot_agc_gdf = gpd.GeoDataFrame.from_file(sampling_plot_gt_file)
 im_plot_agc_gdf_dict = {}
@@ -91,8 +82,8 @@ for image_key, im_plot_agc_gdf in im_plot_agc_gdf_dict.items():
                                            model=linear_model.LinearRegression(), cv=5, find_predicted=True)
         feat_scores[feat_key] = {'-RMSE': scores['test_-RMSE'].mean(), 'R2': scores['R2_stacked']}
     image_feat_scores[image_key] = feat_scores
-    print(f'{image_key}:')
-    print(pd.DataFrame.from_dict(feat_scores, orient='index').sort_values(by='R2', ascending=False),'\n')
+    logger.info(f'{image_key}:')
+    logger.info(pd.DataFrame.from_dict(feat_scores, orient='index').sort_values(by='R2', ascending=False))
 
 # find correlation of (select) features between images
 image_feat_corr = OrderedDict()
@@ -117,10 +108,10 @@ for image_i, (image_key, im_plot_agc_gdf) in enumerate(im_plot_agc_gdf_dict.item
     image_feat_corr[f'+{image_key}'] = feat_corr
 
 image_feat_corr_df = pd.DataFrame.from_dict(image_feat_corr)
-print('Correlation of features between WV3 Oct 2017 and...')
-print(image_feat_corr_df)
-print('Average correlation of features over images')
-print(image_feat_corr_df.mean(axis=1))
+logger.info('Correlation of features between WV3 Oct 2017 and...')
+logger.info(image_feat_corr_df)
+logger.info('Average correlation of features over images')
+logger.info(image_feat_corr_df.mean(axis=1))
 
 # run the temporal calibration accuracy test with univariate model and log(mean(R/pan) feature
 calib_feat_keys = ['log(mean(R/pan))']
@@ -134,4 +125,7 @@ eval_calib = calib.EvaluateCalibration(model_data_dict=model_data_dict, y=y, str
                                        calib_data_dict=model_data_dict, model=linear_model.LinearRegression)
 
 model_scores, calib_scores = eval_calib.test(n_bootstraps=100, n_calib_plots=8)
-eval_calib.print_scores()
+eval_calib.logger.info_scores()
+
+logger.info('Done\n')
+input('Press ENTER to continue...')

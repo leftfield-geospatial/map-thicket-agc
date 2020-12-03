@@ -29,10 +29,9 @@ from openpyxl.styles import PatternFill
 from openpyxl.styles.colors import Color
 from openpyxl.styles import colors
 import pandas as pd
-import logging
+from agc_estimation import get_logger
 
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
+logger = get_logger(__name__)
 
 # globals
 biomass_to_carbon_w = 0.48      # factor to convert from biomass to carbon weight

@@ -18,13 +18,12 @@
 """
 
 
-import logging
+from agc_estimation import get_logger
 import numpy as np
 from sklearn import linear_model, metrics
 import pandas as pd
 
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
+logger = get_logger(__name__)
 
 class EvaluateCalibration(object):
     def __init__(self, model_data_dict=[], y=[], strata=None, calib_data_dict=[], model=linear_model.LinearRegression):

@@ -17,7 +17,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
-
+from agc_estimation import get_logger
 import logging, os
 from collections import OrderedDict
 import numpy as np
@@ -29,8 +29,7 @@ from rasterio.mask import raster_geometry_mask
 from rasterio import fill
 import geopandas as gpd, pandas as pd
 
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
+logger = get_logger(__name__)
 
 def nanentropy(x, axis=None):
     """

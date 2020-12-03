@@ -16,3 +16,12 @@
     You should have received a copy of the GNU Affero General Public License
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
+
+import logging
+logging.basicConfig(format='%(levelname)s %(name)s: %(message)s')
+
+def get_logger(name):
+	logger = logging.getLogger(name)
+	logger.setLevel(logging.DEBUG)
+	return logger
+

@@ -17,20 +17,16 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
-# import matplotlib
-# matplotlib.use("TkAgg")
-# matplotlib.interactive(True)
-import logging
+from agc_estimation import get_logger
 import numpy as np
-import matplotlib.pyplot as pyplot
+from matplotlib import pyplot
 from matplotlib import patches
 from scipy import stats as stats
 from sklearn import linear_model
 import pandas as pd
 from agc_estimation import feature_selection
 
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
+logger = get_logger(__name__)
 
 def scatter_ds(data, x_col=None, y_col=None, class_col=None, label_col=None, thumbnail_col=None, do_regress=True,
                x_label=None, y_label=None, xfn=lambda x: x, yfn=lambda y: y):
@@ -161,7 +157,8 @@ def scatter_ds(data, x_col=None, y_col=None, class_col=None, label_col=None, thu
             pyplot.legend(handles, classes, fontsize=12)
         else:
             pyplot.legend(classes, fontsize=12)
-    pyplot.show()
+    # pyplot.show()
+    pyplot.pause(0.1)
     return r ** 2, rmse
 
 

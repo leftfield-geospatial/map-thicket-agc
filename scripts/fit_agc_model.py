@@ -17,33 +17,25 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
+from scripts import root_path
 import numpy as np
 import geopandas as gpd, pandas as pd
-import pathlib, sys, os
 from sklearn import linear_model
 from matplotlib import pyplot
-import logging
 import joblib, pickle
-
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
-
-if '__file__' in globals():
-    root_path = pathlib.Path(__file__).absolute().parents[1]
-else:
-    root_path = pathlib.Path(os.getcwd())
-
-sys.path.append(str(root_path))
-logging.basicConfig(format='%(levelname)s %(name)s: %(message)s')
 
 from agc_estimation import imaging as img
 from agc_estimation import visualisation as vis
 from agc_estimation import feature_selection as fs
+from agc_estimation import get_logger
 
 #--------------------------------------------------------------------------------------------------------------
 # WV3 im analysis
 plot_agc_shapefile_name = root_path.joinpath(r'data/outputs/geospatial/gef_plot_polygons_with_agc_v2.shp')
 image_filename = r"D:/OneDrive/GEF Essentials/Source Images/WorldView3 Oct 2017/WorldView3_Oct2017_OrthoNgiDem_AtcorSrtmAdjCorr_PanAndPandSharpMs.tif"
+
+logger = get_logger(__name__)
+logger.info('Starting...')
 
 plot_agc_gdf = gpd.GeoDataFrame.from_file(plot_agc_shapefile_name)
 plot_agc_gdf = plot_agc_gdf.set_index('ID').sort_index()
@@ -99,7 +91,7 @@ for i in num_feats:
     scores, predicted = fs.score_model(selected_feats_df.to_numpy()[:, :i + 1], y, model=linear_model.LinearRegression(), find_predicted=True, cv=len(selected_feats_df))
     loocv_scores = {'R2': scores['R2_stacked'], 'RMSE': np.abs(scores['test_-RMSE']).mean()/1000., 'RMSE CI': np.percentile(np.abs(scores['test_-RMSE']), [5, 95])}
     selected_loocv_scores.append(loocv_scores)
-    print('Scored model {0} of {1}'.format(i+1, len(selected_scores)))
+    logger.info('Scored model {0} of {1}'.format(i+1, len(selected_scores)))
 
 selected_loocv_scores_df = pd.DataFrame(selected_loocv_scores)
 
@@ -116,7 +108,7 @@ pyplot.plot(num_feats, selected_loocv_scores_df['RMSE'], 'k-')
 pyplot.xlabel('Number of features')
 pyplot.ylabel('RMSE (t C ha$^{-1}$)')
 pyplot.tight_layout()
-pyplot.pause(.1)
+pyplot.pause(.2)
 pyplot.savefig(root_path.joinpath(r'data/outputs/plots/agc_acc_vs_num_feats1b_py38_cv10.png'), dpi=300)
 
 fig, ax1 = pyplot.subplots()
@@ -132,17 +124,17 @@ ax2.set_ylabel('-RMSE (t C ha$^{-1}$)', color=color)  # we already handled the x
 ax2.plot(num_feats, -selected_loocv_scores_df['RMSE'], color=color)
 ax2.tick_params(axis='y', labelcolor=color)
 fig.tight_layout()  # otherwise the right y-label is slightly clipped
-pyplot.pause(.1)
+pyplot.pause(.2)
 fig.savefig(root_path.joinpath(r'data/outputs/agc_acc_vs_num_feats2b_py38_cv10.png'), dpi=300)
 
 #------------------------------------------------------------------------------------------------------------------------
-# Fit best multiple and single feature models, generate acccuracy stats and plots
-# multiple feat model
-logger.info('Multi feat model scores:')
+# Fit best multivariate and Univariate models, generate acccuracy stats and plots
+# Multivariate model
+logger.info('Multivariate scores:')
 best_model_idx = np.argmin(selected_loocv_scores_df['RMSE'])
 scores, predicted = fs.score_model(selected_feats_df.iloc[:, :best_model_idx + 1], y/1000, model=linear_model.LinearRegression(),
                                                     find_predicted=True, cv=selected_feats_df.shape[0], print_scores=True)
-logger.info('Multi feat model features:')
+logger.info('Multivariate features:')
 logger.info(selected_feats_df.columns[:best_model_idx+1].to_numpy())
 
 fig = pyplot.figure()
@@ -152,21 +144,21 @@ fig.savefig(root_path.joinpath(r'data/outputs/Plots/meas_vs_pred_agc_multivariat
 
 best_multivariate_model = linear_model.LinearRegression()
 best_multivariate_model.fit(selected_feats_df.iloc[:, :best_model_idx+1], y/1000)
-logger.info('Multi feat model coefficients:')
+logger.info('Multivariate coefficients:')
 logger.info(np.array(best_multivariate_model.coef_))
-logger.info('Multi feat model intercept:')
+logger.info('Multivariate intercept:')
 logger.info(np.array(best_multivariate_model.intercept_))
 
 if True:
     joblib.dump([best_multivariate_model, selected_feats_df.columns[:best_model_idx+1].to_numpy(), scores], root_path.joinpath(r'data/outputs/Models/best_multivariate_model_py38_cv5v2.joblib'))
     pickle.dump([best_multivariate_model, selected_feats_df.columns[:best_model_idx+1].to_numpy(), scores], open(root_path.joinpath(r'data/outputs/Models/best_multivariate_model_py38_cv5v2.pickle'), 'wb'))
 
-# single feat model
-logger.info('Single feat model scores:')
+# Univariate model
+logger.info('Univariate model scores:')
 scores, predicted = fs.score_model(selected_feats_df.iloc[:, :1], y/1000, model=linear_model.LinearRegression(),
                                                     find_predicted=True, cv=selected_feats_df.shape[0], print_scores=True)
 
-logger.info('Single feat model features:')
+logger.info('Univariate model features:')
 logger.info(selected_feats_df.columns[:1].to_numpy())
 
 fig = pyplot.figure()
@@ -177,12 +169,14 @@ fig.savefig(root_path.joinpath(r'data/outputs/Plots/meas_vs_pred_agc_univariate_
 # fitting
 best_univariate_model = linear_model.LinearRegression(fit_intercept=True)
 best_univariate_model.fit(selected_feats_df.iloc[:, :1], y/1000)
-logger.info('Single feat model coefficient:')
+logger.info('Univariate model coefficient:')
 logger.info(np.array(best_univariate_model.coef_))
-logger.info('Single feat model intercept:')
+logger.info('Univariate model intercept:')
 logger.info(np.array(best_univariate_model.intercept_))
 
 if True:
     joblib.dump([best_univariate_model, selected_feats_df.columns[:1].to_numpy(), scores], root_path.joinpath(r'data/outputs/Models/best_univariate_model_py38_cv5v2.joblib'))
     pickle.dump([best_univariate_model, selected_feats_df.columns[:1].to_numpy(), scores], open(root_path.joinpath(r'data/outputs/Models/best_univariate_model_py38_cv5v2.pickle'), 'wb'))
 
+logger.info('Done\n')
+input('Press ENTER to continue...')

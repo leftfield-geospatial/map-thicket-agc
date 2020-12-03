@@ -17,20 +17,18 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
+from scripts import root_path
 import numpy as np
 import geopandas as gpd, pandas as pd
-import pathlib, os, glob, warnings
+import pathlib, glob
+from agc_estimation import get_logger
 
-if '__file__' in globals():
-    root_path = pathlib.Path(__file__).absolute().parents[1]
-else:
-    root_path = pathlib.Path(os.getcwd())
-
+logger = get_logger(__name__)
 
 # Most DGSPS plot locations were corrected / post-processed to ~30cm accuracy = corr_*,
 #  some could not be post-processed and are corrected manually here using GCPs = uncorr_*
-corr_plot_loc_root_path = root_path.joinpath(r'data/sampling_inputs/plot_locations/corrected')
-uncorr_plot_loc_root_path = root_path.joinpath(r'data/sampling_inputs/plot_locations/uncorrected/march_2019')
+corr_plot_loc_root_path = root_path.joinpath(r'data/inputs/geospatial/corrected')
+uncorr_plot_loc_root_path = root_path.joinpath(r'data/inputs/geospatial/uncorrected/march_2019')
 
 corr_shapefile_names = [sub_item.joinpath('Point_ge.shp') for sub_item in corr_plot_loc_root_path.iterdir() if sub_item.is_dir()]   # corrected dgps locs
 uncorr_shapefile_names = [pathlib.Path(p) for p in glob.glob(str(uncorr_plot_loc_root_path.joinpath('GEF_FIELD*.shp')))]            # uncorrected locs
@@ -38,8 +36,10 @@ gcp_shapefile_name = uncorr_plot_loc_root_path.joinpath('geomax_field_reference_
 plot_agc_allom_filename = root_path.joinpath(r'data/outputs/allometry/plot_agc_v3.csv')
 plot_agc_shapefile_name = root_path.joinpath(r'data/outputs/geospatial/gef_plot_polygons_with_agc_v2.shp')
 
+logger.info('Starting...')
+
 if not plot_agc_allom_filename.exists():
-    warnings.warn(f'{plot_agc_allom_filename} does not exist.  You need to run generate_agc_ground_truth')
+    logger.warning(f'{plot_agc_allom_filename} does not exist.  You need to run generate_agc_ground_truth')
 
 # read corrected locations
 corr_plot_loc_gdf = pd.concat([gpd.read_file(str(corr_shapefile_name)) for corr_shapefile_name in corr_shapefile_names])
@@ -87,7 +87,7 @@ plot_agc_gdf = plot_agc_gdf.set_crs(corr_plot_loc_gdf.crs)
 # merge AGC ground truth with plot geometry
 for plot_name, plot_group in corr_plot_loc_gdf.groupby('PlotName'):
     if plot_group.shape[0] != 4:
-        warnings.warn(f'{plot_name} should contain 4 corner points, but contains {plot_group.shape[0]}')
+        logger.warning(f'{plot_name} should contain 4 corner points, but contains {plot_group.shape[0]}')
     plot_polygon = plot_group['geometry'].unary_union.convex_hull   # create a plot polygon from corner points
     plot_agc_idx = plot_agc_gdf['ID'] == plot_name
     plot_agc_gdf['geometry'][plot_agc_idx] = plot_polygon
@@ -97,3 +97,5 @@ plot_agc_gdf = plot_agc_gdf.drop(np.where(plot_agc_gdf['geometry'].isnull())[0],
 
 plot_agc_gdf.to_file(plot_agc_shapefile_name)
 
+logger.info('Done\n')
+input('Press ENTER to continue...')

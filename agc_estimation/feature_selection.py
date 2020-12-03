@@ -16,7 +16,7 @@
     You should have received a copy of the GNU Affero General Public License
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
-
+from agc_estimation import get_logger
 import sys, logging
 import numpy as np
 from sklearn import linear_model, metrics
@@ -29,8 +29,7 @@ if sys.version_info.major == 3:
 else:
     from sklearn.metrics.scorer import make_scorer
 
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
+logger = get_logger(__name__)
 
 def forward_selection(feat_df, y, max_num_feats=0, model=linear_model.LinearRegression(),
                       score_fn=None, cv=None):
