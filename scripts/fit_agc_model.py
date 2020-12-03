@@ -80,7 +80,7 @@ if False:
 # TODO - experiment with different cv vals here and below - it has a big effect on what is selected and how it is scored.
 #  Likewise, so do small numerical differences in feats.
 y = im_plot_agc_gdf['data']['AgcHa']
-selected_feats_df, selected_scores =  fs.forward_selection(im_plot_agc_gdf['feats'], y, max_num_feats=3, cv=5,  #cv=X.shape[0] / 5
+selected_feats_df, selected_scores =  fs.forward_selection(im_plot_agc_gdf['feats'], y, max_num_feats=25, cv=5,  #cv=X.shape[0] / 5
                                                            score_fn=None)
 # feat_scores = fs.ranking(im_plot_data_gdf['feats'], y, cv=5, score_fn=None)
 

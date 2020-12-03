@@ -36,7 +36,7 @@ else:
 model, model_feat_keys, model_scores = joblib.load(model_filename)
 
 mapper = img.MsImageMapper(image_file_name=image_filename, map_file_name=map_filename, model=model, model_feat_keys=model_feat_keys,
-                         save_feats=True)
+                         save_feats=False)
 start = time.time()
 mapper.map(win_size=(33, 33), step_size=(33, 33))   # map with ~10m pixels
 logger.info(f'Mapping duration: {(time.time()-start):.2f}s')

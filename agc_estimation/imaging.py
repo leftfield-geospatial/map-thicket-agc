@@ -18,7 +18,8 @@
 """
 
 from agc_estimation import get_logger
-import logging, os
+import os
+import warnings
 from collections import OrderedDict
 import numpy as np
 from sklearn import linear_model
@@ -290,8 +291,10 @@ class MsPatchFeatureExtractor(PatchFeatureExtractor):
         pan_mask = im_patch_mask[self._pan_bands, :].mean(axis=0)
 
         feat_dict = OrderedDict()
-        for fn_key in fn_keys:
-            feat_dict[fn_key] = self.fn_dict[fn_key](pan_mask, im_patch_mask)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", category=RuntimeWarning)    # suppress mean of empty slice warning
+            for fn_key in fn_keys:
+                feat_dict[fn_key] = self.fn_dict[fn_key](pan_mask, im_patch_mask)
 
         return feat_dict
 
@@ -513,10 +516,9 @@ class ImageMapper(object):
                             map.write(feat_buf, indexes=np.arange(2, 2+len(self._model_keys)), window=map_win)
 
                         # TODO: proper progress bar
-                        if np.floor(100 * cy / (image.height - win_size[1] + 1)) >= prog_update:
+                        if np.ceil(100 * cy / (image.height - win_size[1] + 1)) >= prog_update:
                             logger.info(f'Progress {prog_update}%')
                             prog_update += 10
-        logger.info(f'Progress 100%')
 
 class MsImageMapper(ImageMapper):
     def __init__(self, image_file_name='', map_file_name='', model=linear_model.LinearRegression, model_feat_keys=[],
