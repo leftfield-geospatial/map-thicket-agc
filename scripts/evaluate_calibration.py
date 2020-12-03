@@ -43,6 +43,7 @@ logger = get_logger(__name__)
 logger.info('Starting...')
 
 plot_agc_gdf = gpd.GeoDataFrame.from_file(sampling_plot_gt_file)
+plot_agc_gdf.index = plot_agc_gdf['ID']
 im_plot_agc_gdf_dict = {}
 
 # extract features from images into geodataframes
@@ -83,7 +84,7 @@ for image_key, im_plot_agc_gdf in im_plot_agc_gdf_dict.items():
         feat_scores[feat_key] = {'-RMSE': scores['test_-RMSE'].mean(), 'R2': scores['R2_stacked']}
     image_feat_scores[image_key] = feat_scores
     logger.info(f'{image_key}:')
-    logger.info(pd.DataFrame.from_dict(feat_scores, orient='index').sort_values(by='R2', ascending=False))
+    logger.info('\n' + pd.DataFrame.from_dict(feat_scores, orient='index').sort_values(by='R2', ascending=False).to_string())
 
 # find correlation of (select) features between images
 image_feat_corr = OrderedDict()
@@ -109,9 +110,9 @@ for image_i, (image_key, im_plot_agc_gdf) in enumerate(im_plot_agc_gdf_dict.item
 
 image_feat_corr_df = pd.DataFrame.from_dict(image_feat_corr)
 logger.info('Correlation of features between WV3 Oct 2017 and...')
-logger.info(image_feat_corr_df)
+logger.info('\n' + image_feat_corr_df.to_string())
 logger.info('Average correlation of features over images')
-logger.info(image_feat_corr_df.mean(axis=1))
+logger.info('\n' + image_feat_corr_df.mean(axis=1).to_string())
 
 # run the temporal calibration accuracy test with univariate model and log(mean(R/pan) feature
 calib_feat_keys = ['log(mean(R/pan))']
@@ -125,7 +126,7 @@ eval_calib = calib.EvaluateCalibration(model_data_dict=model_data_dict, y=y, str
                                        calib_data_dict=model_data_dict, model=linear_model.LinearRegression)
 
 model_scores, calib_scores = eval_calib.test(n_bootstraps=100, n_calib_plots=8)
-eval_calib.logger.info_scores()
+# eval_calib.print_scores()
 
 logger.info('Done\n')
 input('Press ENTER to continue...')

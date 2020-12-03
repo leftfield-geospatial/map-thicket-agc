@@ -182,9 +182,9 @@ class EvaluateCalibration(object):
         return self.model_scores_df, self.calib_scores_df
 
     def print_scores(self):
+        logger.info('print_scores')
         for scores_label, scores_df in zip(['Model', 'Calib'], [self.model_scores_df, self.calib_scores_df]):
             for scores_key in ['r2', 'std(r2)', 'rmse', 'std(rmse)']:
-                print(' ')
-                print(f'{scores_label} - {scores_key}:')
-                print(scores_df.loc[scores_key])
-
+                logger.info(' ')
+                logger.info(f'{scores_label} - {scores_key}:')
+                logger.info('\n' + scores_df.loc[scores_key].to_string())
