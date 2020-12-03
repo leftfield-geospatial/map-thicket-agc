@@ -157,7 +157,6 @@ def scatter_ds(data, x_col=None, y_col=None, class_col=None, label_col=None, thu
             pyplot.legend(handles, classes, fontsize=12)
         else:
             pyplot.legend(classes, fontsize=12)
-    # pyplot.show()
     pyplot.pause(0.1)
     return r ** 2, rmse
 
@@ -192,7 +191,6 @@ def scatter_y_actual_vs_pred(y, pred, scores, xlabel='Measured AGC (t C ha$^{-1}
                fontdict={'size': 11})
     pyplot.text(26, 2, str.format('RMSE = {0:.2f} t C ha{1}',np.abs(scores['test_-RMSE']).mean(),'$^{-1}$'),
                fontdict={'size': 11})
-    pyplot.show()
     pyplot.tight_layout()
     pyplot.legend([h], ['1:1'], frameon=False)
     pyplot.pause(0.1)   # hack to get around pyplot bug when saving figure

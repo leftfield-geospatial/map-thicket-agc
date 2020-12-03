@@ -80,7 +80,7 @@ if False:
 # TODO - experiment with different cv vals here and below - it has a big effect on what is selected and how it is scored.
 #  Likewise, so do small numerical differences in feats.
 y = im_plot_agc_gdf['data']['AgcHa']
-selected_feats_df, selected_scores =  fs.forward_selection(im_plot_agc_gdf['feats'], y, max_num_feats=25, cv=5,  #cv=X.shape[0] / 5
+selected_feats_df, selected_scores =  fs.forward_selection(im_plot_agc_gdf['feats'], y, max_num_feats=3, cv=5,  #cv=X.shape[0] / 5
                                                            score_fn=None)
 # feat_scores = fs.ranking(im_plot_data_gdf['feats'], y, cv=5, score_fn=None)
 
@@ -137,10 +137,10 @@ scores, predicted = fs.score_model(selected_feats_df.iloc[:, :best_model_idx + 1
 logger.info('Multivariate features:')
 logger.info(selected_feats_df.columns[:best_model_idx+1].to_numpy())
 
-fig = pyplot.figure()
-fig.set_size_inches(5, 4, forward=True)
+f = pyplot.figure()
+f.set_size_inches(5, 4, forward=True)
 vis.scatter_y_actual_vs_pred(y/1000., predicted, scores)
-fig.savefig(root_path.joinpath(r'data/outputs/Plots/meas_vs_pred_agc_multivariate_model_b.png'), dpi=300)
+pyplot.savefig(root_path.joinpath(r'data/outputs/Plots/meas_vs_pred_agc_multivariate_model_b.png'), dpi=300)
 
 best_multivariate_model = linear_model.LinearRegression()
 best_multivariate_model.fit(selected_feats_df.iloc[:, :best_model_idx+1], y/1000)
@@ -161,10 +161,10 @@ scores, predicted = fs.score_model(selected_feats_df.iloc[:, :1], y/1000, model=
 logger.info('Univariate model features:')
 logger.info(selected_feats_df.columns[:1].to_numpy())
 
-fig = pyplot.figure()
-fig.set_size_inches(5, 4, forward=True)
+f = pyplot.figure()
+f.set_size_inches(5, 4, forward=True)
 vis.scatter_y_actual_vs_pred(y/1000., predicted, scores)
-fig.savefig(root_path.joinpath(r'data/outputs/Plots/meas_vs_pred_agc_univariate_model_b.png'), dpi=300)
+pyplot.savefig(root_path.joinpath(r'data/outputs/Plots/meas_vs_pred_agc_univariate_model_b.png'), dpi=300)
 
 # fitting
 best_univariate_model = linear_model.LinearRegression(fit_intercept=True)
