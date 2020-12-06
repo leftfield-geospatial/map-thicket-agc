@@ -16,7 +16,7 @@
     You should have received a copy of the GNU Affero General Public License
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
-
+##
 from scripts import root_path
 from builtins import zip
 from matplotlib import pyplot
@@ -27,6 +27,8 @@ from scipy.stats import gaussian_kde
 from agc_estimation import allometry as allom
 from agc_estimation import visualisation as vis
 from agc_estimation import get_logger
+
+
 
 logger = get_logger(__name__)
 
@@ -42,7 +44,7 @@ logger.info('Starting...')
 
 agc_plot_est = allom.AgcPlotEstimator(model_file_name=model_file_name, correction_method=allom.BiomassCorrectionMethod.NicklessZou)
 agc_plot_est.estimate(woody_file_name=woody_file_name, litter_file_name=litter_file_name)
-
+##
 if True:
     # write per-plant and per-plot ABC/AGC etc files
     agc_plot_est.write_abc_plant_file(out_file_name=plant_abc_file_name)
@@ -72,13 +74,13 @@ if True:
 
     f2 = pyplot.figure('Relation between Litter C and ABC')
     f2.set_size_inches(5, 4, forward=True)
-    vis.scatter_ds(agc_plot_est.plot_summary_agc_df, x_col='VolHa', y_col='AgcHa', xfn=lambda x: x / 1000., yfn=lambda y: y / 1000.,
+    vis.scatter_ds(agc_plot_est.plot_summary_agc_df, x_col='LitterCHa', y_col='AbcHa', xfn=lambda x: x / 1000., yfn=lambda y: y / 1000.,
                    x_label='Litter C (t C ha$^{-1}$)', y_label='ABC (t C ha$^{-1}$)')
     f2.tight_layout()
     pyplot.pause(0.2)
     f2.savefig(root_path.joinpath('data/outputs/plots/litter_c_vs_abc_scatter.png'), dpi=300)
 
-
+##
 if True:
     # ------------------------------------------------------------------------------------------------------------------
     # Further data analysis (species ABC contributions, per-stratum, plant height ABC contributions, ...)

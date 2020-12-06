@@ -4,6 +4,11 @@ Aboveground carbon (AGC) maps are needed for planning and monitoring of thicket 
 ## Installation
 Miniconda
 git clone or pip ??
+[eg](https://jupyter.org/install)
+
+`conda create -n py38_geospatial_test python=3.8 -c conda-forge`
+
+`conda install -c conda-forge matplotlib numpy scipy scikit-learn openpyxl rasterio geopandas`
 
 ## Getting Started
 Where stuff is 

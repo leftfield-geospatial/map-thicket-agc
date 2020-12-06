@@ -21,7 +21,6 @@
 from builtins import str
 from openpyxl import load_workbook
 import numpy as np
-import collections
 from collections import OrderedDict
 import os.path
 from enum import Enum
@@ -261,21 +260,21 @@ class AbcAggregator:
             ws = wb.get_sheet_by_name("CB Surrogates")
             for r in ws[2:ws.max_row]:
                 species = str(r[1].value).strip()
-
+                map_species = ''
                 for c in r[6:]:     # check spreadsheet format
                     if (c.value is not None) and (c.value != ''):
                         map_species = str(c.value).strip()
                         break
-
+                allom_species = FormatSpeciesName(map_species)
                 # add wet/dry surrogate
                 wd_species = None
                 if species in self.wd_ratio_dict:
                     wd_species = species
-                elif model['allom_species'] in self.wd_ratio_dict:
-                    wd_species = model['allom_species']
+                elif allom_species in self.wd_ratio_dict:
+                    wd_species = allom_species
 
-                model = {'species': species, 'allom_species': FormatSpeciesName(map_species), 'wd_species': wd_species,
-                        'species_full': str(r[0].value).strip()}  # hack for translating between name formats
+                model = {'species': species, 'allom_species': allom_species, 'wd_species': wd_species,
+                        'species_full': str(r[0].value).strip()}  # for translating between name formats
                 self.cb_surrogate_dict[species] = model
         finally:
             wb.close()
@@ -344,7 +343,6 @@ class AbcAggregator:
             ws = wb.get_sheet_by_name("Consolidated data")
 
             self._unmodelled_species = {'unknown': {}, 'none': {}}       # keep a record of species without models
-            plot_abc_dict = collections.OrderedDict()
             plot_abc_list = []
             for r in ws[2:ws.max_row]:      # loop through each plant
                 if r is None or r[2].value is None:
@@ -386,13 +384,14 @@ class AbcAggregator:
 
                 if make_marked_file:    # mark problem cells in excel spreadsheet
                     if species not in self.master_surrogate_dict or not fields_ok:
-                        r[3].fill = PatternFill(fgColor=colors.YELLOW, fill_type='solid')
+                        r[3].fill = PatternFill(fgColor=colors.COLOR_INDEX[5], fill_type='solid')
                         logger.debug('Marking row {0}'.format(r[3].row))
                     else:
                         r[3].fill = PatternFill(fgColor=ok_colour, fill_type='solid',)
 
                 # gather stats on species without models
                 if species not in self.master_surrogate_dict or self.master_surrogate_dict[species]['allom_species'] == 'none':
+                    key = ''
                     if species not in self.master_surrogate_dict:
                         key = 'unknown'     # unknown unknowns
                     elif self.master_surrogate_dict[species]['allom_species'] == 'none':
