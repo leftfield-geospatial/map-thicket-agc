@@ -32,7 +32,7 @@ import geopandas as gpd, pandas as pd
 
 logger = get_logger(__name__)
 
-def nanentropy(x, axis=None):
+def nanentropy(x, axis: tuple=None):
     """
     Find entropy ignoring NaNs
 
@@ -68,19 +68,19 @@ def nanentropy(x, axis=None):
     else:        # slice 3D array
         along_axis = np.setdiff1d(range(0, x.ndim), axis)[0]
         e = np.zeros((x.shape[along_axis]))
-        for slice in range(x.shape[along_axis]):
+        for axis_slice in range(x.shape[along_axis]):
             if along_axis == 0:
-                xa = x[slice,:,:]
+                xa = x[axis_slice,:,:]
             elif along_axis == 1:
-                xa = x[:,slice,:]
+                xa = x[:,axis_slice,:]
             elif along_axis == 2:
-                xa = x[:,:,slice]
+                xa = x[:,:,axis_slice]
             else:
                 raise Exception('along_axis > 2 or < 0')
-            e[slice] = nanentropy(xa, axis=None)
+            e[axis_slice] = nanentropy(xa, axis=None)
         return e
 
-class PatchFeatureExtractor():
+class PatchFeatureExtractor:
     def __init__(self, num_bands=1, apply_rolling_window=False, rolling_window_xsize=None, rolling_window_xstep=None):
         """
         Virtual class for extracting features from image patches, that hides extraction details from user.
@@ -96,15 +96,15 @@ class PatchFeatureExtractor():
             Number of pixels to step in x direction (optional)
         """
         self.fn_dict = {}
-        if apply_rolling_window==True:
+        if apply_rolling_window:
             if rolling_window_xsize is None or rolling_window_xstep is None:
                 raise Exception("rolling_window_xsize and rolling_window_xstep must be specified")
         self._num_bands = num_bands
         self._apply_rolling_window = apply_rolling_window
         self._rolling_window_xsize = rolling_window_xsize
         self._rolling_window_xstep = rolling_window_xstep
-        self.generate_fn_dict()
-        return
+        # self._pan_bands = None
+        self._generate_fn_dict()
 
     def _rolling_window_view(self, x):
         """
@@ -125,18 +125,11 @@ class PatchFeatureExtractor():
         strides = x.strides[:-1] + (x.strides[-1], self._rolling_window_xstep * x.strides[-1])
         return np.lib.stride_tricks.as_strided(x, shape=shape, strides=strides, writeable=False)
 
-    def generate_fn_dict(self):
+    def _generate_fn_dict(self):
         """
         Generate feature extraction dictionary self.fn_dict with values= pointer to feature extraction functions, and
         keys= descriptive feature strings.  Suitable for use with modelling from patches or mapping a whole image i.e.
-        ImageFeatureExtractor and ApplyLinearModel.  Generates band ratios, veg. indices, simple texture measures, and
-        non-linear transformations thereof.
-
-        Parameters
-        ----------
-        apply_rolling_window : bool
-            Apply window function inside a rolling window
-
+        ImageFeatureExtractor and ImageMapper.
         """
         raise NotImplementedError()
 
@@ -204,11 +197,11 @@ class MsPatchFeatureExtractor(PatchFeatureExtractor):
             band_dict = OrderedDict([('R', 0), ('G', 1), ('B', 2), ('NIR', 3)])
         return pan_bands, band_dict
 
-    def generate_fn_dict(self):
+    def _generate_fn_dict(self):
         """
         Generate feature extraction dictionary with values= pointers to feature extraction functions, and
         keys= descriptive feature strings.
-        Suitable for use with modelling from patches or mapping a whole image i.e. ImageFeatureExtractor and ApplyLinearModel.
+        Suitable for use with modelling from patches or mapping a whole image i.e. ImageFeatureExtractor and ImageMapper.
         Generates band ratios, veg. indices, simple texture measures, and non-linear transformations thereof.
         """
 
@@ -218,23 +211,23 @@ class MsPatchFeatureExtractor(PatchFeatureExtractor):
         # inner band ratios
         self.inner_dict = OrderedDict()
         self.inner_dict['pan/1'] = lambda pan, bands: pan
-        for num_key in list(self._band_dict.keys()):
-            self.inner_dict['{0}/pan'.format(num_key)] = lambda pan, bands, num_key=num_key: bands[self._band_dict[num_key], :] / pan
-            self.inner_dict['pan/{0}'.format(num_key)] = lambda pan, bands, num_key=num_key: pan / bands[self._band_dict[num_key], :]
-            self.inner_dict['{0}/1'.format(num_key)] = lambda pan, bands, num_key=num_key: bands[self._band_dict[num_key], :]
-            for den_key in list(self._band_dict.keys()):
-                if not num_key == den_key:
-                    self.inner_dict['{0}/{1}'.format(num_key, den_key)] = lambda pan, bands, num_key=num_key, den_key=den_key:\
+        for _num_key in list(self._band_dict.keys()):
+            self.inner_dict['{0}/pan'.format(_num_key)] = lambda pan, bands, num_key=_num_key: bands[self._band_dict[num_key], :] / pan
+            self.inner_dict['pan/{0}'.format(_num_key)] = lambda pan, bands, num_key=_num_key: pan / bands[self._band_dict[num_key], :]
+            self.inner_dict['{0}/1'.format(_num_key)] = lambda pan, bands, num_key=_num_key: bands[self._band_dict[num_key], :]
+            for _den_key in list(self._band_dict.keys()):
+                if not _num_key == _den_key:
+                    self.inner_dict['{0}/{1}'.format(_num_key, _den_key)] = lambda pan, bands, num_key=_num_key, den_key=_den_key:\
                         bands[self._band_dict[num_key], :] / bands[self._band_dict[den_key], :]
 
         # inner veg indices
         SAVI_L = 0.05   # wikipedia
         nir_keys = [key for key in list(self._band_dict.keys()) if ('NIR' in key) or ('RE' in key)]
-        for nir_key in nir_keys:
-            post_fix = '' if nir_key == 'NIR' else '_{0}'.format(nir_key)
-            self.inner_dict['NDVI' + post_fix] = lambda pan, bands, nir_key=nir_key: 1 + (bands[self._band_dict[nir_key], :] - bands[self._band_dict['R'], :]) / \
+        for _nir_key in nir_keys:
+            post_fix = '' if _nir_key == 'NIR' else '_{0}'.format(_nir_key)
+            self.inner_dict['NDVI' + post_fix] = lambda pan, bands, nir_key=_nir_key: 1 + (bands[self._band_dict[nir_key], :] - bands[self._band_dict['R'], :]) / \
                                                                                      (bands[self._band_dict[nir_key], :] + bands[self._band_dict['R'], :])
-            self.inner_dict['SAVI' + post_fix] = lambda pan, bands, nir_key=nir_key: 1 + (1 + SAVI_L) * (bands[self._band_dict[nir_key], :] - bands[self._band_dict['R'], :]) / \
+            self.inner_dict['SAVI' + post_fix] = lambda pan, bands, nir_key=_nir_key: 1 + (1 + SAVI_L) * (bands[self._band_dict[nir_key], :] - bands[self._band_dict['R'], :]) / \
                                                                                      (SAVI_L + bands[self._band_dict[nir_key], :] + bands[self._band_dict['R'], :])
 
         # window functions
@@ -248,15 +241,15 @@ class MsPatchFeatureExtractor(PatchFeatureExtractor):
         self.scale_dict = OrderedDict({'log': np.log10, 'sqr': lambda x: np.power(x, 2), 'sqrt': np.sqrt})
 
         # combine inner, window and scaling functions
-        for inner_key, inner_fn in self.inner_dict.items():
-            for win_key, win_fn in self.win_dict.items():
+        for inner_key, _inner_fn in self.inner_dict.items():
+            for win_key, _win_fn in self.win_dict.items():
                 fn_key = '({0}({1}))'.format(win_key, inner_key)
-                fn = lambda pan, bands, win_fn=win_fn, inner_fn=inner_fn: win_fn(inner_fn(pan, bands))
+                fn = lambda pan, bands, win_fn=_win_fn, inner_fn=_inner_fn: win_fn(inner_fn(pan, bands))
                 self.fn_dict[fn_key] = fn
                 if win_key == 'mean':   # for backward compatibility - TODO: try apply scaling to all windows, not only mean
-                    for scale_key, scale_fn in self.scale_dict.items():
+                    for scale_key, _scale_fn in self.scale_dict.items():
                         fn_key = '{0}({1}({2}))'.format(scale_key, win_key, inner_key)
-                        fn = lambda pan, bands, scale_fn=scale_fn, win_fn=win_fn, inner_fn=inner_fn: scale_fn(win_fn(inner_fn(pan, bands)))
+                        fn = lambda pan, bands, scale_fn=_scale_fn, win_fn=_win_fn, inner_fn=_inner_fn: scale_fn(win_fn(inner_fn(pan, bands)))
                         self.fn_dict[fn_key] = fn
 
 
@@ -331,9 +324,11 @@ class ImageFeatureExtractor(object):
         """
         self._plot_data_gdf = self._plot_data_gdf.to_crs(self._image_reader.crs)   # convert plot co-ordinates to image projection
 
-        im_plot_data_dict = {}      # dict to store plot features etc
+        im_plot_data_dict = dict()      # dict to store plot features etc
         im_plot_count = 0
-        max_thumbnail_vals = np.zeros((self._image_reader.count))    # max vals for each image band to scale thumbnails
+        max_thumbnail_vals = np.zeros(self._image_reader.count)    # max vals for each image band to scale thumbnails
+        im_feat_dict = {}
+        im_data_dict = {}
 
         for plot_id, plot in self._plot_data_gdf.iterrows():     # loop through plot polygons
             # convert polygon to raster mask
@@ -343,7 +338,7 @@ class ImageFeatureExtractor(object):
             plot_mask = ~plot_mask  # TODO: can we lose this?
 
             # check plot window lies inside image
-            if not (np.all(plot_cnrs_pixel[1, :] < self._image_reader.width) and np.all(plot_cnrs_pixel[0, :] < self._image_reader.height) \
+            if not (np.all(plot_cnrs_pixel[1, :] < self._image_reader.width) and np.all(plot_cnrs_pixel[0, :] < self._image_reader.height)
                     and np.all(plot_cnrs_pixel >= 0)):  # and plot.has_key('Yc') and plot['Yc'] > 0.:
                 logger.warning(f'Excluding plot {plot["ID"]} - outside image extent')
                 continue
@@ -362,8 +357,7 @@ class ImageFeatureExtractor(object):
 
             im_feat_dict = self._patch_feature_extractor.extract_features(im_buf, mask=plot_mask)  # extract image features for this plot
 
-            im_data_dict = {**im_feat_dict, **plot}     # combine features and other plot data
-            im_data_dict['thumbnail'] = thumbnail
+            im_data_dict = {**im_feat_dict, **plot, 'thumbnail': thumbnail}  # combine features and other plot data
 
             im_plot_data_dict[plot_id] = im_data_dict       # add to dict of all plots
 
@@ -415,7 +409,7 @@ class MsImageFeatureExtractor(ImageFeatureExtractor):
 
 
 class ImageMapper(object):
-    def __init__(self, image_file_name='', map_file_name='', model=linear_model.LinearRegression(), model_feat_keys=[],
+    def __init__(self, image_file_name='', map_file_name='', model=linear_model.LinearRegression(), model_feat_keys: list=None,
                  save_feats=False):
         """
         Virtual base class to generate raster map by applying a fitted model to an image
@@ -434,12 +428,10 @@ class ImageMapper(object):
         save_feats : bool
             include extracted features as bands in map_file_name (default = False)
         """
-        self._image_file_name = image_file_name
-        self._map_file_name = map_file_name
-        # if not issubclass(type(model), linear_model._base.LinearModel):
-        #     raise Exception('model must be derived from sklearn.linear_model._base.LinearModel')
-        self._model = model
-        self._model_keys = model_feat_keys
+        self.image_file_name = image_file_name
+        self.map_file_name = map_file_name
+        self.model = model
+        self.model_keys = model_feat_keys
         self.save_feats = save_feats
         self.nodata = np.nan        # nodata value to use for map raster
         self._feature_extractor_type = PatchFeatureExtractor    # not implemented, to be specified in derived class
@@ -458,9 +450,8 @@ class ImageMapper(object):
         if np.any(np.array(step_size) > np.array(win_size)):
             logger.warning('step_size <= win_size')
 
-
         with rasterio.Env():
-            with rasterio.open(self._image_file_name, 'r') as image:
+            with rasterio.open(self.image_file_name, 'r') as image:
                 # create the feature extraction class
                 feature_extractor = self._feature_extractor_type(num_bands=image.count, apply_rolling_window=True,
                                                                           rolling_window_xsize=win_size[0], rolling_window_xstep=step_size[0])
@@ -468,7 +459,7 @@ class ImageMapper(object):
                 prog_update = 10
 
                 if self.save_feats:
-                    out_bands = len(self._model_keys) + 1
+                    out_bands = len(self.model_keys) + 1
                 else:
                     out_bands = 1
 
@@ -486,7 +477,7 @@ class ImageMapper(object):
                     map_profile['blockxsize'] = map_size[0]
                     map_profile['blockysize'] = 1
 
-                with rasterio.open(self._map_file_name, 'w', **map_profile) as map:
+                with rasterio.open(self.map_file_name, 'w', **map_profile) as map_im:
                     # read image by groups of N rows where N = win_size[1], then slide window in x direction
                     # Note: rasterio index is x,y, numpy index is row, col (i.e. y,x)
                     for cy in range(0, image.height - win_size[1] + 1, step_size[1]):
@@ -494,26 +485,25 @@ class ImageMapper(object):
                         bands = list(range(1, image.count + 1))
                         image_buf = image.read(bands, window=image_win).astype(rasterio.float32)  # NB bands along first dim
 
-                        pan = image_buf[feature_extractor._pan_bands, :, :].mean(axis=0)
-                        map_buf = self._model.intercept_ * np.ones((map_size[0]), dtype=map.dtypes[0])
+                        # pan = image_buf[feature_extractor._pan_bands, :, :].mean(axis=0)
                         map_win = Window(map_win_off[0], int(cy/step_size[0]) + map_win_off[1], map_size[0], 1)
 
                         # mask out negative and zero values to prevent NaN outputs - overly conservative but neater & faster than other options
-                        image_nan_mask = np.all(image_buf > 0, axis=0) & np.all(pan != 0, axis=0)
+                        image_nan_mask = np.all(image_buf > 0, axis=0)  # & np.all(pan != 0, axis=0)
                         # extract features (model features only - not entire library) from image_buf using rolling window
-                        feat_dict = feature_extractor.extract_features(image_buf, mask=image_nan_mask, fn_keys=self._model_keys)
+                        feat_dict = feature_extractor.extract_features(image_buf, mask=image_nan_mask, fn_keys=self.model_keys)
 
                         feat_buf = np.array([fv for fv in feat_dict.values()]).transpose()
                         feat_buf_nan_mask = np.any(np.isnan(feat_buf) | np.isinf(feat_buf), axis=1)    # work around for nan's which raise an error in sklearn
                         feat_buf[feat_buf_nan_mask, :] = 0
-                        map_buf = self._model.predict(feat_buf).astype(map.dtypes[0])
+                        map_buf = self.model.predict(feat_buf).astype(map_im.dtypes[0])
                         map_buf[feat_buf_nan_mask] = self.nodata
 
-                        map.write(map_buf.reshape(1,-1), indexes=1, window=map_win)
+                        map_im.write(map_buf.reshape(1, -1), indexes=1, window=map_win)
                         if self.save_feats:
                             feat_buf[feat_buf_nan_mask, :] = self.nodata
-                            feat_buf = feat_buf.astype(map.dtypes[0]).transpose()[:, np.newaxis, :]   # order axes correctly for rasterio write
-                            map.write(feat_buf, indexes=np.arange(2, 2+len(self._model_keys)), window=map_win)
+                            feat_buf = feat_buf.astype(map_im.dtypes[0]).transpose()[:, np.newaxis, :]   # order axes correctly for rasterio write
+                            map_im.write(feat_buf, indexes=np.arange(2, 2 + len(self.model_keys)), window=map_win)
 
                         # TODO: proper progress bar
                         if np.ceil(100 * cy / (image.height - win_size[1] + 1)) >= prog_update:
@@ -521,7 +511,7 @@ class ImageMapper(object):
                             prog_update += 10
 
 class MsImageMapper(ImageMapper):
-    def __init__(self, image_file_name='', map_file_name='', model=linear_model.LinearRegression, model_feat_keys=[],
+    def __init__(self, image_file_name='', map_file_name='', model=linear_model.LinearRegression, model_feat_keys: list=None,
                  save_feats=False):
         """
         Class to generate raster map by applying fitted model to a multispectral image
@@ -539,13 +529,10 @@ class MsImageMapper(ImageMapper):
             (as understood by feature_extractor_type)
         save_feats : bool
             include extracted features as bands in map_file_name (default = False)
-        feature_extractor_type : PatchFeatureExtractor
-            class to use to extract features (default = MsPatchFeatureExtractor)
         """
         ImageMapper.__init__(self, image_file_name=image_file_name, map_file_name=map_file_name, model=model, model_feat_keys=model_feat_keys,
                  save_feats=save_feats)
         self._feature_extractor_type = MsPatchFeatureExtractor
-
 
 def thicket_agc_post_proc(image_mapper = ImageMapper()):
     """
@@ -563,10 +550,10 @@ def thicket_agc_post_proc(image_mapper = ImageMapper()):
     post processed raster file name
     """
     with rasterio.Env():
-        with rasterio.open(image_mapper._map_file_name, 'r') as in_ds:
+        with rasterio.open(image_mapper.map_file_name, 'r') as in_ds:
             out_profile = in_ds.profile
             out_profile.update(count=1)
-            split_ext = os.path.splitext(image_mapper._map_file_name)
+            split_ext = os.path.splitext(image_mapper.map_file_name)
             out_file_name = '{0}_postproc{1}'.format(split_ext[0], split_ext[1])
             with rasterio.open(out_file_name, 'w', **out_profile) as out_ds:
                 if (not out_profile['tiled']) or (np.prod(in_ds.shape) < 10e6):

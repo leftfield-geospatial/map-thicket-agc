@@ -26,14 +26,14 @@ import pandas as pd
 logger = get_logger(__name__)
 
 class EvaluateCalibration(object):
-    def __init__(self, model_data_dict=[], y=[], strata=None, calib_data_dict=[], model=linear_model.LinearRegression):
+    def __init__(self, model_data_dict: dict=None, y=None, strata=None, calib_data_dict: dict=None, model=linear_model.LinearRegression):
         """
         Evaluate calibration by testing model performance over calibrated image data
 
         Parameters
         ----------
-        model_data_dict : list
-            each value element is a numpy.array_like containing model feature(s) from a single image, keys are labels for images
+        model_data_dict : dict
+            each value is a numpy.array_like containing model feature(s) from a single image, keys are labels for images
         y : numpy.array_like
             target / ground truth values for model
         strata : numpy.array_like
@@ -47,12 +47,12 @@ class EvaluateCalibration(object):
         self.calib_data_dict = calib_data_dict
         self.model = model
         self.y = y
-        self.fitted_models_dict = []
         self.strata = strata
-        self.model_scores_array = None
-        self.calib_scores_array = None
+        self.model_scores_df = None
+        self.calib_scores_df = None
+        self._fitted_models_dict = {}
 
-    def bootstrap(self, fit_model, fit_model_data, fit_calib_data, test_model_data, test_calib_data, n_bootstraps=10, n_calib_plots=10):
+    def _bootstrap(self, fit_model, fit_model_data, fit_calib_data, test_model_data, test_calib_data, n_bootstraps=10, n_calib_plots=10):
         """
         Repeated two-image calibration evaluations on random resamplings of image data.
         NOTE: Here, the image from which the model is derived is termed the "fit" image, and the new image to which model
@@ -145,26 +145,20 @@ class EvaluateCalibration(object):
         model_scores_array: numpy.array_like
             calib_scores_array[i,j] is the score of the calibration transform from the ith image to the jth image
         """
-        np.set_printoptions(precision=4)
-        self.fitted_models_dict = {}
+        self._fitted_models_dict = {}
         for fit_model_key, model_data in self.model_data_dict.items():
             fit_model = self.model()
             fit_model.fit(model_data, self.y)
-            self.fitted_models_dict[fit_model_key] = fit_model
+            self._fitted_models_dict[fit_model_key] = fit_model
 
-        nm = len(self.fitted_models_dict)
-        model_keys = list(self.fitted_models_dict.keys())
-        # model_idx = list(range(0, nm))
-        # loop over different images/models to fit to
-        self.model_scores_array = np.zeros((nm, nm), dtype=object)
-        self.calib_scores_array = np.zeros((nm, nm), dtype=object)
+        model_keys = list(self._fitted_models_dict.keys())
 
         score_keys = ['r2', 'rmse', 'std(r2)', 'std(rmse)']
         multi_index = pd.MultiIndex.from_product([score_keys, model_keys])
         self.model_scores_df = pd.DataFrame(columns=model_keys, index=multi_index)
         self.calib_scores_df = pd.DataFrame(columns=model_keys, index=multi_index)
-        for fit_model_key in model_keys:
-            fit_model = self.fitted_models_dict[fit_model_key]
+        for fit_model_key in model_keys:    # loop over images/models to fit to
+            fit_model = self._fitted_models_dict[fit_model_key]
             test_model_keys = np.setdiff1d(model_keys, fit_model_key)
             fit_calib_data = self.calib_data_dict[fit_model_key]
             fit_model_data = self.model_data_dict[fit_model_key]
@@ -173,8 +167,8 @@ class EvaluateCalibration(object):
                 test_calib_data = self.calib_data_dict[test_model_key]
                 test_model_data = self.model_data_dict[test_model_key]
 
-                model_scores, calib_scores = self.bootstrap(fit_model, np.array(fit_model_data), np.array(fit_calib_data), np.array(test_model_data),
-                                                            np.array(test_calib_data), n_bootstraps=n_bootstraps, n_calib_plots=n_calib_plots)
+                model_scores, calib_scores = self._bootstrap(fit_model, np.array(fit_model_data), np.array(fit_calib_data), np.array(test_model_data),
+                                                             np.array(test_calib_data), n_bootstraps=n_bootstraps, n_calib_plots=n_calib_plots)
                 for k in model_scores.keys():   # to get around pandas weird view vs copy and multiindex stuff
                     self.model_scores_df.loc[(k, fit_model_key), test_model_key] = model_scores[k]
                     self.calib_scores_df.loc[(k, fit_model_key), test_model_key] = calib_scores[k]
@@ -183,8 +177,9 @@ class EvaluateCalibration(object):
 
     def print_scores(self):
         logger.info('print_scores')
-        for scores_label, scores_df in zip(['Model', 'Calib'], [self.model_scores_df, self.calib_scores_df]):
-            for scores_key in ['r2', 'std(r2)', 'rmse', 'std(rmse)']:
-                logger.info(' ')
-                logger.info(f'{scores_label} - {scores_key}:')
-                logger.info('\n' + scores_df.loc[scores_key].to_string())
+        with pd.option_context('display.float_format', '{:0.4f}'.format):
+            for scores_label, scores_df in zip(['Model', 'Calib'], [self.model_scores_df, self.calib_scores_df]):
+                for scores_key in ['r2', 'std(r2)', 'rmse', 'std(rmse)']:
+                    logger.info(' ')
+                    logger.info(f'{scores_label} - {scores_key}:')
+                    logger.info('\n' + scores_df.loc[scores_key].to_string())

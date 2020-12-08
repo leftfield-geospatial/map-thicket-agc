@@ -16,8 +16,9 @@
     You should have received a copy of the GNU Affero General Public License
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
-import pathlib, sys, os
-import logging
+##
+
+import pathlib
 from collections import OrderedDict
 import geopandas as gpd, pandas as pd
 import numpy as np
@@ -46,11 +47,11 @@ plot_agc_gdf = gpd.GeoDataFrame.from_file(sampling_plot_gt_file)
 plot_agc_gdf.index = plot_agc_gdf['ID']
 im_plot_agc_gdf_dict = {}
 
-# extract features from images into geodataframes
+## extract features from images into geodataframes
 for image_key, image_file in image_files_dict.items():
     fex = img.MsImageFeatureExtractor(image_file, plot_data_gdf=plot_agc_gdf)
     im_plot_agc_gdf = fex.extract_image_features()
-    del(fex)
+    del fex
 
     # calculate versions of ABC and AGC normalised by actual polygon area, rather than theoretical plot sizes, and append to im_plot_agc_gdf
     carbon_polynorm_dict = {}
@@ -72,8 +73,7 @@ for image_key, image_file in image_files_dict.items():
 
     im_plot_agc_gdf_dict[image_key] = im_plot_agc_gdf
 
-
-# find the best features for AGC modelling for each image
+## find the best features for AGC modelling for each image
 image_feat_scores = OrderedDict()
 feats_of_interest = ['log(mean(R/pan))', 'log(mean(G/R))', 'log(mean(R/NIR))', '(mean(NDVI))', '(mean(SAVI))', 'log(mean(B/R))']
 for image_key, im_plot_agc_gdf in im_plot_agc_gdf_dict.items():
@@ -86,7 +86,7 @@ for image_key, im_plot_agc_gdf in im_plot_agc_gdf_dict.items():
     logger.info(f'{image_key}:')
     logger.info('\n' + pd.DataFrame.from_dict(feat_scores, orient='index').sort_values(by='R2', ascending=False).to_string())
 
-# find correlation of (select) features between images
+## find correlation of (select) features between images
 image_feat_corr = OrderedDict()
 feats_of_interest = ['log(mean(R/pan))', 'log(mean(G/R))', 'log(mean(R/NIR))', '(mean(NDVI))', '(mean(SAVI))', 'log(mean(B/R))']
 for image_i, (image_key, im_plot_agc_gdf) in enumerate(im_plot_agc_gdf_dict.items()):
@@ -114,7 +114,7 @@ logger.info('\n' + image_feat_corr_df.to_string())
 logger.info('Average correlation of features over images')
 logger.info('\n' + image_feat_corr_df.mean(axis=1).to_string())
 
-# run the temporal calibration accuracy test with univariate model and log(mean(R/pan) feature
+## run the temporal calibration accuracy test with univariate model and log(mean(R/pan) feature
 calib_feat_keys = ['log(mean(R/pan))']
 model_data_dict = {}
 for image_key, im_plot_agc_gdf in im_plot_agc_gdf_dict.items():

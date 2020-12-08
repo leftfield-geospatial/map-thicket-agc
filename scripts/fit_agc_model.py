@@ -16,7 +16,7 @@
     You should have received a copy of the GNU Affero General Public License
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
-
+##
 from scripts import root_path
 import numpy as np
 import geopandas as gpd, pandas as pd
@@ -29,8 +29,7 @@ from agc_estimation import visualisation as vis
 from agc_estimation import feature_selection as fs
 from agc_estimation import get_logger
 
-#--------------------------------------------------------------------------------------------------------------
-# WV3 im analysis
+## extract features from multi-spectral satellite image
 plot_agc_shapefile_name = root_path.joinpath(r'data/outputs/geospatial/gef_plot_polygons_with_agc_v2.shp')
 image_filename = r"D:/OneDrive/GEF Essentials/Source Images/WorldView3 Oct 2017/WorldView3_Oct2017_OrthoNgiDem_AtcorSrtmAdjCorr_PanAndPandSharpMs.tif"
 
@@ -42,9 +41,8 @@ plot_agc_gdf = plot_agc_gdf.set_index('ID').sort_index()
 
 fex = img.MsImageFeatureExtractor(image_filename=image_filename, plot_data_gdf=plot_agc_gdf)
 im_plot_agc_gdf = fex.extract_image_features()
-    # im_plot_data_gdf.pop('ST49')
 
-# calculate versions of ABC and AGC normalised by actual polygon area, rather than theoretical plot sizes, and append to im_plot_data_gdf
+# calculate versions of ABC and AGC normalised by actual polygon area, rather than theoretical plot sizes, and
 carbon_polynorm_dict = {}
 for plot_id, plot in im_plot_agc_gdf['data'].iterrows():
     if 'Abc' in plot and 'LitterCHa' in plot:
@@ -55,41 +53,31 @@ for plot_id, plot in im_plot_agc_gdf['data'].iterrows():
 
 carbon_polynorm_df = pd.DataFrame.from_dict(carbon_polynorm_dict, orient='index')
 
-for key in ['AbcHa2', 'AgcHa2']:
+for key in ['AbcHa2', 'AgcHa2']:    # append to im_plot_data_gdf
     im_plot_agc_gdf[('data', key)] = carbon_polynorm_df[key]
 
 # fix stratum labels
 im_plot_agc_gdf.loc[im_plot_agc_gdf['data']['Stratum'] == 'Degraded', ('data', 'Stratum')] = 'Severe'
 im_plot_agc_gdf.loc[im_plot_agc_gdf['data']['Stratum'] == 'Intact', ('data', 'Stratum')] = 'Pristine'
 
-if False:
-    # make some scatter plots of features vs AGC/ABC
-    pyplot.figure()
-    # vis.scatter_ds(im_plot_data_gdf, x_col=('feats', 'pan/R'), y_col=('data', 'AgcHa'), class_col=('data', 'Stratum'),
-    #                xfn=lambda x: np.log10(x), do_regress=True)
-    vis.scatter_ds(im_plot_agc_gdf, x_col=('feats', '(mean(pan/R))'), y_col=('data', 'AgcHa'), class_col=('data', 'Stratum'),
-                   xfn=lambda x: np.log10(x), do_regress=True)
-    pyplot.figure()
-    vis.scatter_ds(im_plot_agc_gdf, x_col=('feats', 'sqr(mean(R/G))'), y_col=('data', 'AbcHa'), class_col=('data', 'Stratum'),
-                   xfn=lambda x: np.log10(x), do_regress=True)
-    pyplot.figure()
-    vis.scatter_ds(im_plot_agc_gdf, x_col=('feats', '(mean(pan/R))'), y_col=('data', 'AbcHa'), class_col=('data', 'Stratum'),
-                   xfn=lambda x: np.log10(x), do_regress=True, thumbnail_col=('data','thumbnail'), label_col=('data', 'ID'))
+# make an example scatter plot of feature vs AGC/ABC
+pyplot.figure()
+vis.scatter_ds(im_plot_agc_gdf, x_col=('feats', '(mean(pan/R))'), y_col=('data', 'AgcHa'), class_col=('data', 'Stratum'),
+               xfn=lambda x: np.log10(x), do_regress=True)
 
-# select best features for predicting AGC with linear regression
-# TODO - experiment with different cv vals here and below - it has a big effect on what is selected and how it is scored.
-#  Likewise, so do small numerical differences in feats.
+## select and analyse best features for predicting AGC with linear regression
+# TODO - experiment with cv vals in fs and eval below - has a big effect on what is selected and how it is scored.
 y = im_plot_agc_gdf['data']['AgcHa']
-selected_feats_df, selected_scores =  fs.forward_selection(im_plot_agc_gdf['feats'], y, max_num_feats=25, cv=5,  #cv=X.shape[0] / 5
-                                                           score_fn=None)
-# feat_scores = fs.ranking(im_plot_data_gdf['feats'], y, cv=5, score_fn=None)
+selected_feats_df, selected_scores =  fs.forward_selection(im_plot_agc_gdf['feats'], y, max_num_feats=25, cv=5, score_fn=None)
 
 # calculate scores of selected features with LOOCV
 selected_loocv_scores = []
 num_feats = range(0, len(selected_scores))
 for i in num_feats:
-    scores, predicted = fs.score_model(selected_feats_df.to_numpy()[:, :i + 1], y, model=linear_model.LinearRegression(), find_predicted=True, cv=len(selected_feats_df))
-    loocv_scores = {'R2': scores['R2_stacked'], 'RMSE': np.abs(scores['test_-RMSE']).mean()/1000., 'RMSE CI': np.percentile(np.abs(scores['test_-RMSE']), [5, 95])}
+    scores, predicted = fs.score_model(selected_feats_df.to_numpy()[:, :i + 1], y, model=linear_model.LinearRegression(),
+                                       find_predicted=True, cv=len(selected_feats_df))
+    loocv_scores = {'R2': scores['R2_stacked'], 'RMSE': np.abs(scores['test_-RMSE']).mean()/1000., 'RMSE CI':
+        np.percentile(np.abs(scores['test_-RMSE']), [5, 95])}
     selected_loocv_scores.append(loocv_scores)
     logger.info('Scored model {0} of {1}'.format(i+1, len(selected_scores)))
 
@@ -127,9 +115,7 @@ fig.tight_layout()  # otherwise the right y-label is slightly clipped
 pyplot.pause(.2)
 fig.savefig(root_path.joinpath(r'data/outputs/agc_acc_vs_num_feats2b_py38_cv10.png'), dpi=300)
 
-#------------------------------------------------------------------------------------------------------------------------
-# Fit best multivariate and Univariate models, generate acccuracy stats and plots
-# Multivariate model
+## fit best multivariate model based on selected features
 logger.info('Multivariate scores:')
 best_model_idx = np.argmin(selected_loocv_scores_df['RMSE'])
 scores, predicted = fs.score_model(selected_feats_df.iloc[:, :best_model_idx + 1], y/1000, model=linear_model.LinearRegression(),
@@ -142,6 +128,7 @@ f.set_size_inches(5, 4, forward=True)
 vis.scatter_y_actual_vs_pred(y/1000., predicted, scores)
 pyplot.savefig(root_path.joinpath(r'data/outputs/Plots/meas_vs_pred_agc_multivariate_model_b.png'), dpi=300)
 
+# fitting
 best_multivariate_model = linear_model.LinearRegression()
 best_multivariate_model.fit(selected_feats_df.iloc[:, :best_model_idx+1], y/1000)
 logger.info('Multivariate coefficients:')
@@ -149,11 +136,11 @@ logger.info(np.array(best_multivariate_model.coef_))
 logger.info('Multivariate intercept:')
 logger.info(np.array(best_multivariate_model.intercept_))
 
-if True:
-    joblib.dump([best_multivariate_model, selected_feats_df.columns[:best_model_idx+1].to_numpy(), scores], root_path.joinpath(r'data/outputs/Models/best_multivariate_model_py38_cv5v2.joblib'))
-    pickle.dump([best_multivariate_model, selected_feats_df.columns[:best_model_idx+1].to_numpy(), scores], open(root_path.joinpath(r'data/outputs/Models/best_multivariate_model_py38_cv5v2.pickle'), 'wb'))
+# save model
+joblib.dump([best_multivariate_model, selected_feats_df.columns[:best_model_idx+1].to_numpy(), scores], root_path.joinpath(r'data/outputs/Models/best_multivariate_model_py38_cv5v2.joblib'))
+pickle.dump([best_multivariate_model, selected_feats_df.columns[:best_model_idx+1].to_numpy(), scores], open(root_path.joinpath(r'data/outputs/Models/best_multivariate_model_py38_cv5v2.pickle'), 'wb'))
 
-# Univariate model
+## fit best univariate model based on selected feature
 logger.info('Univariate model scores:')
 scores, predicted = fs.score_model(selected_feats_df.iloc[:, :1], y/1000, model=linear_model.LinearRegression(),
                                                     find_predicted=True, cv=selected_feats_df.shape[0], print_scores=True)
@@ -174,9 +161,9 @@ logger.info(np.array(best_univariate_model.coef_))
 logger.info('Univariate model intercept:')
 logger.info(np.array(best_univariate_model.intercept_))
 
-if True:
-    joblib.dump([best_univariate_model, selected_feats_df.columns[:1].to_numpy(), scores], root_path.joinpath(r'data/outputs/Models/best_univariate_model_py38_cv5v2.joblib'))
-    pickle.dump([best_univariate_model, selected_feats_df.columns[:1].to_numpy(), scores], open(root_path.joinpath(r'data/outputs/Models/best_univariate_model_py38_cv5v2.pickle'), 'wb'))
+# save model
+joblib.dump([best_univariate_model, selected_feats_df.columns[:1].to_numpy(), scores], root_path.joinpath(r'data/outputs/Models/best_univariate_model_py38_cv5v2.joblib'))
+pickle.dump([best_univariate_model, selected_feats_df.columns[:1].to_numpy(), scores], open(root_path.joinpath(r'data/outputs/Models/best_univariate_model_py38_cv5v2.pickle'), 'wb'))
 
 logger.info('Done\n')
 input('Press ENTER to continue...')

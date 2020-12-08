@@ -17,7 +17,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 from agc_estimation import get_logger
-import sys, logging
+import sys
 import numpy as np
 from sklearn import linear_model, metrics
 from sklearn.model_selection import cross_val_predict, cross_validate
@@ -74,6 +74,7 @@ def forward_selection(feat_df, y, max_num_feats=0, model=linear_model.LinearRegr
     while selected_feats_df.shape[1] < max_num_feats:
         best_score = -np.inf
         best_feat = []
+        best_key = available_feats_df.columns[0]
         for feat_key, feat_vec in available_feats_df.iteritems():
             test_feats_df = pd.concat((selected_feats_df, feat_vec), axis=1, ignore_index=False) # list(selected_feats.values()) + [feat_vec]
             scores, predicted = score_model(test_feats_df, y, model=model,
@@ -135,7 +136,7 @@ def ranking(feat_df, y, model=linear_model.LinearRegression(), score_fn=None, cv
 
         scores, predicted = score_model(pd.DataFrame(feat_vec), y, model=model, score_fn=score_fn, cv=cv, find_predicted=False)
 
-        if score_fn == None:
+        if score_fn is None:
             score = -np.sqrt((scores['test_-RMSE']**2).mean())
         else:
             score = scores['test_user'].mean()
@@ -183,10 +184,10 @@ def score_model(feat_df, y, model=linear_model.LinearRegression(), score_fn=None
 
     if score_fn is not None:
         scoring = {#'R2': make_scorer(metrics.r2_score),        # R2 in cross validation is suspect
-                   '-RMSE': make_scorer(lambda y, pred: -np.sqrt(metrics.mean_squared_error(y, pred))),
+                   '-RMSE': make_scorer(lambda meas, pred: -np.sqrt(metrics.mean_squared_error(meas, pred))),
                    'user': make_scorer(score_fn)}
     else:
-        scoring = {'-RMSE': make_scorer(lambda y, pred: -np.sqrt(metrics.mean_squared_error(y, pred)))}
+        scoring = {'-RMSE': make_scorer(lambda meas, pred: -np.sqrt(metrics.mean_squared_error(meas, pred)))}
 
     scores = cross_validate(model, feat_df, y, scoring=scoring, cv=cv, n_jobs=-1)
 

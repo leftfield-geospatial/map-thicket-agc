@@ -37,7 +37,7 @@ biomass_to_carbon_w = 0.48      # factor to convert from biomass to carbon weigh
 # (Note that CDM and J Reeler use 0.37, while C Bolus, M vd Vyver and A Mills use 0.48)
 nested_height_thresh = 50.      # cutoff plant height for nested plot (cm)
 
-def FormatSpeciesName(species):
+def format_species_name(species):
     """ Formats the species name into abbreviated dot notation.
 
     Parameters
@@ -208,7 +208,7 @@ class AbcAggregator:
             for r in ws[2:ws.max_row]:
                 if r[0].value is None:
                     break
-                species = FormatSpeciesName('{0} {1}'.format(str(r[0].value).strip(), str(r[1].value).strip()))
+                species = format_species_name('{0} {1}'.format(str(r[0].value).strip(), str(r[1].value).strip()))
                 model = {'vars': r[3].value, 'ay': r[6].value, 'by': r[7].value, 'sigma': r[8].value, 'LC': r[9].value,
                          'UC': r[10].value, 'Duan': r[12].value, 'MB': r[13].value,
                          'use_wd_ratio': False if (str(r[14].value) == 'x') else True}
@@ -220,7 +220,7 @@ class AbcAggregator:
             for r in ws[2:ws.max_row]:
                 if r[0].value is None:
                     break
-                species = FormatSpeciesName('{0} {1}'.format(str(r[0].value).strip(), str(r[1].value).strip()))
+                species = format_species_name('{0} {1}'.format(str(r[0].value).strip(), str(r[1].value).strip()))
                 model = {'wd_species': species, 'wd_ratio': r[4].value}
                 self.wd_ratio_dict[species] = model
         finally:
@@ -249,9 +249,9 @@ class AbcAggregator:
                 if r[0].value is None:
                     break
 
-                species = FormatSpeciesName(str(r[0].value).strip())
-                model = {'species': species, 'allom_species': FormatSpeciesName(str(r[1].value).strip()),
-                         'wd_species': FormatSpeciesName(str(r[2].value).strip()) if r[2].value is not None else None}
+                species = format_species_name(str(r[0].value).strip())
+                model = {'species': species, 'allom_species': format_species_name(str(r[1].value).strip()),
+                         'wd_species': format_species_name(str(r[2].value).strip()) if r[2].value is not None else None}
                 self.mvdv_surrogate_dict[species] = model
 
             self.cb_surrogate_dict = {}
@@ -265,7 +265,7 @@ class AbcAggregator:
                     if (c.value is not None) and (c.value != ''):
                         map_species = str(c.value).strip()
                         break
-                allom_species = FormatSpeciesName(map_species)
+                allom_species = format_species_name(map_species)
                 # add wet/dry surrogate
                 wd_species = None
                 if species in self.wd_ratio_dict:
@@ -444,7 +444,7 @@ class AgcPlotEstimator:
             Biomass correction method to use (default BiomassCorrectionMethod.NicklessZou)
         """
         self.plot_summary_agc_df = pd.DataFrame()
-        self._abc_aggregator = AbcAggregator(model_file_name=model_file_name, correction_method=correction_method)
+        self.abc_aggregator = AbcAggregator(model_file_name=model_file_name, correction_method=correction_method)
         self._plot_litter_df = pd.DataFrame()
         self._woody_file_name = None
 
@@ -508,13 +508,13 @@ class AgcPlotEstimator:
         """
         plot_summary_agc_dict = {}
         self.plot_summary_agc_df = pd.DataFrame()
-        self._abc_aggregator.aggregate(woody_file_name=woody_file_name, make_marked_file=make_marked_file)
+        self.abc_aggregator.aggregate(woody_file_name=woody_file_name, make_marked_file=make_marked_file)
         self._woody_file_name = woody_file_name
         self._plot_litter_df = pd.DataFrame()
         self._read_litter(litter_file_name)
 
         fields_to_summarise = ['yc', 'height', 'vol']
-        for plot_id, plot in self._abc_aggregator.plot_abc_df.groupby('ID'):
+        for plot_id, plot in self.abc_aggregator.plot_abc_df.groupby('ID'):
             plot_sizes_un = np.unique(plot['plot_size'])
             vector_dict = {}
 
@@ -575,9 +575,9 @@ class AgcPlotEstimator:
         out_file_name : str
             (optional) name of csv file to write to
         """
-        if len(self._abc_aggregator.plot_abc_df) == 0:
+        if len(self.abc_aggregator.plot_abc_df) == 0:
             raise Exception('There is no ABC data - call estimate() first')
-        self._abc_aggregator.write_file(out_file_name=out_file_name)
+        self.abc_aggregator.write_file(out_file_name=out_file_name)
 
     def write_agc_plot_file(self, out_file_name=None):
         """ Write AGC values etc per plot to CSV file.

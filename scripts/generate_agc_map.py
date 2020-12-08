@@ -16,6 +16,7 @@
     You should have received a copy of the GNU Affero General Public License
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
+##
 from scripts import root_path
 from agc_estimation import imaging as img
 import joblib
@@ -33,8 +34,8 @@ else:
     map_filename = root_path.joinpath(r'data/outputs/geospatial/gef5_slm_wv3_oct_2017_multivariate_agc_10m_w33s33.tif')
     model_filename = root_path.joinpath(r'data/outputs/Models/best_multivariate_model_py38_cv5v2.joblib')
 
+## load model and apply to image
 model, model_feat_keys, model_scores = joblib.load(model_filename)
-
 mapper = img.MsImageMapper(image_file_name=image_filename, map_file_name=map_filename, model=model, model_feat_keys=model_feat_keys,
                          save_feats=False)
 start = time.time()

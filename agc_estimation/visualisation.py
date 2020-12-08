@@ -182,9 +182,9 @@ def scatter_y_actual_vs_pred(y, pred, scores, xlabel='Measured AGC (t C ha$^{-1}
     df = pd.DataFrame({xlabel: y, ylabel: pred})    # form a datafram for scatter_ds
     scatter_ds(df, do_regress=False)
 
-    mn = np.min([y, pred])
+    mn = np.min([y, pred], initial=0)
     mx = np.max([y, pred])
-    h, = pyplot.plot([0, mx], [0, mx], 'k--', lw=2, zorder=-1, label='1:1')
+    h, = pyplot.plot([mn, mx], [mn, mx], 'k--', lw=2, zorder=-1, label='1:1')
     pyplot.xlim(0, mx)
     pyplot.ylim(0, mx)
     pyplot.text(26, 5, str.format('$R^2$ = {0:.2f}', scores['R2_stacked']),
