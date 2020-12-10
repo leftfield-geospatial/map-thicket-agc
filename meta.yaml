@@ -1,3 +1,11 @@
+# Config file for conda package
+#
+#  To build, install & remove the development version:
+#    git clone git+https://github.com/dugalh/map_thicket_agc.git
+#    conda build .
+#    conda install -c conda-forge --use-local map-thicket-agc
+#    conda remove -c conda-forge --use-local map-thicket-agc
+
 package:
   name: map-thicket-agc
   version: 0.1.0

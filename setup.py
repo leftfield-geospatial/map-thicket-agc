@@ -19,6 +19,9 @@
 from setuptools import setup, find_packages
 import glob
 
+# To install local development version use:
+#    pip install -e .
+
 setup(
 	name='map-thicket-agc',
 	version='0.1.0',
