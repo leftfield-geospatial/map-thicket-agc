@@ -1,0 +1,26 @@
+package:
+  name: map-thicket-agc
+  version: 0.1.0
+
+source:
+  git_url: https://github.com/dugalh/map_thicket_agc.git
+
+requirements:
+  run:
+    - python >=3.6
+    - geopandas >=0.8
+    - rasterio >=1.1
+    - numpy >=1.19
+    - scipy >=1.5
+    - scikit-learn >=0.23
+    - matplotlib >=3.3
+    - openpyxl >=3.0
+
+build:
+  number: 0
+  noarch: python
+  script: pip install -e .
+
+about:
+  home: https://github.com/dugalh/map_thicket_agc
+  license: AGPLv3

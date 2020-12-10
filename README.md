@@ -6,11 +6,18 @@ Miniconda
 git clone or pip ??
 [eg](https://jupyter.org/install)
 
-`conda create -n py38_geospatial_test python=3.8 -c conda-forge`
+    `conda create -n py38_geospatial_test python=3.8 -c conda-forge` 
+    `conda install -c conda-forge matplotlib numpy scipy scikit-learn openpyxl rasterio geopandas`    
+    
+    `git clone git+https://github.com/dugalh/map_thicket_agc.git`    
+    `pip install -e .`
 
-`conda install -c conda-forge matplotlib numpy scipy scikit-learn openpyxl rasterio geopandas`
+The above two commands can be done in one step with (but the two commands separately are probably clearer):
+
+    `pip install --user -e git+https://dugalh%40gmail.com:Muizenber9@github.com/dugalh/map_thicket_agc.git#egg=map-thicket-agc`
 
 `pip install git+https://dugalh%40gmail.com:[password]@github.com/dugalh/map_thicket_agc.git`
+
 ## Getting Started
 Where stuff is 
 
