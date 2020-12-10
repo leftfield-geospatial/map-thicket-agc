@@ -25,6 +25,7 @@ from agc_estimation import get_logger
 logger = get_logger(__name__)
 
 logger.info('Starting...')
+
 image_filename = r"D:/OneDrive/GEF Essentials/Source Images/WorldView3 Oct 2017/WorldView3_Oct2017_OrthoNgiDem_AtcorSrtmAdjCorr_PanAndPandSharpMs.tif"
 
 if True:

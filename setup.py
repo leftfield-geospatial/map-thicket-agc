@@ -16,4 +16,30 @@
     You should have received a copy of the GNU Affero General Public License
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
+from setuptools import setup, find_packages
+import glob
 
+setup(
+	name='agc_estimation',
+	version='0.1.0',
+	description='Mapping AGC in thicket with multi-spectral imagery',
+	author='Dugal Harris',
+	author_email='dugalh@gmail.com',
+	url='https://github.com/dugalh/GEF-5-SLM/blob/master/setup-py',
+	license='AGPLv3',
+	packages=find_packages(include=['agc_estimation', 'agc_estimation.*']),
+	python_requires='>=3.6',
+	install_requires=[
+		'numpy>=1.19',
+		'scipy>=1.5',
+		'matplotlib>=3.3',
+		'openpyxl>=3.0',
+		'geopandas>=0.8',
+		'rasterio>=1.1',
+		'scikit-learn>=0.23'
+	],
+	scripts=glob.glob('scripts/*.py'),
+	data_files=[('agc_estimation_data', glob.glob('data/**/*.xlsx', recursive=True))],
+	# package_data={'': ['README.md', 'data/*', 'data/*/*', 'data/*/*/*', 'data/*/*/*/*']}
+	include_package_data=False
+)
