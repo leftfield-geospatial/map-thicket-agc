@@ -20,14 +20,14 @@ from setuptools import setup, find_packages
 import glob
 
 setup(
-	name='agc_estimation',
+	name='map-thicket-agc',
 	version='0.1.0',
 	description='Mapping AGC in thicket with multi-spectral imagery',
 	author='Dugal Harris',
 	author_email='dugalh@gmail.com',
-	url='https://github.com/dugalh/GEF-5-SLM/blob/master/setup-py',
+	url='https://github.com/dugalh/map_thicket_agc/blob/master/setup-py',
 	license='AGPLv3',
-	packages=find_packages(include=['agc_estimation', 'agc_estimation.*']),
+	packages=find_packages(),
 	python_requires='>=3.6',
 	install_requires=[
 		'numpy>=1.19',
@@ -38,8 +38,6 @@ setup(
 		'rasterio>=1.1',
 		'scikit-learn>=0.23'
 	],
-	scripts=glob.glob('scripts/*.py'),
-	data_files=[('agc_estimation_data', glob.glob('data/**/*.xlsx', recursive=True))],
-	# package_data={'': ['README.md', 'data/*', 'data/*/*', 'data/*/*/*', 'data/*/*/*/*']}
-	include_package_data=False
+	# scripts=glob.glob('scripts/*.py'),
+	# data_files=[('map_thicket_agc_data', glob.glob('data/inputs/**/*.*', recursive=True))],
 )

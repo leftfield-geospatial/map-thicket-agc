@@ -10,6 +10,7 @@ git clone or pip ??
 
 `conda install -c conda-forge matplotlib numpy scipy scikit-learn openpyxl rasterio geopandas`
 
+`pip install git+https://dugalh%40gmail.com:[password]@github.com/dugalh/map_thicket_agc.git`
 ## Getting Started
 Where stuff is 
 
