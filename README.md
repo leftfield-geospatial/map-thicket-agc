@@ -2,21 +2,34 @@
 Aboveground carbon (AGC) maps are needed for planning and monitoring of thicket restoration in South Africa.  Field methods for measuring biomass are labour-intensive and and only practical for small areas.  To work around these challenges, we developed a method for mapping AGC using satellite imagery.  The work was undertaken as part of the part of the [GEF5-SLM](https://www.thegef.org/project/securing-multiple-ecosystems-benefit-through-slm-productive-degraded-landscapes-south-africa) (sustainable land management project) project.  You may find the modules for allometric calculations, image feature extraction, feature selection and mapping useful for other projects.
 
 ## Installation
-Miniconda
-git clone or pip ??
-[eg](https://jupyter.org/install)
+I recommend using conda with the conda-forge channel to resolve binary dependencies:
+- Clone the git repository    
+        
+        git clone git+https://github.com/dugalh/map_thicket_agc.git
+- Create a conda environment and install dependencies:
 
-    `conda create -n py38_geospatial_test python=3.8 -c conda-forge` 
-    `conda install -c conda-forge matplotlib numpy scipy scikit-learn openpyxl rasterio geopandas`    
-    
-    `git clone git+https://github.com/dugalh/map_thicket_agc.git`    
-    `pip install -e .`
+        conda create -n <environment name> python=3.8 -c conda-forge 
+        conda activate <environment name> 
+        conda install -c conda-forge matplotlib numpy scipy scikit-learn openpyxl rasterio geopandas 
+- Setup `<environment name>` to use the local repository        
+        
+        pip install -e <path to repository>
 
 The above two commands can be done in one step with (but the two commands separately are probably clearer):
 
     `pip install --user -e git+https://dugalh%40gmail.com:Muizenber9@github.com/dugalh/map_thicket_agc.git#egg=map-thicket-agc`
 
 `pip install git+https://dugalh%40gmail.com:[password]@github.com/dugalh/map_thicket_agc.git`
+
+#[eg](https://jupyter.org/install)
+## Data
+
+Directory | Description
+---|---
+[data/inputs/allometry](data/inputs/allometry) | Woody and litter allometric measurements from 90 sampling plots in the Baviaanskloof, South Africa, and [allometric models](https://www.researchgate.net/publication/335531470_Aboveground_biomass_and_carbon_pool_estimates_of_Portulacaria_afra_spekboom-rich_subtropical_thicket_with_species-specific_allometric_models) for common thicket species.    
+[data/inputs/plot_locations/corrected](data/inputs/plot_locations/corrected) | Polygons of sampling plot boundaries with differential correction to < 30cm accuracy.      
+[data/inputs/plot_locations/uncorrected](data/inputs/plot_locations/uncorrected) | Reference and sampling plot corner points with no differential correction.      
+[data/inputs/imagery](data/inputs/imagery) | Download the [satellite and aerial imagery](https://1drv.ms/u/s!Aq0bZ0KcAqFZgRbcRhS5iDFdqC8F?e=gu3qLf) into this directory. 
 
 ## Getting Started
 Where stuff is 
