@@ -18,27 +18,26 @@
 """
 ##
 
-import pathlib
 from collections import OrderedDict
 import geopandas as gpd, pandas as pd
 import numpy as np
 from matplotlib import pyplot
 from sklearn import linear_model
 from scipy import stats as stats
-from agc_estimation import imaging as img
-from agc_estimation import feature_selection as fs
-from agc_estimation import calibration as calib
-from agc_estimation import visualisation as vis
-from agc_estimation import get_logger
+from map_thicket_agc import imaging as img
+from map_thicket_agc import feature_selection as fs
+from map_thicket_agc import calibration as calib
+from map_thicket_agc import visualisation as vis
+from map_thicket_agc import get_logger
 from scripts import root_path
 
-image_root_path = pathlib.Path(r"D:/OneDrive/GEF Essentials/Source Images")
-sampling_plot_gt_file = root_path.joinpath(r"data/outputs/geospatial/gef_plot_polygons_with_agc_v2.shp")
+image_root_path = root_path.joinpath(r'data/inputs/imagery')
+sampling_plot_gt_file = root_path.joinpath(r'data/outputs/geospatial/gef_plot_polygons_with_agc_v2.shp')
 
-image_files_dict = {'WV3 Oct 2017': image_root_path.joinpath(r"WorldView3 Oct 2017/WorldView3_Oct2017_OrthoNgiDem_AtcorSrtmAdjCorr_PanAndPandSharpMs.tif"),
-               'WV3 Nov 2018': image_root_path.joinpath(r"WorldView3 Nov 2018/WorldView3_Nov2018_OrthoThinSpline_NoAtcor_PanSharpMs.tif"),
-               'WV3 Aug 2017': image_root_path.joinpath(r"WorldView3 Aug 2017/WorldView3_Aug2017_OrthoThinSpline_NoAtcor_PanSharpMs.tif"),
-               'NGI April 2015': image_root_path.joinpath(r"NGI April 2015/Ngi_May2015_OrthoNgiDem_Xcalib_Rgbn_Mosaic.vrt")}
+image_files_dict = {'WV3 Oct 2017': image_root_path.joinpath(r'WorldView3_Oct2017_OrthoNgiDem_AtcorSrtmAdjCorr_PanAndPandSharpMs.tif'),
+               'WV3 Nov 2018': image_root_path.joinpath(r'WorldView3_Nov2018_OrthoThinSpline_NoAtcor_PanSharpMs.tif'),
+               'WV3 Aug 2017': image_root_path.joinpath(r'WorldView3_Aug2017_OrthoThinSpline_NoAtcor_PanSharpMs.tif'),
+               'NGI April 2015': image_root_path.joinpath(r'Ngi_May2015_OrthoNgiDem_Xcalib_Rgbn_Mosaic.vrt')}
 
 logger = get_logger(__name__)
 logger.info('Starting...')
@@ -129,4 +128,5 @@ model_scores, calib_scores = eval_calib.test(n_bootstraps=100, n_calib_plots=8)
 # eval_calib.print_scores()
 
 logger.info('Done\n')
-input('Press ENTER to continue...')
+if __name__ =='__main__':
+    input('Press ENTER to continue...')

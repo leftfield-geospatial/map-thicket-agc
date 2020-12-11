@@ -24,9 +24,9 @@ import numpy as np
 from csv import DictWriter
 import pandas as pd
 from scipy.stats import gaussian_kde
-from agc_estimation import allometry as allom
-from agc_estimation import visualisation as vis
-from agc_estimation import get_logger
+from map_thicket_agc import allometry as allom
+from map_thicket_agc import visualisation as vis
+from map_thicket_agc import get_logger
 
 
 
@@ -200,7 +200,8 @@ pyplot.pause(0.1)
 f.savefig(root_path.joinpath('data/outputs/plots/plant_height_contribution_to_abc_by_stratum.png'), dpi=300)
 
 logger.info('Done\n')
-input('Press ENTER to continue...')
+if __name__ =='__main__':
+    input('Press ENTER to continue...')
 
 # TODO  - we can simulate what the "error" is when we increase the height cutoff idx (exclude heights less than x in
 #  containing plot, and extrap heights < x from nested plot, then compare to x=50)

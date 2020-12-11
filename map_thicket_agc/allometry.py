@@ -28,7 +28,7 @@ from openpyxl.styles import PatternFill
 from openpyxl.styles.colors import Color
 from openpyxl.styles import colors
 import pandas as pd
-from agc_estimation import get_logger
+from map_thicket_agc import get_logger
 
 logger = get_logger(__name__)
 

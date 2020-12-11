@@ -18,15 +18,17 @@
 """
 ##
 from scripts import root_path
-from agc_estimation import imaging as img
+from map_thicket_agc import imaging as img
 import joblib
 import time
-from agc_estimation import get_logger
+from map_thicket_agc import get_logger
+
 logger = get_logger(__name__)
 
 logger.info('Starting...')
 
-image_filename = r"D:/OneDrive/GEF Essentials/Source Images/WorldView3 Oct 2017/WorldView3_Oct2017_OrthoNgiDem_AtcorSrtmAdjCorr_PanAndPandSharpMs.tif"
+image_root_path = root_path.joinpath(r'data/inputs/imagery')
+image_filename = image_root_path.joinpath('WorldView3_Oct2017_OrthoNgiDem_AtcorSrtmAdjCorr_PanAndPandSharpMs.tif')
 
 if True:
     map_filename = root_path.joinpath(r'data/outputs/geospatial/gef5_slm_wv3_oct_2017_univariate_agc_10m_w33s33.tif')
@@ -45,4 +47,5 @@ logger.info(f'Mapping duration: {(time.time()-start):.2f}s')
 img.thicket_agc_post_proc(mapper)                   # remove noise and place sensible limits on AGC
 
 logger.info('Done\n')
-input('Press ENTER to continue...')
+if __name__ =='__main__':
+    input('Press ENTER to continue...')

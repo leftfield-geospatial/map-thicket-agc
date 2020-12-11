@@ -24,10 +24,10 @@ from sklearn import linear_model
 from matplotlib import pyplot
 import joblib, pickle
 
-from agc_estimation import imaging as img
-from agc_estimation import visualisation as vis
-from agc_estimation import feature_selection as fs
-from agc_estimation import get_logger
+from map_thicket_agc import imaging as img
+from map_thicket_agc import visualisation as vis
+from map_thicket_agc import feature_selection as fs
+from map_thicket_agc import get_logger
 
 ## extract features from multi-spectral satellite image
 plot_agc_shapefile_name = root_path.joinpath(r'data/outputs/geospatial/gef_plot_polygons_with_agc_v2.shp')
@@ -167,4 +167,5 @@ joblib.dump([best_univariate_model, selected_feats_df.columns[:1].to_numpy(), sc
 pickle.dump([best_univariate_model, selected_feats_df.columns[:1].to_numpy(), scores], open(root_path.joinpath(r'data/outputs/Models/best_univariate_model_py38_cv5v2.pickle'), 'wb'))
 
 logger.info('Done\n')
-input('Press ENTER to continue...')
+if __name__ =='__main__':
+    input('Press ENTER to continue...')

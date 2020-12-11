@@ -18,7 +18,7 @@
 """
 
 
-from agc_estimation import get_logger
+from map_thicket_agc import get_logger
 import numpy as np
 from sklearn import linear_model, metrics
 import pandas as pd

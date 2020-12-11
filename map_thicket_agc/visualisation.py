@@ -17,14 +17,14 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
-from agc_estimation import get_logger
+from map_thicket_agc import get_logger
 import numpy as np
 from matplotlib import pyplot
 from matplotlib import patches
 from scipy import stats as stats
 from sklearn import linear_model
 import pandas as pd
-from agc_estimation import feature_selection
+from map_thicket_agc import feature_selection
 
 logger = get_logger(__name__)
 

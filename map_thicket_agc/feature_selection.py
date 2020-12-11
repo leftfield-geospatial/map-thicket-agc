@@ -16,7 +16,7 @@
     You should have received a copy of the GNU Affero General Public License
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
-from agc_estimation import get_logger
+from map_thicket_agc import get_logger
 import sys
 import numpy as np
 from sklearn import linear_model, metrics

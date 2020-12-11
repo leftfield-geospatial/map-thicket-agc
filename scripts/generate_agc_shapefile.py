@@ -22,12 +22,12 @@ from scripts import root_path
 import numpy as np
 import geopandas as gpd, pandas as pd
 import pathlib, glob
-from agc_estimation import get_logger
+from map_thicket_agc import get_logger
 
 logger = get_logger(__name__)
 
-corr_plot_loc_root_path = root_path.joinpath(r'data/inputs/geospatial/corrected')
-uncorr_plot_loc_root_path = root_path.joinpath(r'data/inputs/geospatial/uncorrected/march_2019')
+corr_plot_loc_root_path = root_path.joinpath(r'data/inputs/plot_locations/corrected')
+uncorr_plot_loc_root_path = root_path.joinpath(r'data/inputs/plot_locations/uncorrected/march_2019')
 
 corr_shapefile_names = [sub_item.joinpath('Point_ge.shp') for sub_item in corr_plot_loc_root_path.iterdir() if sub_item.is_dir()]   # corrected dgps locs
 uncorr_shapefile_names = [pathlib.Path(p) for p in glob.glob(str(uncorr_plot_loc_root_path.joinpath('GEF_FIELD*.shp')))]            # uncorrected locs
@@ -94,4 +94,5 @@ plot_agc_gdf = plot_agc_gdf.drop(np.where(plot_agc_gdf['geometry'].isnull())[0],
 plot_agc_gdf.to_file(plot_agc_shapefile_name)   # write shapefile
 
 logger.info('Done\n')
-input('Press ENTER to continue...')
+if __name__ =='__main__':
+    input('Press ENTER to continue...')

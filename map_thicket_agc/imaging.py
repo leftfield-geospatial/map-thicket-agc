@@ -17,7 +17,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
-from agc_estimation import get_logger
+from map_thicket_agc import get_logger
 import os
 import warnings
 from collections import OrderedDict
