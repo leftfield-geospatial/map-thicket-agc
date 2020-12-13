@@ -7,7 +7,7 @@ More details can be found in the [report](docs/gef5_slm_final_report_new_c_metho
 
 ## Getting Started
 ### Installation
-Using [conda](https://docs.conda.io/en/latest/miniconda.html), with the conda-forge channel, for resolving binary dependencies is the recommended way:
+Using the [`conda`](https://docs.conda.io/en/latest/miniconda.html) package manager, for resolving binary dependencies is the recommended way.  The [Minconda](https://docs.conda.io/en/latest/miniconda.html) installation includes a minimal `conda`.
 1) Create a conda environment and install dependencies:
 ```shell
 conda create -n <environment name> python=3.8 -c conda-forge 
@@ -19,10 +19,10 @@ conda install -c conda-forge matplotlib numpy scipy scikit-learn openpyxl raster
 git clone https://github.com/dugalh/map_thicket_agc.git
 pip install -e map_thicket_agc
 ```        
-3) Create the [data/inputs/imagery](data/inputs/imagery) direcory and download the [satellite and aerial imagery](https://1drv.ms/u/s!Aq0bZ0KcAqFZgRbcRhS5iDFdqC8F?e=gu3qLf) into it.
+3) Create the [data/inputs/imagery](data/inputs/imagery) directory and download the [satellite and aerial imagery](https://1drv.ms/u/s!Aq0bZ0KcAqFZgRbcRhS5iDFdqC8F?e=gu3qLf) into it
 
 ### Requirements  
-Listed dependencies are installed in the process above.  The `geopandas` and `rasterio` packages have binary dependencies that are not directly availble through `pip`, hence the recommendation for using `conda`.  
+Listed dependencies are installed in the process above.  The `geopandas` and `rasterio` packages have binary dependencies that are not directly available through `pip`, hence the recommendation for using `conda`.  
   
   - python >= 3.6
   - geopandas >= 0.8
@@ -44,7 +44,7 @@ Path | Description
 [data/inputs/imagery](data/inputs/imagery) | The [satellite and aerial imagery](https://1drv.ms/u/s!Aq0bZ0KcAqFZgRbcRhS5iDFdqC8F?e=gu3qLf) should be downloaded into this path. 
 
 ### Generating Results
-The [scripts](scripts/) direcory contains python scripts for generating results.  '`python run_all.py`' will run through them all in the required order.  
+The [scripts](scripts) directory contains python scripts for generating results.  '`python run_all.py`' will run through them all in the required order.  
 
 Script | Description
 ------ | -----------
@@ -62,7 +62,7 @@ We used multivariate regression modelling for predicting AGC from features in mu
 
 <img align="left" src="data/outputs/plots/meas_vs_pred_agc_multivariate_model_b.png" data-canonical-src="data/outputs/plots/meas_vs_pred_agc_multivariate_model_b.png" alt="Predicted vs actual AGC" width="400"/>
 
-The code evaluates spectral, textural and vegetation index features extracted from a 2017 [WorldView-3](http://worldview3.digitalglobe.com/) (0.34m resolution 8-band) multi-spectral image (shown above).  This plot shows the results of a linear model fitted to a subset of informative features, selected using stepwise forward selection.  Some testing was done with more sophisticated models, but they did not improve on these results.  
+The code evaluates spectral, textural and vegetation index features extracted from a 2017 [WorldView-3](http://worldview3.digitalglobe.com/) (0.34 m resolution 8-band) multi-spectral image (shown above).  This plot shows the results of a linear model fitted to a subset of informative features, selected using stepwise forward selection.  Some testing was done with more sophisticated models, but they did not improve on these results.  
 
 
 
@@ -88,9 +88,10 @@ See the [full report](docs/gef5_slm_final_report_new_c_methodology_dec2019.pdf) 
 * **Cosman Bolus** - *Field work and allometry* - [cosbolus@gmail.com](mailto:cosbolus@gmail.com)
 * **Marius van der Vyver** - *Allometric models* - [mariusvdv@gmail.com](mailto:mariusvdv@gmail.com)
 * **James Reeler** - *Policy advice and oversight* - [jreeler@wwf.org.za](mailto:jreeler@wwf.org.za)
-* **National Geo-spatial Information (NGI)** - *Aerial imagery* - [www.ngi.gov.za](www.ngi.gov.za/)
-* DigitalGlobe
-* GEF team
+* **Rebecca Powell** - *GEF-5 SLM project coordination, E. Cape* - [rebeccajoub@gmail.com](mailto:rebeccajoub@gmail.com)
+* **Center for Geographical Analysis** - *DGPS device and software* - [www0.sun.ac.za/cga/](http://www0.sun.ac.za/cga/)
+* **National Geo-spatial Information** - *Aerial imagery* - [www.ngi.gov.za](http://www.ngi.gov.za)
+* **DigitalGlobe Foundation** - *WorldView-3 image* - [www.maxmar.com](http://www.maxar.com)
 
 ## Citation
 When using this code, please cite: 
