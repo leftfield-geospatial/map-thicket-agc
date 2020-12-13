@@ -1,45 +1,61 @@
 # Above ground carbon estimation in thicket using multi-spectral images
-Aboveground carbon (AGC) maps are needed for planning and monitoring of thicket restoration in South Africa.  Field methods for measuring biomass are labour-intensive and and only practical for small areas.  To work around these challenges, we developed a method for mapping AGC using satellite imagery.  The work was undertaken as part of the part of the [GEF5-SLM](https://www.thegef.org/project/securing-multiple-ecosystems-benefit-through-slm-productive-degraded-landscapes-south-africa) (sustainable land management project) project.  You may find the modules for allometric calculations, image feature extraction, feature selection and mapping useful for other projects.
+Aboveground carbon (AGC) maps are needed for monitoring of thicket restoration in  South Africa.  This project developed a method for mapping AGC using multi-spectral satellite imagery.  The work was undertaken as part of the part of the [GEF5-SLM](https://www.thegef.org/project/securing-multiple-ecosystems-benefit-through-slm-productive-degraded-landscapes-south-africa) (sustainable land management project) project.  
 
-## Installation
-I recommend using conda with the conda-forge channel to resolve binary dependencies:
-- Clone the git repository    
-        
-        git clone git+https://github.com/dugalh/map_thicket_agc.git
-- Create a conda environment and install dependencies:
+Generic modules for allometry, image feature extraction, feature selection and modelling large rasters may be useful for other projects.
 
-        conda create -n <environment name> python=3.8 -c conda-forge 
-        conda activate <environment name> 
-        conda install -c conda-forge matplotlib numpy scipy scikit-learn openpyxl rasterio geopandas 
-- Setup `<environment name>` to use the local repository        
-        
-        pip install -e <path to repository>
+More details can be found in the [report](docs/gef5_slm_final_report_new_c_methodology_dec2019.pdf).
 
-The above two commands can be done in one step with (but the two commands separately are probably clearer):
+## Getting Started
+### Installation
+Using [conda](https://docs.conda.io/en/latest/miniconda.html), with the conda-forge channel, for resolving binary dependencies is the recommended way:
+1) Create a conda environment and install dependencies:
+```shell
+conda create -n <environment name> python=3.8 -c conda-forge 
+conda activate <environment name> 
+conda install -c conda-forge matplotlib numpy scipy scikit-learn openpyxl rasterio geopandas 
+```
+2) Clone the git repository and link into the conda environment:
+```shell
+git clone https://github.com/dugalh/map_thicket_agc.git
+pip install -e map_thicket_agc
+```        
+3) Create the [data/inputs/imagery](data/inputs/imagery) direcory and download the [satellite and aerial imagery](https://1drv.ms/u/s!Aq0bZ0KcAqFZgRbcRhS5iDFdqC8F?e=gu3qLf) into it.
 
-    `pip install --user -e git+https://dugalh%40gmail.com:Muizenber9@github.com/dugalh/map_thicket_agc.git#egg=map-thicket-agc`
+### Requirements  
+Listed dependencies are installed in the process above.  The `geopandas` and `rasterio` packages have binary dependencies that are not directly availble through `pip`, hence the recommendation for using `conda`.  
+  
+  - python >= 3.6
+  - geopandas >= 0.8
+  - rasterio >= 1.1
+  - numpy >= 1.19
+  - scipy >= 1.5
+  - scikit-learn >= 0.23
+  - matplotlib >= 3.3
+  - openpyxl >= 3.0
 
-`pip install git+https://dugalh%40gmail.com:[password]@github.com/dugalh/map_thicket_agc.git`
+### Data
+Allometric and plot location data for generating AGC ground truth are included in the repository.  Satellite and aerial imagery is too large for `git` and can be downloaded separately.
 
-#[eg](https://jupyter.org/install)
-## Data
-
-Directory | Description
+Path | Description
 ---|---
 [data/inputs/allometry](data/inputs/allometry) | Woody and litter allometric measurements from 90 sampling plots in the Baviaanskloof, South Africa, and [allometric models](https://www.researchgate.net/publication/335531470_Aboveground_biomass_and_carbon_pool_estimates_of_Portulacaria_afra_spekboom-rich_subtropical_thicket_with_species-specific_allometric_models) for common thicket species.    
 [data/inputs/plot_locations/corrected](data/inputs/plot_locations/corrected) | Polygons of sampling plot boundaries with differential correction to < 30cm accuracy.      
 [data/inputs/plot_locations/uncorrected](data/inputs/plot_locations/uncorrected) | Reference and sampling plot corner points with no differential correction.      
-[data/inputs/imagery](data/inputs/imagery) | Download the [satellite and aerial imagery](https://1drv.ms/u/s!Aq0bZ0KcAqFZgRbcRhS5iDFdqC8F?e=gu3qLf) into this directory. 
+[data/inputs/imagery](data/inputs/imagery) | The [satellite and aerial imagery](https://1drv.ms/u/s!Aq0bZ0KcAqFZgRbcRhS5iDFdqC8F?e=gu3qLf) should be downloaded into this path. 
 
-## Getting Started
-Where stuff is 
+### Generating Results
+The [scripts](scripts/) direcory contains python scripts for generating results.  '`python run_all.py`' will run through them all in the required order.  
 
-Run scipts, what the scripts do
+Script | Description
+------ | -----------
+[scripts/run_all.py](scripts/run_all.py) | Runs through all the scripts in the required order
+[scripts/generate_agc_ground_truth.py](scripts/generate_agc_ground_truth.py) | Applies allometric models to plant and litter measurements to generate AGC for the 90 sampling plots 
+[scripts/generate_agc_shapefile.py](scripts/generate_agc_ground_truth.py) | Combines the above ground truth with plot locations to generate a shapefile of plot polygons with fields for AGC etc 
+[scripts/fit_agc_model.py](scripts/fit_agc_model.py) | Extracts features from the satellite image, selects a set of informative features, and fits and evaluates models for predicting AGC from these features  
+[scripts/generate_agc_map.py](scripts/generate_agc_map.py) | Applies fitted model(s) to the satellite image to generate a coarse resolution (10m x 10m) AGC map
+[scripts/evaluate_calibration.py](scripts/evaluate_calibration.py) | Evaluates a method for calibrating AGC models to new images (using an additional two satellite images and a mosaic of aerial imagery)
 
-## Data
-Required allometric data and plot locations are included in the repository under [data](/data).  Satellite images can be obtained on request from the [GEF5-SLM project manager](mailto:) .
-
-## Description
+## Overview of Methods and Results
 We used multivariate regression modelling for predicting AGC from features in multi-spectral imagery.  Ground truth AGC data for model fitting were generated by applying [existing allometric models](https://www.researchgate.net/publication/335531470_Aboveground_biomass_and_carbon_pool_estimates_of_Portulacaria_afra_spekboom-rich_subtropical_thicket_with_species-specific_allometric_models) to plant measurements gathered in the Baviaanskloof, South Africa.  90 sampling plots were spread over three degradation strata (WorldView-3 image in colour-infrared rendering).  
 
 <img src="data/outputs/plots/study_area_map_wv3_aug_2017.png" data-canonical-src="data/outputs/plots/study_area_map_wv3_aug_2017.png" alt="Study area map with ground truth plots" width="800"/>
@@ -65,15 +81,17 @@ Extending models spatially and temporally is currently a major challenge in remo
 
 See the [full report](docs/gef5_slm_final_report_new_c_methodology_dec2019.pdf) for more detail.
 
+## Author
+* **Dugal Harris** - *Method design and development* - [dugalh@gmail.com](mailto:dugalh@gmail.com)
+
+## Credits
+* **Cosman Bolus** - *Field work and allometry* - [cosbolus@gmail.com](mailto:cosbolus@gmail.com)
+* **Marius van der Vyver** - *Allometric models* - [mariusvdv@gmail.com](mailto:mariusvdv@gmail.com)
+* **James Reeler** - *Policy advice and oversight* - [jreeler@wwf.org.za](mailto:jreeler@wwf.org.za)
+* **National Geo-spatial Information (NGI)** - *Aerial imagery* - [www.ngi.gov.za](www.ngi.gov.za/)
+* DigitalGlobe
+* GEF team
+
 ## Citation
 When using this code, please cite: 
 - Harris, D., Bolus, C., Reeler, J. 2019. *Development of a method for remote sensing of aboveground carbon in subtropical thicket*, GEF-5 SLM, Rhodes University. Internal report.
-
-## Some Results
-
-## Authors
-* **Dugal Harris** - *Method design and development* - [dugalh@gmail.com](mailto:dugalh@gmail.com)
-* **Cosman Bolus** - *Field work and allometry* - [cosbolus@gmail.com](mailto:cosbolus@gmail.com)
-* **James Reeler** - *Policy advice and oversight* - [jreeler@wwf.org.za](mailto:jreeler@wwf.org.za)
-
-See also the list of [contributors](https://github.com/your/project/contributors) who participated in this project.
