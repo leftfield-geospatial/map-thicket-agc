@@ -1,5 +1,5 @@
 # Above ground carbon estimation in thicket using multi-spectral images
-Aboveground carbon (AGC) maps are needed for monitoring of thicket restoration in  South Africa.  This project developed a method for mapping AGC using multi-spectral satellite imagery.  The work was undertaken as part of the part of the [GEF5-SLM](https://www.thegef.org/project/securing-multiple-ecosystems-benefit-through-slm-productive-degraded-landscapes-south-africa) (sustainable land management project) project.  
+Aboveground carbon (AGC) maps are needed for monitoring of thicket restoration in  South Africa.  This project developed a method for mapping AGC using multi-spectral satellite imagery.  The work was undertaken as part of the [GEF5-SLM](https://www.thegef.org/project/securing-multiple-ecosystems-benefit-through-slm-productive-degraded-landscapes-south-africa) (sustainable land management project) project.  
 
 Generic modules for allometry, image feature extraction, feature selection and applying models to large rasters may be useful for other projects.
 
@@ -7,7 +7,7 @@ More details can be found in the [report](docs/gef5_slm_final_report_new_c_metho
 
 ## Getting Started
 ### Installation
-Using the [`conda`](https://docs.conda.io/en/latest/miniconda.html) package manager, for resolving binary dependencies is the recommended way.  The [Minconda](https://docs.conda.io/en/latest/miniconda.html) installation includes a minimal `conda`.
+Using the `conda` package manager, for resolving binary dependencies is the recommended way.  The [Minconda](https://docs.conda.io/en/latest/miniconda.html) installation includes a minimal `conda`.
 1) Create a conda environment and install dependencies:
 ```shell
 conda create -n <environment name> python=3.8 -c conda-forge 
@@ -19,7 +19,7 @@ conda install -c conda-forge matplotlib numpy scipy scikit-learn openpyxl raster
 git clone https://github.com/dugalh/map_thicket_agc.git
 pip install -e map_thicket_agc
 ```        
-3) Create the [data/inputs/imagery](data/inputs/imagery) directory and download the [satellite and aerial imagery](https://1drv.ms/u/s!Aq0bZ0KcAqFZgRbcRhS5iDFdqC8F?e=gu3qLf) into it
+3) Create the `data/inputs/imagery` directory and download the [satellite and aerial imagery](https://1drv.ms/u/s!Aq0bZ0KcAqFZgRbcRhS5iDFdqC8F?e=gu3qLf) into it
 
 ### Requirements  
 The following dependencies are installed in the process above.  The `geopandas` and `rasterio` packages have binary dependencies that are not directly available through `pip`, hence the recommendation for using `conda`.  
@@ -44,7 +44,7 @@ Path | Description
 [data/inputs/imagery](data/inputs/imagery) | The [satellite and aerial imagery](https://1drv.ms/u/s!Aq0bZ0KcAqFZgRbcRhS5iDFdqC8F?e=gu3qLf) should be downloaded into this directory. 
 
 ### Generating Results
-The [scripts](scripts) directory contains python scripts for generating results.  To execute the scripts in the required order, execute:
+The [scripts](scripts) directory contains python scripts for generating results.  To run the scripts in the required order, execute:
 ```shell
 python map_thicket_agc/scripts/run_all.py
 ```
