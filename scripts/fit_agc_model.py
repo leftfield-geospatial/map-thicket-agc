@@ -31,7 +31,7 @@ from map_thicket_agc import get_logger
 
 ## extract features from multi-spectral satellite image
 plot_agc_shapefile_name = root_path.joinpath(r'data/outputs/geospatial/gef_plot_polygons_with_agc_v2.shp')
-image_filename = root_path.joinpath('data/inputs/imagery/WorldView3_Oct2017_OrthoNgiDem_AtcorSrtmAdjCorr_PanAndPandSharpMs.tif')
+image_filename = root_path.joinpath(r'data/inputs/imagery/WorldView3_Oct2017_OrthoNgiDem_AtcorSrtmAdjCorr_PanAndPandSharpMs.tif')
 
 logger = get_logger(__name__)
 logger.info('Starting...')
@@ -90,7 +90,7 @@ fig.set_size_inches(8, 6, forward=True)
 pyplot.subplot(2, 1, 1)
 pyplot.plot(num_feats, selected_loocv_scores_df['R2'], 'k-')
 pyplot.xlabel('Number of features')
-pyplot.ylabel('$/mathit{R}^2$')
+pyplot.ylabel('$\mathit{R}^2$')
 pyplot.tight_layout()
 pyplot.subplot(2, 1, 2)
 pyplot.plot(num_feats, selected_loocv_scores_df['RMSE'], 'k-')
@@ -104,7 +104,7 @@ fig, ax1 = pyplot.subplots()
 fig.set_size_inches(8, 4, forward=True)
 color = 'tab:red'
 ax1.set_xlabel('Number of features')
-ax1.set_ylabel('$/mathit{R}^2$', color=color)  # we already handled the x-label with ax1
+ax1.set_ylabel('$\mathit{R}^2$', color=color)  # we already handled the x-label with ax1
 ax1.plot(num_feats, selected_loocv_scores_df['R2'], color=color)
 ax1.tick_params(axis='y', labelcolor=color)
 ax2 = ax1.twinx()
