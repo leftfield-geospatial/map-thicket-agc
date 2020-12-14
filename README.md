@@ -19,7 +19,7 @@ conda install -c conda-forge matplotlib numpy scipy scikit-learn openpyxl raster
 git clone https://github.com/dugalh/map_thicket_agc.git
 pip install -e map_thicket_agc
 ```        
-3) Create the `data/inputs/imagery` directory and download the [satellite and aerial imagery](https://1drv.ms/u/s!Aq0bZ0KcAqFZgRbcRhS5iDFdqC8F?e=gu3qLf) into it
+3) Create the `data/inputs/imagery` directory and download the [satellite and aerial imagery](https://1drv.ms/u/s!Aq0bZ0KcAqFZgRawIwhndMUdXFEs?e=q9HaPC) into it
 
 ### Requirements  
 The following dependencies are installed in the process above.  The `geopandas` and `rasterio` packages have binary dependencies that are not directly available through `pip`, hence the recommendation for using `conda`.  
