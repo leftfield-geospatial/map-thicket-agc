@@ -42,7 +42,7 @@ plot_agc_gdf = plot_agc_gdf.set_index('ID').sort_index()
 fex = img.MsImageFeatureExtractor(image_filename=image_filename, plot_data_gdf=plot_agc_gdf)
 im_plot_agc_gdf = fex.extract_image_features()
 
-# calculate versions of ABC and AGC normalised by actual polygon area, rather than theoretical plot sizes, and
+# calculate versions of ABC and AGC normalised by actual polygon area, rather than theoretical plot sizes
 carbon_polynorm_dict = {}
 for plot_id, plot in im_plot_agc_gdf['data'].iterrows():
     if 'Abc' in plot and 'LitterCHa' in plot:
