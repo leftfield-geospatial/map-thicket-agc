@@ -96,7 +96,7 @@ A method for calibrating AGC models to new images gave encouraging results.  Tes
 * **James Reeler** - *Policy advice and oversight* - [jreeler@wwf.org.za](mailto:jreeler@wwf.org.za)
 * **Marius van der Vyver** - *Allometric models* - [mariusvdv@gmail.com](mailto:mariusvdv@gmail.com)
 * **Rebecca Powell** - *GEF-5 SLM project coordination, E. Cape* - [rebeccajoub@gmail.com](mailto:rebeccajoub@gmail.com)
-* **Center for Geographical Analysis** - *DGPS device and software* - [www.sun.ac.za/cga](http://www0.sun.ac.za/cga/)
+* **Center for Geographical Analysis** - *Assistance with imagery and DGPS device* - [www.sun.ac.za/cga](http://www0.sun.ac.za/cga/)
 * **National Geo-spatial Information** - *Aerial imagery* - [www.ngi.gov.za](http://www.ngi.gov.za)
 * Satellite images courtesy of the [DigitalGlobe Foundation](http://www.maxar.com)
 
