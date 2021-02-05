@@ -88,6 +88,11 @@ A method for calibrating AGC models to new images gave encouraging results.  Tes
 **WV3 Aug 2017** | 0.8392 | 0.8215 | - | 0.7027
 **NGI April 2015** | 0.8099 | 0.7951 | 0.7443 | -
 
+## Licenses
+- Code is licensed under the [AGPLv3](https://www.gnu.org/licenses/agpl-3.0.en.html)
+- Plot and allometric data is licensed under the [CC-BY-SA](https://creativecommons.org/licenses/by-sa/4.0)
+- WorldView-3 imagery is licensed under the [DigitalGlobe Foundation's terms](data/WV3_attribution)
+
 ## Author
 * **Dugal Harris** - *Method design and development* - [dugalh@gmail.com](mailto:dugalh@gmail.com)
 
