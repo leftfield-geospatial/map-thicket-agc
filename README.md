@@ -90,8 +90,15 @@ A method for calibrating AGC models to new images gave encouraging results.  Tes
 
 ## Licenses
 - Code is licensed under the [AGPLv3](https://www.gnu.org/licenses/agpl-3.0.en.html)
-- Plot and allometric data is licensed under the [CC-BY-SA](https://creativecommons.org/licenses/by-sa/4.0)
+- Data, excluding imagery, is licensed under the [CC-BY-SA](https://creativecommons.org/licenses/by-sa/4.0)
 - WorldView-3 imagery is licensed under the [DigitalGlobe Foundation's terms](data/WV3_attribution)
+
+## Citation
+For use of the code or output data, please cite: 
+- Harris, D., Bolus, C., Reeler, J. 2019. *Development of a method for remote sensing of aboveground carbon in subtropical thicket*, GEF-5 SLM, Rhodes University. Internal report.
+
+For use of the input allometric or plot location data, please cite: 
+- Bolus,  C., Harris, D., Reeler,  J., Powell, M.,  Powell, R., Ngwenya, M. 2020. *Above Ground Carbon (AGC) baseline assessment, using species specific allometric models, across  three  degradation  classes  in  Baviaanskloof Spekboom Thicket*, GEF-5  SLM,  Rhodes University. Internal report.
 
 ## Author
 * **Dugal Harris** - *Method design and development* - [dugalh@gmail.com](mailto:dugalh@gmail.com)
@@ -104,10 +111,3 @@ A method for calibrating AGC models to new images gave encouraging results.  Tes
 * **Center for Geographical Analysis** - *Assistance with imagery and DGPS device* - [www.sun.ac.za/cga](http://www0.sun.ac.za/cga/)
 * **National Geo-spatial Information** - *Aerial imagery* - [www.ngi.gov.za](http://www.ngi.gov.za)
 * Satellite images courtesy of the [DigitalGlobe Foundation](http://www.maxar.com)
-
-## Citation
-For use of the code or output data, please cite: 
-- Harris, D., Bolus, C., Reeler, J. 2019. *Development of a method for remote sensing of aboveground carbon in subtropical thicket*, GEF-5 SLM, Rhodes University. Internal report.
-
-For use of the input allometric or plot location data, please cite: 
-- Bolus,  C., Harris, D., Reeler,  J., Powell, M.,  Powell, R., Ngwenya, M. 2020. *Above Ground Carbon (AGC) baseline assessment, using species specific allometric models, across  three  degradation  classes  in  Baviaanskloof Spekboom Thicket*, GEF-5  SLM,  Rhodes University. Internal report.
