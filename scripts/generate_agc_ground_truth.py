@@ -29,7 +29,6 @@ from map_thicket_agc import visualisation as vis
 from map_thicket_agc import get_logger
 
 
-
 logger = get_logger(__name__)
 
 model_file_name = root_path.joinpath('data/inputs/allometry/allometric_models.xlsx')
