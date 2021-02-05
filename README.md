@@ -100,10 +100,9 @@ A method for calibrating AGC models to new images gave encouraging results.  Tes
 * **National Geo-spatial Information** - *Aerial imagery* - [www.ngi.gov.za](http://www.ngi.gov.za)
 * Satellite images courtesy of the [DigitalGlobe Foundation](http://www.maxar.com)
 
-
 ## Citation
-For use of the code, please cite: 
+For use of the code or output data, please cite: 
 - Harris, D., Bolus, C., Reeler, J. 2019. *Development of a method for remote sensing of aboveground carbon in subtropical thicket*, GEF-5 SLM, Rhodes University. Internal report.
 
-For use of the allometric or plot location data, please cite: 
+For use of the input allometric or plot location data, please cite: 
 - Bolus,  C., Harris, D., Reeler,  J., Powell, M.,  Powell, R., Ngwenya, M. 2020. *Above Ground Carbon (AGC) baseline assessment, using species specific allometric models, across  three  degradation  classes  in  Baviaanskloof Spekboom Thicket*, GEF-5  SLM,  Rhodes University. Internal report.
