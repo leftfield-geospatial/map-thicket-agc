@@ -140,7 +140,7 @@ for image_key, im_calib_plot_gdf in im_calib_plot_gdf_dict.items():
     calib_data_dict[image_key] = im_calib_plot_gdf['feats'][calib_feat_keys]
 
 y = im_sampling_plot_agc_gdf_dict['WV3 Oct 2017']['data']['AgcHa'] / 1000
-calib_strata = calib_data_dict['WV3 Oct 2017']['data']['Stratum']
+calib_strata = im_calib_plot_gdf_dict['WV3 Oct 2017']['data']['Stratum']
 
 eval_calib = calib.EvaluateCalibration(model_data_dict=model_data_dict, y=y, calib_strata=calib_strata,
                                        calib_data_dict=calib_data_dict, model=linear_model.LinearRegression)
