@@ -26,7 +26,8 @@ import pandas as pd
 logger = get_logger(__name__)
 
 class EvaluateCalibration(object):
-    def __init__(self, model_data_dict: dict=None, y=None, strata=None, calib_data_dict: dict=None, model=linear_model.LinearRegression):
+    def __init__(self, model_data_dict: dict=None, y=None, calib_data_dict: dict=None, calib_strata=None,
+                 model=linear_model.LinearRegression):
         """
         Evaluate calibration by testing model performance over calibrated image data
 
@@ -36,7 +37,7 @@ class EvaluateCalibration(object):
             each value is a numpy.array_like containing model feature(s) from a single image, keys are labels for images
         y : numpy.array_like
             target / ground truth values for model
-        strata : numpy.array_like
+        calib_strata : numpy.array_like
             strata for stratified bootstrap of calibration plots (optional)
         calib_data_dict : list
             each value element is a numpy.array_like containing calibration feature(s) from a single image, keys are labels for images
@@ -47,7 +48,7 @@ class EvaluateCalibration(object):
         self.calib_data_dict = calib_data_dict
         self.model = model
         self.y = y
-        self.strata = strata
+        self.calib_strata = calib_strata
         self.model_scores_df = None
         self.calib_scores_df = None
         self._fitted_models_dict = {}
@@ -93,13 +94,13 @@ class EvaluateCalibration(object):
 
         # sample with bootstrapping the calib plots, fit calib models, apply to model_data and test
         for bi in range(0, n_bootstraps):
-            if self.strata is None:
-                calib_plot_idx = np.random.permutation(len(test_model_data))[:n_calib_plots]
+            if self.calib_strata is None:
+                calib_plot_idx = np.random.permutation(len(test_calib_data))[:n_calib_plots]
             else:   # stratified random sampling balanced over strata
                 calib_plot_idx = []
-                strata_list = np.unique(self.strata)
+                strata_list = np.unique(self.calib_strata)
                 for strata_i in strata_list:
-                    strata_idx = np.int32(np.where(strata_i == self.strata)[0])
+                    strata_idx = np.int32(np.where(strata_i == self.calib_strata)[0])
                     calib_plot_idx += np.random.permutation(strata_idx)[
                                       :np.round(n_calib_plots / len(strata_list)).astype('int')].tolist()
 
@@ -117,7 +118,7 @@ class EvaluateCalibration(object):
                 r2_calib[bi, fi] = metrics.r2_score(fit_model_data[test_plot_idx, fi], calib_feat)      # find R2 between fit and calibrated test feature
                 rmse_calib[bi, fi] = np.sqrt(metrics.mean_squared_error(fit_model_data[test_plot_idx, fi], calib_feat)) # find RMSE between fit and calibrated test feature
                 calib_feats[:, fi] = calib_feat.flatten()   # store calibrated feature for model eval below
-
+                # print(f'slope: {calib_model.coef_}, intercept: {calib_model.intercept_}')
             predicted = fit_model.predict(calib_feats)      # find model prediction on calibrated test features
             r2_model[bi] = metrics.r2_score(self.y[test_plot_idx], predicted)   # find R2 between model predictions and ground truth
             rmse_model[bi] = np.sqrt(metrics.mean_squared_error(self.y[test_plot_idx], predicted))  # find RMSE on model predictions  and ground truth

@@ -39,8 +39,8 @@ Allometric and plot location data for generating AGC ground truth are included i
 Path | Description
 ---|---
 [data/inputs/allometry](data/inputs/allometry) | Woody and litter allometric measurements from 90 sampling plots in the Baviaanskloof, South Africa, and [allometric models](https://www.researchgate.net/publication/335531470_Aboveground_biomass_and_carbon_pool_estimates_of_Portulacaria_afra_spekboom-rich_subtropical_thicket_with_species-specific_allometric_models) for common thicket species.  
-[data/inputs/plot_locations/corrected](data/inputs/plot_locations/corrected) | Polygons of sampling plot boundaries with differential correction to < 30cm accuracy.      
-[data/inputs/plot_locations/uncorrected](data/inputs/plot_locations/uncorrected) | Reference and sampling plot corner points with no differential correction.      
+[data/inputs/geospatial/plot_locations/corrected](data/inputs/geospatial/plot_locations/corrected) | Polygons of sampling plot boundaries with differential correction to < 30cm accuracy.      
+[data/inputs/geospatial/plot_locations/uncorrected](data/inputs/geospatial/plot_locations/uncorrected) | Reference and sampling plot corner points with no differential correction.      
 data/inputs/imagery | Satellite and aerial imagery (see [Installation](#installation)). 
 
 ### Generating Results

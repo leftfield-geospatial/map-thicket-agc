@@ -33,6 +33,8 @@ from scripts import root_path
 
 image_root_path = root_path.joinpath(r'data/inputs/imagery')
 sampling_plot_gt_file = root_path.joinpath(r'data/outputs/geospatial/gef_plot_polygons_with_agc_v2.shp')
+calib_plot_file = root_path.joinpath(r'data/inputs/geospatial/gef_calib_polygons.shp')
+# calib_plot_file = sampling_plot_gt_file
 
 image_files_dict = {'WV3 Oct 2017': image_root_path.joinpath(r'WorldView3_Oct2017_OrthoNgiDem_AtcorSrtmAdjCorr_PanAndPandSharpMs.tif'),
                'WV3 Nov 2018': image_root_path.joinpath(r'WorldView3_Nov2018_OrthoThinSpline_NoAtcor_PanSharpMs.tif'),
@@ -42,19 +44,30 @@ image_files_dict = {'WV3 Oct 2017': image_root_path.joinpath(r'WorldView3_Oct201
 logger = get_logger(__name__)
 logger.info('Starting...')
 
-plot_agc_gdf = gpd.GeoDataFrame.from_file(sampling_plot_gt_file)
-plot_agc_gdf.index = plot_agc_gdf['ID']
-im_plot_agc_gdf_dict = {}
+sampling_plot_agc_gdf = gpd.GeoDataFrame.from_file(sampling_plot_gt_file)
+sampling_plot_agc_gdf.index = sampling_plot_agc_gdf['ID']
+
+calib_plot_gdf = gpd.GeoDataFrame.from_file(calib_plot_file)
+
+im_sampling_plot_agc_gdf_dict = {}
+im_calib_plot_gdf_dict = {}
 
 ## extract features from images into geodataframes
 for image_key, image_file in image_files_dict.items():
-    fex = img.MsImageFeatureExtractor(image_file, plot_data_gdf=plot_agc_gdf)
-    im_plot_agc_gdf = fex.extract_image_features()
+    fex = img.MsImageFeatureExtractor(image_file, plot_data_gdf=sampling_plot_agc_gdf)
+    im_sampling_plot_agc_gdf = fex.extract_image_features()
     del fex
 
-    # calculate versions of ABC and AGC normalised by actual polygon area, rather than theoretical plot sizes, and append to im_plot_agc_gdf
+    if calib_plot_file == sampling_plot_gt_file:
+        im_calib_plot_gdf = im_sampling_plot_agc_gdf
+    else:
+        fex = img.MsImageFeatureExtractor(image_file, plot_data_gdf=calib_plot_gdf)
+        im_calib_plot_gdf = fex.extract_image_features()
+        del fex
+
+    # calculate versions of ABC and AGC normalised by actual polygon area, rather than theoretical plot sizes, and append to im_sampling_plot_agc_gdf
     carbon_polynorm_dict = {}
-    for plot_id, plot in im_plot_agc_gdf['data'].iterrows():
+    for plot_id, plot in im_sampling_plot_agc_gdf['data'].iterrows():
         if 'Abc' in plot and 'LitterCHa' in plot:
             litter_c_ha = np.max([plot['LitterCHa'], 0.])
             abc = np.max([plot['Abc'], 0.])
@@ -64,21 +77,21 @@ for image_key, image_file in image_files_dict.items():
     carbon_polynorm_df = pd.DataFrame.from_dict(carbon_polynorm_dict, orient='index')
 
     for key in ['AbcHa2', 'AgcHa2']:
-        im_plot_agc_gdf[('data', key)] = carbon_polynorm_df[key]
+        im_sampling_plot_agc_gdf[('data', key)] = carbon_polynorm_df[key]
 
     # fix stratum labels
-    im_plot_agc_gdf.loc[im_plot_agc_gdf['data']['Stratum'] == 'Degraded', ('data', 'Stratum')] = 'Severe'
-    im_plot_agc_gdf.loc[im_plot_agc_gdf['data']['Stratum'] == 'Intact', ('data', 'Stratum')] = 'Pristine'
+    im_sampling_plot_agc_gdf.loc[im_sampling_plot_agc_gdf['data']['Stratum'] == 'Degraded', ('data', 'Stratum')] = 'Severe'
 
-    im_plot_agc_gdf_dict[image_key] = im_plot_agc_gdf
+    im_sampling_plot_agc_gdf_dict[image_key] = im_sampling_plot_agc_gdf
+    im_calib_plot_gdf_dict[image_key] = im_calib_plot_gdf
 
 ## find the best features for AGC modelling for each image
 image_feat_scores = OrderedDict()
 feats_of_interest = ['log(mean(R/pan))', 'log(mean(G/R))', 'log(mean(R/NIR))', '(mean(NDVI))', '(mean(SAVI))', 'log(mean(B/R))']
-for image_key, im_plot_agc_gdf in im_plot_agc_gdf_dict.items():
+for image_key, im_sampling_plot_agc_gdf in im_sampling_plot_agc_gdf_dict.items():
     feat_scores = OrderedDict()
-    for feat_key, feat_df in im_plot_agc_gdf['feats'][feats_of_interest].iteritems():
-        scores, predicted = fs.score_model(feat_df.to_numpy().reshape(-1, 1), im_plot_agc_gdf['data', 'AgcHa'],
+    for feat_key, feat_df in im_sampling_plot_agc_gdf['feats'][feats_of_interest].iteritems():
+        scores, predicted = fs.score_model(feat_df.to_numpy().reshape(-1, 1), im_sampling_plot_agc_gdf['data', 'AgcHa'],
                                            model=linear_model.LinearRegression(), cv=5, find_predicted=True)
         feat_scores[feat_key] = {'-RMSE': scores['test_-RMSE'].mean(), 'R2': scores['R2_stacked']}
     image_feat_scores[image_key] = feat_scores
@@ -88,17 +101,18 @@ for image_key, im_plot_agc_gdf in im_plot_agc_gdf_dict.items():
 ## find correlation of (select) features between images
 image_feat_corr = OrderedDict()
 feats_of_interest = ['log(mean(R/pan))', 'log(mean(G/R))', 'log(mean(R/NIR))', '(mean(NDVI))', '(mean(SAVI))', 'log(mean(B/R))']
-for image_i, (image_key, im_plot_agc_gdf) in enumerate(im_plot_agc_gdf_dict.items()):
+for image_i, (image_key, im_sampling_plot_agc_gdf) in enumerate(im_calib_plot_gdf_dict.items()):
     if image_key == 'WV3 Oct 2017':
-        ref_im_plot_agc_gdf = im_plot_agc_gdf
+        ref_im_sampling_plot_agc_gdf = im_sampling_plot_agc_gdf
         continue
-    r2 = np.zeros(len(im_plot_agc_gdf_dict))
+    r2 = np.zeros(len(im_sampling_plot_agc_gdf_dict))
     feat_corr = OrderedDict()
     for feat_i, feat_key in enumerate(feats_of_interest):
-        ref_feat = ref_im_plot_agc_gdf['feats'][feat_key]
-        feat = im_plot_agc_gdf['feats'][feat_key]
+        ref_feat = ref_im_sampling_plot_agc_gdf['feats'][feat_key]
+        feat = im_sampling_plot_agc_gdf['feats'][feat_key]
         (slope, intercept, r2, p, stde) = stats.linregress(ref_feat, feat)
         feat_corr[feat_key] = r2
+        # print(f'slope: {slope}, intercept: {intercept}')
         if False:
             pyplot.figure(feat_i)
             pyplot.subplot(2, 2, image_i)
@@ -112,17 +126,24 @@ logger.info('Correlation of features between WV3 Oct 2017 and...')
 logger.info('\n' + image_feat_corr_df.to_string())
 logger.info('Average correlation of features over images')
 logger.info('\n' + image_feat_corr_df.mean(axis=1).to_string())
+logger.info('Average correlation of features over images')
+logger.info('\n' + image_feat_corr_df.mean(axis=1).to_string())
 
 ## run the temporal calibration accuracy test with univariate model and log(mean(R/pan) feature
 calib_feat_keys = ['log(mean(R/pan))']
 model_data_dict = {}
-for image_key, im_plot_agc_gdf in im_plot_agc_gdf_dict.items():
-    model_data_dict[image_key]  = im_plot_agc_gdf['feats'][calib_feat_keys]
-y = im_plot_agc_gdf_dict['WV3 Oct 2017']['data']['AgcHa'] / 1000
-strata = im_plot_agc_gdf_dict['WV3 Oct 2017']['data']['Stratum']
+for image_key, im_sampling_plot_agc_gdf in im_sampling_plot_agc_gdf_dict.items():
+    model_data_dict[image_key]  = im_sampling_plot_agc_gdf['feats'][calib_feat_keys]
 
-eval_calib = calib.EvaluateCalibration(model_data_dict=model_data_dict, y=y, strata=strata,
-                                       calib_data_dict=model_data_dict, model=linear_model.LinearRegression)
+calib_data_dict = {}
+for image_key, im_calib_plot_gdf in im_calib_plot_gdf_dict.items():
+    calib_data_dict[image_key] = im_calib_plot_gdf['feats'][calib_feat_keys]
+
+y = im_sampling_plot_agc_gdf_dict['WV3 Oct 2017']['data']['AgcHa'] / 1000
+calib_strata = calib_data_dict['WV3 Oct 2017']['data']['Stratum']
+
+eval_calib = calib.EvaluateCalibration(model_data_dict=model_data_dict, y=y, calib_strata=calib_strata,
+                                       calib_data_dict=calib_data_dict, model=linear_model.LinearRegression)
 
 model_scores, calib_scores = eval_calib.test(n_bootstraps=100, n_calib_plots=8)
 # eval_calib.print_scores()

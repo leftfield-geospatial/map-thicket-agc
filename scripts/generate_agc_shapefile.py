@@ -26,8 +26,8 @@ from map_thicket_agc import get_logger
 
 logger = get_logger(__name__)
 
-corr_plot_loc_root_path = root_path.joinpath(r'data/inputs/plot_locations/corrected')
-uncorr_plot_loc_root_path = root_path.joinpath(r'data/inputs/plot_locations/uncorrected/march_2019')
+corr_plot_loc_root_path = root_path.joinpath(r'data/inputs/geospatial/plot_locations/corrected')
+uncorr_plot_loc_root_path = root_path.joinpath(r'data/inputs/geospatial/plot_locations/uncorrected/march_2019')
 
 corr_shapefile_names = [sub_item.joinpath('Point_ge.shp') for sub_item in corr_plot_loc_root_path.iterdir() if sub_item.is_dir()]   # corrected dgps locs
 uncorr_shapefile_names = [pathlib.Path(p) for p in glob.glob(str(uncorr_plot_loc_root_path.joinpath('GEF_FIELD*.shp')))]            # uncorrected locs
