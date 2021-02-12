@@ -91,6 +91,7 @@ if True:    # write out a flattened WV3 Oct 2017 geodataframe with feat vals for
     calib_plot_feats_file = root_path.joinpath(r'data/outputs/geospatial/gef_calib_feat_polygons.geojson')
     gdf = pd.concat([im_calib_plot_gdf_dict['WV3 Oct 2017']['data'], im_calib_plot_gdf_dict['WV3 Oct 2017']['feats']],
                     axis=1) # flatten for export
+    gdf = gdf.to_crs(epsg=4326)
     gdf.to_file(calib_plot_feats_file, driver='GeoJSON')
 
 ## find the best features for AGC modelling for each image

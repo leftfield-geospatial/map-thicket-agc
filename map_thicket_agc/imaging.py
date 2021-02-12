@@ -323,7 +323,8 @@ class ImageFeatureExtractor(object):
         -------
         geopandas.GeoDataFrame of features in subindex 'feats' and data in 'data'
         """
-        self._plot_data_gdf = self._plot_data_gdf.to_crs(self._image_reader.crs)   # convert plot co-ordinates to image projection
+        plot_data_gdf = self._plot_data_gdf
+        plot_data_gdf = plot_data_gdf.to_crs(self._image_reader.crs)   # convert plot co-ordinates to image projection
 
         im_plot_data_dict = dict()      # dict to store plot features etc
         im_plot_count = 0
@@ -331,7 +332,7 @@ class ImageFeatureExtractor(object):
         im_feat_dict = {}
         im_data_dict = {}
 
-        for plot_id, plot in self._plot_data_gdf.iterrows():     # loop through plot polygons
+        for plot_id, plot in plot_data_gdf.iterrows():     # loop through plot polygons
             # convert polygon to raster mask
             plot_mask, plot_transform, plot_window = raster_geometry_mask(self._image_reader, [plot['geometry']], crop=True,
                                                                           all_touched=False)
@@ -390,6 +391,7 @@ class ImageFeatureExtractor(object):
 
         # create geodataframe of results
         self.im_plot_data_gdf = gpd.GeoDataFrame.from_dict(im_plot_data_dict, orient='index')
+        self.im_plot_data_gdf = self.im_plot_data_gdf.set_crs(self._image_reader.crs)
         self.im_plot_data_gdf.columns = columns
         self.im_plot_data_gdf[('data','ID')] = self.im_plot_data_gdf.index
 
