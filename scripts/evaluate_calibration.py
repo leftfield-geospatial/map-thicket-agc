@@ -41,6 +41,8 @@ image_files_dict = {'WV3 Oct 2017': image_root_path.joinpath(r'WorldView3_Oct201
                'WV3 Aug 2017': image_root_path.joinpath(r'WorldView3_Aug2017_OrthoThinSpline_NoAtcor_PanSharpMs.tif'),
                'NGI April 2015': image_root_path.joinpath(r'Ngi_May2015_OrthoNgiDem_Xcalib_Rgbn_Mosaic.vrt')}
 
+feats_of_interest = ['log(mean(R/pan))', 'log(mean(G/R))', 'log(mean(R/NIR))', '(mean(NDVI))', '(mean(SAVI))', 'log(mean(B/R))']
+
 logger = get_logger(__name__)
 logger.info('Starting...')
 
@@ -61,8 +63,8 @@ for image_key, image_file in image_files_dict.items():
     if calib_plot_file == sampling_plot_gt_file:
         im_calib_plot_gdf = im_sampling_plot_agc_gdf
     else:
-        fex = img.MsImageFeatureExtractor(image_file, plot_data_gdf=calib_plot_gdf)
-        im_calib_plot_gdf = fex.extract_image_features()
+        fex = img.MsImageFeatureExtractor(image_file, plot_data_gdf=calib_plot_gdf, store_thumbnail=False)
+        im_calib_plot_gdf = fex.extract_image_features(feat_keys=feats_of_interest)     # limit the features to save time
         del fex
 
     # calculate versions of ABC and AGC normalised by actual polygon area, rather than theoretical plot sizes, and append to im_sampling_plot_agc_gdf
@@ -85,9 +87,14 @@ for image_key, image_file in image_files_dict.items():
     im_sampling_plot_agc_gdf_dict[image_key] = im_sampling_plot_agc_gdf
     im_calib_plot_gdf_dict[image_key] = im_calib_plot_gdf
 
+if True:    # write out a flattened WV3 Oct 2017 geodataframe with feat vals for use in GEE
+    calib_plot_feats_file = root_path.joinpath(r'data/outputs/geospatial/gef_calib_feat_polygons.geojson')
+    gdf = pd.concat([im_calib_plot_gdf_dict['WV3 Oct 2017']['data'], im_calib_plot_gdf_dict['WV3 Oct 2017']['feats']],
+                    axis=1) # flatten for export
+    gdf.to_file(calib_plot_feats_file, driver='GeoJSON')
+
 ## find the best features for AGC modelling for each image
 image_feat_scores = OrderedDict()
-feats_of_interest = ['log(mean(R/pan))', 'log(mean(G/R))', 'log(mean(R/NIR))', '(mean(NDVI))', '(mean(SAVI))', 'log(mean(B/R))']
 for image_key, im_sampling_plot_agc_gdf in im_sampling_plot_agc_gdf_dict.items():
     feat_scores = OrderedDict()
     for feat_key, feat_df in im_sampling_plot_agc_gdf['feats'][feats_of_interest].iteritems():

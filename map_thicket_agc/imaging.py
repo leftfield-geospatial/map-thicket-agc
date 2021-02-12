@@ -295,7 +295,7 @@ class MsPatchFeatureExtractor(PatchFeatureExtractor):
 
 class ImageFeatureExtractor(object):
     # Note: this could be a function rather than a class but have made it a class in line with PatchFeatureExtractor etc above
-    def __init__(self, image_filename=None, plot_data_gdf=gpd.GeoDataFrame()):
+    def __init__(self, image_filename=None, plot_data_gdf=gpd.GeoDataFrame(), store_thumbnail=True):
         """
         Virtual base class to extract features from patches (e.g. ground truth plots) in an image
 
@@ -310,11 +310,12 @@ class ImageFeatureExtractor(object):
         self._image_reader = rasterio.open(image_filename, 'r')
         self._plot_data_gdf = plot_data_gdf
         self._patch_feature_extractor = None     # not implemented, to be specified in derived class constructor
+        self._store_thumbnail = store_thumbnail
 
     def __del__(self):
         self._image_reader.close()
 
-    def extract_image_features(self):
+    def extract_image_features(self, feat_keys=None):
         """
         Extract features from plot polygons specified by plot_data_gdf in image
 
@@ -351,19 +352,21 @@ class ImageFeatureExtractor(object):
 
             plot_mask = plot_mask & np.all(im_buf > 0, axis=0) & np.all(~np.isnan(im_buf), axis=0)  # exclude any nan or -ve pixels
 
+            im_feat_dict = self._patch_feature_extractor.extract_features(im_buf, mask=plot_mask, fn_keys=feat_keys)  # extract image features for this plot
+
             # create plot thumbnail for visualisation in numpy format
-            thumbnail = np.float32(np.moveaxis(im_buf, 0, 2))
-            thumbnail[~plot_mask] = 0.
+            if self._store_thumbnail:
+                thumbnail = np.float32(np.moveaxis(im_buf, 0, 2))
+                thumbnail[~plot_mask] = 0.
+                im_data_dict = {**im_feat_dict, **plot, 'thumbnail': thumbnail}  # combine features and other plot data
 
-            im_feat_dict = self._patch_feature_extractor.extract_features(im_buf, mask=plot_mask)  # extract image features for this plot
-
-            im_data_dict = {**im_feat_dict, **plot, 'thumbnail': thumbnail}  # combine features and other plot data
+                # calc max thumbnail vals for scaling later
+                max_val = np.percentile(thumbnail, 98., axis=(0, 1))
+                max_thumbnail_vals[max_val > max_thumbnail_vals] = max_val[max_val > max_thumbnail_vals]
+            else:
+                im_data_dict = {**im_feat_dict, **plot}                             # combine features and other plot data
 
             im_plot_data_dict[plot_id] = im_data_dict       # add to dict of all plots
-
-            # calc max thumbnail vals for scaling later
-            max_val = np.percentile(thumbnail, 98., axis=(0,1))
-            max_thumbnail_vals[max_val > max_thumbnail_vals] = max_val[max_val > max_thumbnail_vals]
             im_plot_count += 1
 
             log_dict = {'ABC': 'Abc' in plot, 'Num zero pixels': (im_buf == 0).sum(), 'Num -ve pixels': (im_buf < 0).sum(),
@@ -373,12 +376,13 @@ class ImageFeatureExtractor(object):
         logger.info('Processed {0} plots'.format(im_plot_count))
 
         # scale thumbnails for display
-        for im_data_dict in im_plot_data_dict.values():
-            thumbnail = im_data_dict['thumbnail']
-            for b in range(0, self._image_reader.count):
-                thumbnail[:, :, b] /= max_thumbnail_vals[b]
-                thumbnail[:, :, b][thumbnail[:, :, b] > 1.] = 1.
-            im_data_dict['thumbnail'] = thumbnail
+        if self._store_thumbnail:
+            for im_data_dict in im_plot_data_dict.values():
+                thumbnail = im_data_dict['thumbnail']
+                for b in range(0, self._image_reader.count):
+                    thumbnail[:, :, b] /= max_thumbnail_vals[b]
+                    thumbnail[:, :, b][thumbnail[:, :, b] > 1.] = 1.
+                im_data_dict['thumbnail'] = thumbnail
 
         # create MultiIndex column labels that separate features from other data
         data_labels = ['feats']*len(im_feat_dict) + ['data']*(len(im_data_dict) - len(im_feat_dict))
@@ -393,7 +397,7 @@ class ImageFeatureExtractor(object):
 
 
 class MsImageFeatureExtractor(ImageFeatureExtractor):
-    def __init__(self, image_filename=None, plot_data_gdf=gpd.GeoDataFrame()):
+    def __init__(self, image_filename=None, plot_data_gdf=gpd.GeoDataFrame(), store_thumbnail=True):
         """
         Class to extract multi-spectral features from patches (e.g. ground truth plots) in an image
 
@@ -404,7 +408,7 @@ class MsImageFeatureExtractor(ImageFeatureExtractor):
         plot_data_gdf : geopandas.GeoDataFrame
             plot polygons with optional ground truth and index of plot ID strings
         """
-        ImageFeatureExtractor.__init__(self, image_filename=image_filename, plot_data_gdf=plot_data_gdf)
+        ImageFeatureExtractor.__init__(self, image_filename=image_filename, plot_data_gdf=plot_data_gdf, store_thumbnail=store_thumbnail)
         self._patch_feature_extractor = MsPatchFeatureExtractor(num_bands=self._image_reader.count)
 
 
