@@ -87,10 +87,15 @@ for image_key, image_file in image_files_dict.items():
     im_sampling_plot_agc_gdf_dict[image_key] = im_sampling_plot_agc_gdf
     im_calib_plot_gdf_dict[image_key] = im_calib_plot_gdf
 
-if True:    # write out a flattened WV3 Oct 2017 geodataframe with feat vals for use in GEE
-    calib_plot_feats_file = root_path.joinpath(r'data/outputs/geospatial/gef_calib_feat_polygons.geojson')
+if True:    # write out a flattened WV3 Oct 2017 geodataframe with feat and AGC vals for use in GEE
+    import joblib
+    calib_plot_feats_file = root_path.joinpath(r'data/outputs/geospatial/gef_calib_plots.geojson')
     gdf = pd.concat([im_calib_plot_gdf_dict['WV3 Oct 2017']['data'], im_calib_plot_gdf_dict['WV3 Oct 2017']['feats']],
                     axis=1) # flatten for export
+    model_filename = root_path.joinpath(r'data/outputs/Models/best_univariate_model_py38_cv5v2.joblib')
+    model, model_feat_keys, model_scores = joblib.load(model_filename)
+    gdf['AGC'] = model.predict(gdf[model_feat_keys])
+
     gdf = gdf.to_crs(epsg=4326)
     gdf.to_file(calib_plot_feats_file, driver='GeoJSON')
 
