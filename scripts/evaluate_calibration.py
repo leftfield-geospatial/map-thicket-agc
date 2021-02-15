@@ -33,7 +33,7 @@ from scripts import root_path
 
 image_root_path = root_path.joinpath(r'data/inputs/imagery')
 sampling_plot_gt_file = root_path.joinpath(r'data/outputs/geospatial/gef_plot_polygons_with_agc_v2.shp')
-calib_plot_file = root_path.joinpath(r'data/inputs/geospatial/gef_calib_polygons.shp')
+calib_plot_file = root_path.joinpath(r'data/inputs/geospatial/gef_calib_plots.shp')
 # calib_plot_file = sampling_plot_gt_file
 
 image_files_dict = {'WV3 Oct 2017': image_root_path.joinpath(r'WorldView3_Oct2017_OrthoNgiDem_AtcorSrtmAdjCorr_PanAndPandSharpMs.tif'),
