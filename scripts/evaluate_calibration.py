@@ -30,11 +30,12 @@ from map_thicket_agc import calibration as calib
 from map_thicket_agc import visualisation as vis
 from map_thicket_agc import get_logger
 from scripts import root_path
+import joblib
 
 image_root_path = root_path.joinpath(r'data/inputs/imagery')
 sampling_plot_gt_file = root_path.joinpath(r'data/outputs/geospatial/gef_plot_polygons_with_agc_v2.shp')
 calib_plot_file = root_path.joinpath(r'data/inputs/geospatial/gef_calib_plots.shp')
-# calib_plot_file = sampling_plot_gt_file
+calib_plot_out_file = root_path.joinpath(r'data/outputs/geospatial/gef_calib_plots_with_agc.geojson')
 
 image_files_dict = {'WV3 Oct 2017': image_root_path.joinpath(r'WorldView3_Oct2017_OrthoNgiDem_AtcorSrtmAdjCorr_PanAndPandSharpMs.tif'),
                'WV3 Nov 2018': image_root_path.joinpath(r'WorldView3_Nov2018_OrthoThinSpline_NoAtcor_PanSharpMs.tif'),
@@ -57,7 +58,7 @@ im_calib_plot_gdf_dict = {}
 ## extract features from images into geodataframes
 for image_key, image_file in image_files_dict.items():
     fex = img.MsImageFeatureExtractor(image_file, plot_data_gdf=sampling_plot_agc_gdf)
-    im_sampling_plot_agc_gdf = fex.extract_image_features()
+    im_sampling_plot_agc_gdf = fex.extract_image_features(feat_keys=feats_of_interest)
     del fex
 
     if calib_plot_file == sampling_plot_gt_file:
@@ -87,17 +88,14 @@ for image_key, image_file in image_files_dict.items():
     im_sampling_plot_agc_gdf_dict[image_key] = im_sampling_plot_agc_gdf
     im_calib_plot_gdf_dict[image_key] = im_calib_plot_gdf
 
-if True:    # write out a flattened WV3 Oct 2017 geodataframe with feat and AGC vals for use in GEE
-    import joblib
-    calib_plot_feats_file = root_path.joinpath(r'data/outputs/geospatial/gef_calib_plots.geojson')
+if True:    # write out a flattened calib and test WV3 Oct 2017 geodataframes with feat and AGC vals for use in GEE
     gdf = pd.concat([im_calib_plot_gdf_dict['WV3 Oct 2017']['data'], im_calib_plot_gdf_dict['WV3 Oct 2017']['feats']],
                     axis=1) # flatten for export
     model_filename = root_path.joinpath(r'data/outputs/Models/best_univariate_model_py38_cv5v2.joblib')
     model, model_feat_keys, model_scores = joblib.load(model_filename)
-    gdf['AGC'] = model.predict(gdf[model_feat_keys])
-
+    gdf['AgcHa'] = model.predict(gdf[model_feat_keys])      # model est val, not the allometric val
     gdf = gdf.to_crs(epsg=4326)
-    gdf.to_file(calib_plot_feats_file, driver='GeoJSON')
+    gdf.to_file(calib_plot_out_file, driver='GeoJSON')
 
 ## find the best features for AGC modelling for each image
 image_feat_scores = OrderedDict()
@@ -158,7 +156,7 @@ calib_strata = im_calib_plot_gdf_dict['WV3 Oct 2017']['data']['Stratum']
 eval_calib = calib.EvaluateCalibration(model_data_dict=model_data_dict, y=y, calib_strata=calib_strata,
                                        calib_data_dict=calib_data_dict, model=linear_model.LinearRegression)
 
-model_scores, calib_scores = eval_calib.test(n_bootstraps=100, n_calib_plots=8)
+model_scores, calib_scores = eval_calib.test(n_bootstraps=100, n_calib_plots=30)
 # eval_calib.print_scores()
 
 logger.info('Done\n')
