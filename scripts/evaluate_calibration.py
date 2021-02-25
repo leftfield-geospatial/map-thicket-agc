@@ -36,6 +36,7 @@ image_root_path = root_path.joinpath(r'data/inputs/imagery')
 sampling_plot_gt_file = root_path.joinpath(r'data/outputs/geospatial/gef_plot_polygons_with_agc_v2.shp')
 calib_plot_file = root_path.joinpath(r'data/inputs/geospatial/gef_calib_plots.shp')
 calib_plot_out_file = root_path.joinpath(r'data/outputs/geospatial/gef_calib_plots_with_agc.geojson')
+calib_plot_out_file_translated = root_path.joinpath(r'data/outputs/geospatial/gef_calib_plots_with_agc_translated.geojson')
 
 image_files_dict = {'WV3 Oct 2017': image_root_path.joinpath(r'WorldView3_Oct2017_OrthoNgiDem_AtcorSrtmAdjCorr_PanAndPandSharpMs.tif'),
                'WV3 Nov 2018': image_root_path.joinpath(r'WorldView3_Nov2018_OrthoThinSpline_NoAtcor_PanSharpMs.tif'),
@@ -94,8 +95,13 @@ if True:    # write out a flattened calib and test WV3 Oct 2017 geodataframes wi
     model_filename = root_path.joinpath(r'data/outputs/Models/best_univariate_model_py38_cv5v2.joblib')
     model, model_feat_keys, model_scores = joblib.load(model_filename)
     gdf['AgcHa'] = model.predict(gdf[model_feat_keys])      # model est val, not the allometric val
+    gdf_translate = gdf.copy(True)
     gdf = gdf.to_crs(epsg=4326)
     gdf.to_file(calib_plot_out_file, driver='GeoJSON')
+
+    gdf_translate['geometry'] = gdf_translate['geometry'].translate(xoff=10, yoff=40)
+    gdf_translate = gdf_translate.to_crs(epsg=4326)
+    gdf_translate.to_file(calib_plot_out_file_translated, driver='GeoJSON')
 
 ## find the best features for AGC modelling for each image
 image_feat_scores = OrderedDict()
