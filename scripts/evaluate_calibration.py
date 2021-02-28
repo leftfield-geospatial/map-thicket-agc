@@ -34,9 +34,8 @@ import joblib
 
 image_root_path = root_path.joinpath(r'data/inputs/imagery')
 sampling_plot_gt_file = root_path.joinpath(r'data/outputs/geospatial/gef_plot_polygons_with_agc_v2.shp')
-calib_plot_file = root_path.joinpath(r'data/inputs/geospatial/gef_calib_plots.shp')
-calib_plot_out_file = root_path.joinpath(r'data/outputs/geospatial/gef_calib_plots_with_agc.geojson')
-calib_plot_out_file_translated = root_path.joinpath(r'data/outputs/geospatial/gef_calib_plots_with_agc_translated.geojson')
+calib_plot_file = sampling_plot_gt_file     # sampling plots were used as calib plots used for the final report
+# calib_plot_file = root_path.joinpath(r'data/inputs/geospatial/gef_calib_plots.shp')   # a set of calib plots separate from sampling plots
 
 image_files_dict = {'WV3 Oct 2017': image_root_path.joinpath(r'WorldView3_Oct2017_OrthoNgiDem_AtcorSrtmAdjCorr_PanAndPandSharpMs.tif'),
                'WV3 Nov 2018': image_root_path.joinpath(r'WorldView3_Nov2018_OrthoThinSpline_NoAtcor_PanSharpMs.tif'),
@@ -56,18 +55,18 @@ calib_plot_gdf = gpd.GeoDataFrame.from_file(calib_plot_file)
 im_sampling_plot_agc_gdf_dict = {}
 im_calib_plot_gdf_dict = {}
 
-## extract features from images into geodataframes
+## extract sampling and calibration features from images into geodataframes
 for image_key, image_file in image_files_dict.items():
-    fex = img.MsImageFeatureExtractor(image_file, plot_data_gdf=sampling_plot_agc_gdf)
-    im_sampling_plot_agc_gdf = fex.extract_image_features(feat_keys=feats_of_interest)
-    del fex
+    sampling_fex = img.MsImageFeatureExtractor(image_file, plot_data_gdf=sampling_plot_agc_gdf, store_thumbnail=False)
+    im_sampling_plot_agc_gdf = sampling_fex.extract_image_features(feat_keys=feats_of_interest) # limit the features to save time
+    del sampling_fex
 
     if calib_plot_file == sampling_plot_gt_file:
         im_calib_plot_gdf = im_sampling_plot_agc_gdf
     else:
-        fex = img.MsImageFeatureExtractor(image_file, plot_data_gdf=calib_plot_gdf, store_thumbnail=False)
-        im_calib_plot_gdf = fex.extract_image_features(feat_keys=feats_of_interest)     # limit the features to save time
-        del fex
+        calib_fex = img.MsImageFeatureExtractor(image_file, plot_data_gdf=calib_plot_gdf, store_thumbnail=False)    #
+        im_calib_plot_gdf = calib_fex.extract_image_features(feat_keys=feats_of_interest)     # limit the features to save time
+        del calib_fex
 
     # calculate versions of ABC and AGC normalised by actual polygon area, rather than theoretical plot sizes, and append to im_sampling_plot_agc_gdf
     carbon_polynorm_dict = {}
@@ -89,19 +88,6 @@ for image_key, image_file in image_files_dict.items():
     im_sampling_plot_agc_gdf_dict[image_key] = im_sampling_plot_agc_gdf
     im_calib_plot_gdf_dict[image_key] = im_calib_plot_gdf
 
-if True:    # write out a flattened calib and test WV3 Oct 2017 geodataframes with feat and AGC vals for use in GEE
-    gdf = pd.concat([im_calib_plot_gdf_dict['WV3 Oct 2017']['data'], im_calib_plot_gdf_dict['WV3 Oct 2017']['feats']],
-                    axis=1) # flatten for export
-    model_filename = root_path.joinpath(r'data/outputs/Models/best_univariate_model_py38_cv5v2.joblib')
-    model, model_feat_keys, model_scores = joblib.load(model_filename)
-    gdf['AgcHa'] = model.predict(gdf[model_feat_keys])      # model est val, not the allometric val
-    gdf_translate = gdf.copy(True)
-    gdf = gdf.to_crs(epsg=4326)
-    gdf.to_file(calib_plot_out_file, driver='GeoJSON')
-
-    gdf_translate['geometry'] = gdf_translate['geometry'].translate(xoff=10, yoff=40)
-    gdf_translate = gdf_translate.to_crs(epsg=4326)
-    gdf_translate.to_file(calib_plot_out_file_translated, driver='GeoJSON')
 
 ## find the best features for AGC modelling for each image
 image_feat_scores = OrderedDict()
@@ -118,15 +104,15 @@ for image_key, im_sampling_plot_agc_gdf in im_sampling_plot_agc_gdf_dict.items()
 ## find correlation of (select) features between images
 image_feat_corr = OrderedDict()
 feats_of_interest = ['log(mean(R/pan))', 'log(mean(G/R))', 'log(mean(R/NIR))', '(mean(NDVI))', '(mean(SAVI))', 'log(mean(B/R))']
-for image_i, (image_key, im_sampling_plot_agc_gdf) in enumerate(im_calib_plot_gdf_dict.items()):
+for image_i, (image_key, im_calib_plot_gdf) in enumerate(im_calib_plot_gdf_dict.items()):
     if image_key == 'WV3 Oct 2017':
-        ref_im_sampling_plot_agc_gdf = im_sampling_plot_agc_gdf
+        ref_im_sampling_plot_agc_gdf = im_calib_plot_gdf
         continue
     r2 = np.zeros(len(im_sampling_plot_agc_gdf_dict))
     feat_corr = OrderedDict()
     for feat_i, feat_key in enumerate(feats_of_interest):
         ref_feat = ref_im_sampling_plot_agc_gdf['feats'][feat_key]
-        feat = im_sampling_plot_agc_gdf['feats'][feat_key]
+        feat = im_calib_plot_gdf['feats'][feat_key]
         (slope, intercept, r2, p, stde) = stats.linregress(ref_feat, feat)
         feat_corr[feat_key] = r2
         # print(f'slope: {slope}, intercept: {intercept}')
@@ -162,7 +148,7 @@ calib_strata = im_calib_plot_gdf_dict['WV3 Oct 2017']['data']['Stratum']
 eval_calib = calib.EvaluateCalibration(model_data_dict=model_data_dict, y=y, calib_strata=calib_strata,
                                        calib_data_dict=calib_data_dict, model=linear_model.LinearRegression)
 
-model_scores, calib_scores = eval_calib.test(n_bootstraps=100, n_calib_plots=30)
+model_scores, calib_scores = eval_calib.test(n_bootstraps=100, n_calib_plots=9)
 # eval_calib.print_scores()
 
 logger.info('Done\n')

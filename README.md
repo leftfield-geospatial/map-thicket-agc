@@ -39,8 +39,8 @@ Allometric and plot location data for generating AGC ground truth are included i
 Path | Description
 ---|---
 [data/inputs/allometry](data/inputs/allometry) | Woody and litter allometric measurements from 90 sampling plots in the Baviaanskloof, South Africa, and [allometric models](https://www.researchgate.net/publication/335531470_Aboveground_biomass_and_carbon_pool_estimates_of_Portulacaria_afra_spekboom-rich_subtropical_thicket_with_species-specific_allometric_models) for common thicket species.  
-[data/inputs/geospatial/plot_locations/corrected](data/inputs/geospatial/plot_locations/corrected) | Polygons of sampling plot boundaries with differential correction to < 30cm accuracy.      
-[data/inputs/geospatial/plot_locations/uncorrected](data/inputs/geospatial/plot_locations/uncorrected) | Reference and sampling plot corner points with no differential correction.      
+[data/inputs/geospatial/sampling_plot_locations/corrected](data/inputs/geospatial/sampling_plot_locations/corrected) | Polygons of sampling plot boundaries with differential correction to < 30cm accuracy.      
+[data/inputs/geospatial/sampling_plot_locations/uncorrected](data/inputs/geospatial/sampling_plot_locations/uncorrected) | Reference and sampling plot corner points with no differential correction.      
 data/inputs/imagery | Satellite and aerial imagery (see [Installation](#installation)). 
 
 ### Generating Results
@@ -57,6 +57,7 @@ Script | Description
 [scripts/fit_agc_model.py](scripts/fit_agc_model.py) | Extracts features from the satellite image, selects a set of informative features, and fits and evaluates models for predicting AGC from these features  
 [scripts/generate_agc_map.py](scripts/generate_agc_map.py) | Applies fitted model(s) to the satellite image to generate a coarse resolution AGC map
 [scripts/evaluate_calibration.py](scripts/evaluate_calibration.py) | Evaluates a method for calibrating AGC models to new images (using an additional two satellite images and a mosaic of aerial imagery)
+[scripts/generate_extend_ground_truth.py](scripts/generate_extend_ground_truth.py) | Generates AGC and feature ground truth for [extending the model spatially](https://github.com/dugalh/extend_thicket_agc)  
 
 ## Summary of Results
 See the [full report](docs/gef5_slm_final_report_new_c_methodology_dec2019.pdf) for more detail.

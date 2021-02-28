@@ -23,5 +23,6 @@ from scripts import generate_agc_shapefile
 from scripts import fit_agc_model
 from scripts import generate_agc_map
 from scripts import evaluate_calibration
+from scripts import generate_extend_ground_truth
 if __name__ =='__main__':
     input('Press ENTER to continue...')
