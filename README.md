@@ -96,7 +96,7 @@ A method for calibrating AGC models to new images gave encouraging results.  Tes
 
 ## Citation
 For use of the code or output data, please cite: 
-- Harris, D., Bolus, C., Reeler, J. 2019. *Development of a method for remote sensing of aboveground carbon in subtropical thicket*, GEF-5 SLM, Rhodes University. Internal report. [https://www.doi.org/10.13140/RG.2.2.35106.96961](https://www.doi.org/10.13140/RG.2.2.35106.96961)
+- Harris, D., Bolus, C., Reeler, J. 2019. *Development of a method for remote sensing of aboveground carbon in subtropical thicket*, GEF-5 SLM, Rhodes University. Internal report. [https://www.doi.org/10.13140/RG.2.2.35106.96961/1](https://www.doi.org/10.13140/RG.2.2.35106.96961/1)
 
 For use of the input allometric or plot location data, please cite: 
 - Bolus,  C., Harris, D., Reeler,  J., Powell, M.,  Powell, R., Ngwenya, M. 2020. *Above Ground Carbon (AGC) baseline assessment, using species specific allometric models, across  three  degradation  classes  in  Baviaanskloof Spekboom Thicket*, GEF-5  SLM,  Rhodes University. Internal report.
