@@ -71,33 +71,33 @@ def fcr(feat_df, y, max_num_feats=None, dist_fn='dcor', score_fn='dcor'):
     sc_feat_df = scaler.fit_transform(feat_df)
     sc_y = scaler.fit_transform(y.to_numpy().reshape(-1, 1))
     # corrc = -1*np.abs(np.corrcoef(sc_feat_df.T)).T
-    corrc = -dcor.distances.pairwise_distances(sc_feat_df.T)
-    pref = np.median(corrc)
-    ap = AffinityPropagation(random_state=0, max_iter=10000, preference=pref, damping=.5, affinity='precomputed').fit(corrc)
+    d = -dcor.distances.pairwise_distances(sc_feat_df.T)
+    pref = np.median(d)
+    ap = AffinityPropagation(random_state=1, max_iter=10000, preference=pref, damping=.5, affinity='precomputed').fit(d)
 
     logger.info(f'Exemplars ({len(ap.cluster_centers_indices_)}): {feat_df.columns[ap.cluster_centers_indices_]}\n')
     logger.info('Clusters: ')
     selected_feats = []
-    selected_feat_scores = []
+    cluster_scores = []
     for label in np.unique(ap.labels_):
         logger.info(f'Cluster {label}:')
         label_idx = np.nonzero(ap.labels_ == label)[0]      # indices features in this cluster
 
-        # rank features in this cluster by distamce to y
+        # rank features in this cluster by their distance to y
         dy = dcor.rowwise(dcor.distance_covariance_sqr, sc_feat_df[:, label_idx].T, sc_y.T,
                           compile_mode=dcor.CompileMode.COMPILE_PARALLEL)
         rank_label_idx = label_idx[np.argsort(-dy)]
         logger.info(f'{feat_df.columns[rank_label_idx]}\n')
 
         selected_feats.append(rank_label_idx[0])
-        selected_feat_scores.append(dy.min())
+        cluster_scores.append(np.max(dy))
 
-    rank_feat_idx = np.argsort(-np.array(selected_feat_scores))
+    rank_feat_idx = np.argsort(-np.array(cluster_scores))
     selected_feats = np.array(selected_feats)[rank_feat_idx]
-    selected_feat_scores = np.array(selected_feat_scores)[rank_feat_idx]
+    cluster_scores = np.array(cluster_scores)[rank_feat_idx]
     logger.info(f'Selected features (ranked): {feat_df.columns[selected_feats]}:')
 
-    return feat_df.iloc[:, selected_feats[:max_num_feats]], selected_feat_scores[:max_num_feats]
+    return feat_df.iloc[:, selected_feats[:max_num_feats]], cluster_scores[:max_num_feats]
 
 def forward_selection(feat_df, y, max_num_feats=0, model=linear_model.LinearRegression(),
                       score_fn=None, cv=None):
