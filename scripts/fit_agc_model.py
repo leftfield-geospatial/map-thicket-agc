@@ -17,7 +17,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 ##
-from scripts import root_path
+from map_thicket_agc import root_path
 import numpy as np
 import geopandas as gpd, pandas as pd
 from sklearn import linear_model
@@ -110,8 +110,6 @@ pyplot.ylabel('RMSE (t C ha$^{-1}$)')
 pyplot.tight_layout()
 pyplot.pause(.2)
 pyplot.savefig(root_path.joinpath(r'data/outputs/plots/agc_acc_vs_num_feats1b_py38_cv5.png'), dpi=300)
-
-from matplotlib.font_manager import FontProperties
 
 fig, ax1 = pyplot.subplots()
 fig.set_size_inches(10, 4, forward=True)

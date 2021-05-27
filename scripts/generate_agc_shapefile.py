@@ -18,7 +18,7 @@
 """
 
 ##
-from scripts import root_path
+from map_thicket_agc import root_path
 import numpy as np
 import geopandas as gpd, pandas as pd
 import pathlib, glob

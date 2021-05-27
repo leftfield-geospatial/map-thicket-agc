@@ -17,7 +17,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 ##
-from scripts import root_path
+from map_thicket_agc import root_path
 from map_thicket_agc import imaging as img
 import joblib
 import time

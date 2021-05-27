@@ -18,9 +18,18 @@
 """
 
 import logging
+import os
+import pathlib
+
+if '__file__' in globals():
+    root_path = pathlib.Path(__file__).absolute().parents[1]
+else:
+    root_path = pathlib.Path(os.getcwd())
+
 logging.basicConfig(format='%(levelname)s %(name)s: %(message)s')
 
+
 def get_logger(name):
-	logger = logging.getLogger(name)
-	logger.setLevel(logging.DEBUG)
-	return logger
+    logger = logging.getLogger(name)
+    logger.setLevel(logging.DEBUG)
+    return logger

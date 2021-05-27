@@ -12,7 +12,7 @@ Using the `conda` package manager, for resolving binary dependencies is the reco
 ```shell
 conda create -n <environment name> python=3.8 -c conda-forge 
 conda activate <environment name> 
-conda install -c conda-forge matplotlib numpy scipy scikit-learn openpyxl rasterio geopandas 
+conda install -c conda-forge matplotlib numpy scipy scikit-learn openpyxl rasterio geopandas dcor
 ```
 2) Clone the git repository and link into the conda environment:
 ```shell
@@ -32,6 +32,7 @@ The following dependencies are installed in the process above.  The `geopandas` 
   - scikit-learn >= 0.23
   - matplotlib >= 3.3
   - openpyxl >= 3.0
+  - dcor >= 0.5
 
 ### Data
 Allometric and plot location data for generating AGC ground truth are included in the repository (refer to the [carbon baselines report](docs/gef5_slm_final_report_c_baselines_may2020.pdf) for detail on how this data was gathered).  Satellite and aerial imagery is too large for `git` and can be downloaded separately.

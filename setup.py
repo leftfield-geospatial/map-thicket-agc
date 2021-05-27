@@ -17,7 +17,6 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 from setuptools import setup, find_packages
-import glob
 
 # To install local development version use:
 #    pip install -e .
@@ -39,7 +38,8 @@ setup(
         'openpyxl>=3.0',
         'geopandas>=0.8',
         'rasterio>=1.1',
-        'scikit-learn>=0.23'
+        'scikit-learn>=0.23',
+        'dcor>=0.5'
     ],
     # scripts=glob.glob('scripts/*.py'),
     # data_files=[('map_thicket_agc_data', glob.glob('data/inputs/**/*.*', recursive=True))],

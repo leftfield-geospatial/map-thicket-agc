@@ -23,6 +23,8 @@ requirements:
     - scikit-learn >=0.23
     - matplotlib >=3.3
     - openpyxl >=3.0
+    - dcor >=0.5
+
 
 build:
   number: 0
