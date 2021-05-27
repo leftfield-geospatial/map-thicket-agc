@@ -12,7 +12,7 @@ Using the `conda` package manager, for resolving binary dependencies is the reco
 ```shell
 conda create -n <environment name> python=3.8 -c conda-forge 
 conda activate <environment name> 
-conda install -c conda-forge matplotlib numpy scipy scikit-learn openpyxl rasterio geopandas 
+conda install -c conda-forge matplotlib numpy scipy scikit-learn openpyxl rasterio geopandas dcor
 ```
 2) Clone the git repository and link into the conda environment:
 ```shell
@@ -32,6 +32,7 @@ The following dependencies are installed in the process above.  The `geopandas` 
   - scikit-learn >= 0.23
   - matplotlib >= 3.3
   - openpyxl >= 3.0
+  - dcor >= 0.5
 
 ### Data
 Allometric and plot location data for generating AGC ground truth are included in the repository (refer to the [carbon baselines report](docs/gef5_slm_final_report_c_baselines_may2020.pdf) for detail on how this data was gathered).  Satellite and aerial imagery is too large for `git` and can be downloaded separately.
@@ -77,7 +78,7 @@ Regression models were fitted to an informative subsets of image features.
 ### Mapping
 Application of the AGC model to the WorldView-3 image.
 
-<img src="data/outputs/plots/study_area_map_univariate_agc.png" data-canonical-src="data/outputs/plots/study_area_map_univariate_agc.png" alt="Study area map with ground truth plots" width="800"/>
+<img src="data/outputs/plots/study_area_map_univariate_agc.png" data-canonical-src="data/outputs/plots/study_area_map_univariate_agc.png" alt="Application of the AGC model" width="800"/>
 
 ### Temporal Calibration
 A method for calibrating AGC models to new images gave encouraging results.  Tests were conducted on the original WorldView-3 image ("WV3 Aug 2017"), two additional WorldView-3 images("WV3 Oct 2017" and "WV3 Nov 2018"), and a mosaic of aerial imagery ("NGI April 2015").  The table shows *R*<sup>2</sup> between actual and predicted AGC for calibrated models.  Calibration images are along the columns and model fit images down the rows.

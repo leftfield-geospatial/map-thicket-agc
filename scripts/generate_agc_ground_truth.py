@@ -17,7 +17,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 ##
-from scripts import root_path
+from map_thicket_agc import root_path
 from builtins import zip
 from matplotlib import pyplot
 import numpy as np

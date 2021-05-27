@@ -22,7 +22,7 @@ import geopandas as gpd, pandas as pd
 import numpy as np
 from map_thicket_agc import imaging as img
 from map_thicket_agc import get_logger
-from scripts import root_path
+from map_thicket_agc import root_path
 import joblib
 
 image_root_path = root_path.joinpath(r'data/inputs/imagery')

@@ -29,7 +29,7 @@ from map_thicket_agc import feature_selection as fs
 from map_thicket_agc import calibration as calib
 from map_thicket_agc import visualisation as vis
 from map_thicket_agc import get_logger
-from scripts import root_path
+from map_thicket_agc import root_path
 import joblib
 
 image_root_path = root_path.joinpath(r'data/inputs/imagery')
