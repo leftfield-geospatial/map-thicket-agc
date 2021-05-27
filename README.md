@@ -77,7 +77,7 @@ Regression models were fitted to an informative subsets of image features.
 ### Mapping
 Application of the AGC model to the WorldView-3 image.
 
-<img src="data/outputs/plots/study_area_map_univariate_agc.png" data-canonical-src="data/outputs/plots/study_area_map_univariate_agc.png" alt="Study area map with ground truth plots" width="800"/>
+<img src="data/outputs/plots/study_area_map_univariate_agc.png" data-canonical-src="data/outputs/plots/study_area_map_univariate_agc.png" alt="Application of the AGC model" width="800"/>
 
 ### Temporal Calibration
 A method for calibrating AGC models to new images gave encouraging results.  Tests were conducted on the original WorldView-3 image ("WV3 Aug 2017"), two additional WorldView-3 images("WV3 Oct 2017" and "WV3 Nov 2018"), and a mosaic of aerial imagery ("NGI April 2015").  The table shows *R*<sup>2</sup> between actual and predicted AGC for calibrated models.  Calibration images are along the columns and model fit images down the rows.

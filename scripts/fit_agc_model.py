@@ -69,8 +69,8 @@ pyplot.rcParams['legend.fontsize'] = 'medium'
 pyplot.rcParams['figure.titlesize'] = 'medium'
 
 pyplot.figure()
-vis.scatter_ds(im_plot_agc_gdf, x_col=('feats', '(mean(pan/R))'), y_col=('data', 'AgcHa'), class_col=('data', 'Stratum'),
-               xfn=lambda x: np.log10(x), do_regress=True)
+vis.scatter_ds(im_plot_agc_gdf, x_col=('feats', 'log(mean(pan/R))'), y_col=('data', 'AgcHa'), class_col=('data', 'Stratum'),
+               xfn=lambda x: x, do_regress=True)
 
 ## select and analyse best features for predicting AGC with linear regression
 # TODO - experiment with cv vals in fs and eval below - has a big effect on what is selected and how it is scored.
