@@ -513,7 +513,7 @@ class AgcPlotEstimator:
         self._plot_litter_df = pd.DataFrame()
         self._read_litter(litter_file_name)
 
-        fields_to_summarise = ['yc', 'height', 'vol']
+        fields_to_summarise = ['yc', 'height', 'vol', 'area']
         for plot_id, plot in self.abc_aggregator.plot_abc_df.groupby('ID'):
             plot_sizes_un = np.unique(plot['plot_size'])
             vector_dict = {}
@@ -529,11 +529,13 @@ class AgcPlotEstimator:
                     out_v = v[~nest_record_idx]
                     sum_v = out_v.sum() + nest_v.sum() + (small_v.sum() * ((plot_sizes_un.max(initial=5.) / plot_sizes_un.min(initial=5.)) ** 2))
                     mean_v = out_v.tolist() + nest_v.tolist() + (small_v.tolist() * int((plot_sizes_un.max(initial=5.) / plot_sizes_un.min(initial=5.)) ** 2))
-                    vector_dict[field] = {'sum_v': sum_v, 'mean_v': np.array(mean_v).mean(), 'n': len(mean_v)} # out_v.size + nest_v.size + (small_v.size * (plot_sizes_un.max()/ plot_sizes_un.min()) ** 2)
+                    vector_dict[field] = {'sum_v': sum_v, 'mean_v': np.array(mean_v).mean(), 'n': len(mean_v),
+                                          'max_v': np.max(mean_v), '95%_v': np.percentile(mean_v, 95)} # out_v.size + nest_v.size + (small_v.size * (plot_sizes_un.max()/ plot_sizes_un.min()) ** 2)
             else:
                 for field in fields_to_summarise:
                     v = np.array(plot[field])
-                    vector_dict[field] = {'sum_v': v.sum(), 'mean_v':  v.mean(), 'n': v.size}
+                    vector_dict[field] = {'sum_v': v.sum(), 'mean_v':  v.mean(), 'n': v.size, 'max_v': v.max(),
+                                          '95%_v': np.percentile(v, 95)}
 
             summary_plot = OrderedDict()
             summary_plot['ID'] = plot_id
@@ -542,9 +544,16 @@ class AgcPlotEstimator:
             summary_plot['N'] = vector_dict['height']['n']
             summary_plot['Vol'] = vector_dict['vol']['sum_v']
             summary_plot['VolHa'] = (100. ** 2) * vector_dict['vol']['sum_v'] / (plot_sizes_un.max(initial=5.) ** 2)
+            summary_plot['MaxVol'] = vector_dict['vol']['max_v']
+            summary_plot['95%Vol'] = vector_dict['vol']['95%_v']
             summary_plot['Height'] = vector_dict['height']['sum_v']
             summary_plot['HeightHa'] = (100. ** 2) * vector_dict['height']['sum_v'] / (plot_sizes_un.max(initial=5.) ** 2)
             summary_plot['MeanHeight'] = vector_dict['height']['mean_v']
+            summary_plot['MaxHeight'] = vector_dict['height']['max_v']
+            summary_plot['95%Height'] = vector_dict['height']['95%_v']
+            summary_plot['MeanArea'] = vector_dict['area']['mean_v']
+            summary_plot['MaxArea'] = vector_dict['area']['max_v']
+            summary_plot['95%Area'] = vector_dict['area']['95%_v']
             summary_plot['Abc'] = vector_dict['yc']['sum_v']
             summary_plot['AbcHa'] = (100. ** 2) * vector_dict['yc']['sum_v'] / (plot_sizes_un.max(initial=5.) ** 2)
 

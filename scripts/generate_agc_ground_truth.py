@@ -16,18 +16,19 @@
     You should have received a copy of the GNU Affero General Public License
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
+from builtins import zip
+from csv import DictWriter
+
+import numpy as np
+import pandas as pd
+from matplotlib import pyplot
+from scipy.stats import gaussian_kde
+
+from map_thicket_agc import allometry as allom
+from map_thicket_agc import get_logger
 ##
 from map_thicket_agc import root_path
-from builtins import zip
-from matplotlib import pyplot
-import numpy as np
-from csv import DictWriter
-import pandas as pd
-from scipy.stats import gaussian_kde
-from map_thicket_agc import allometry as allom
 from map_thicket_agc import visualisation as vis
-from map_thicket_agc import get_logger
-
 
 logger = get_logger(__name__)
 
@@ -197,6 +198,31 @@ for (degr_class, degr_group), plotIdx in zip(nested_abc_df.groupby('degr_class')
 
 pyplot.pause(0.1)
 f.savefig(root_path.joinpath('data/outputs/plots/plant_height_contribution_to_abc_by_stratum.png'), dpi=300)
+
+## Show the AGC etc stats per stratum
+
+# drop the plots without DGPS data so it is comparable to fit_agc_model results
+plot_summary_agc_df_drop = agc_plot_est.plot_summary_agc_df.drop(['MV27', 'MV31', 'MV32', 'PV27'])
+
+per_stratum_dict = {}
+for stratum_label, stratum_df in plot_summary_agc_df_drop.groupby('Stratum'):
+    per_stratum_dict[stratum_label] = {'Mean(ABC)': stratum_df["AbcHa"].mean() / 1000.,
+                                       'Std(ABC)': stratum_df["AbcHa"].std() / 1000.,
+                                       'Mean(LitterC)': stratum_df["LitterCHa"].mean() / 1000.,
+                                       'Std(LitterC)': stratum_df["LitterCHa"].std() / 1000.,
+                                       'Mean(AGC)': stratum_df["AgcHa"].mean() / 1000.,
+                                       'Std(AGC)': stratum_df["AgcHa"].std() / 1000.}
+
+per_stratum_dict['Total'] = {'Mean(ABC)': plot_summary_agc_df_drop["AbcHa"].mean() / 1000.,
+                             'Std(ABC)': plot_summary_agc_df_drop["AbcHa"].std() / 1000.,
+                             'Mean(LitterC)': plot_summary_agc_df_drop["LitterCHa"].mean() / 1000.,
+                             'Std(LitterC)': plot_summary_agc_df_drop["LitterCHa"].std() / 1000.,
+                             'Mean(AGC)': plot_summary_agc_df_drop["AgcHa"].mean() / 1000.,
+                             'Std(AGC)': plot_summary_agc_df_drop["AgcHa"].std() / 1000.}
+
+per_stratum_df = pd.DataFrame.from_dict(per_stratum_dict).T.round(decimals=4)
+logger.info('Per stratum stats:\n' + per_stratum_df.to_string())
+# per_stratum_df.to_clipboard()
 
 logger.info('Done\n')
 if __name__ =='__main__':

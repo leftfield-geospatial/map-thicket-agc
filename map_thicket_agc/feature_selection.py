@@ -265,6 +265,7 @@ def score_model(feat_df, y, model=linear_model.LinearRegression(), score_fn=None
         logger.info('RMSE mean: {0:.4f}, std: {1:.4f}, 5-95%: {2:.4f} - {3:.4f}'.format(-scores['test_-RMSE'].mean(),
                                                                                         scores['test_-RMSE'].std(),
                                                                                         rmse_ci[0], rmse_ci[1]))
+        logger.info(f'Relative RMSE (%): {100*(-scores["test_-RMSE"].mean()/np.mean(y)):.4f}')
 
     if find_predicted:
         predicted = cross_val_predict(model, feat_df, y, cv=cv)  # )

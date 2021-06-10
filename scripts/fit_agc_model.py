@@ -128,7 +128,7 @@ ax2.set_xticks(num_feats)
 ax2.axis([num_feats[0]-1, num_feats[-1]+1, None, None])
 fig.tight_layout()  # otherwise the right y-label is slightly clipped
 ax2_lim = ax2.axis()
-ax2.plot([best_model_idx + 1, best_model_idx + 1], [ax2_lim[2], ax2_lim[3]], 'k--', label='Selected model')
+ax2.plot([best_model_idx + 1, best_model_idx + 1], [ax2_lim[2], ax2_lim[3]], 'k--', label='Selected multivariate model')
 # pyplot.text(best_model_idx + 1.5, ax2_lim[2] + (ax2_lim[3]-ax2_lim[2])/3, 'Selected multivariate model',
 #             fontdict={'size': 9, 'weight': 'normal'})
 pyplot.legend()
@@ -197,6 +197,32 @@ logger.info(np.array(best_univariate_model.intercept_))
 joblib.dump([best_univariate_model, selected_feats_df.columns[:1].to_numpy(), scores_uv], root_path.joinpath(r'data/outputs/Models/best_univariate_model_py38_cv5v2.joblib'))
 pickle.dump([best_univariate_model, selected_feats_df.columns[:1].to_numpy(), scores_uv], open(root_path.joinpath(r'data/outputs/Models/best_univariate_model_py38_cv5v2.pickle'), 'wb'))
 
+## Analyse outliers
+if True:
+    err_mv = np.abs(predicted_mv - y/1000)
+    im_plot_agc_gdf.loc[:, ('data','predicted_mv')] = predicted_mv
+    im_plot_agc_gdf.loc[:, ('data','err_mv')] = err_mv
+
+    pyplot.figure()
+    vis.scatter_ds(im_plot_agc_gdf, x_col=('data', 'AgcHa'), y_col=('data', 'predicted_mv'),
+                   xfn=lambda x: x/1000, do_regress=False, label_col=('data', 'ID'), thumbnail_col=('data', 'thumbnail'),
+                   x_label='AGC GT', y_label='AGC MV')
+
+    pyplot.figure()
+    vis.scatter_ds(im_plot_agc_gdf, x_col=('data', 'err_mv'), y_col=('data', 'MaxHeight'),
+                   xfn=lambda x: x, do_regress=True, label_col=('data', 'ID'), thumbnail_col=('data', 'thumbnail'),
+                   x_label='Err MV', y_label='Max Height')
+
+    print(err_mv.sort_values(ascending=True))
+    print((im_plot_agc_gdf[('data', 'MaxHeight')]).sort_values(ascending=False)[:20])
+    print((im_plot_agc_gdf[('data', 'MaxArea')]).sort_values(ascending=False)[:20])
+    print((im_plot_agc_gdf[('data', 'MaxVol')]).sort_values(ascending=False)[:20])
+    print(im_plot_agc_gdf[('data', 'MaxHeight')].loc['INT7'])
+    print(im_plot_agc_gdf[('data', 'MaxArea')].loc['INT7'])
+    print(im_plot_agc_gdf[('data', 'MaxVol')].loc['INT7'])
+
+
 logger.info('Done\n')
 if __name__ =='__main__':
     input('Press ENTER to continue...')
+
