@@ -123,7 +123,7 @@ def scatter_ds(data, x_col=None, y_col=None, class_col=None, label_col=None, thu
         scores, predicted = feature_selection.score_model(x.to_numpy().reshape(-1,1), y.to_numpy().reshape(-1,1), model=linear_model.LinearRegression(),
                                                         find_predicted=True, cv=len(x), print_scores=False, score_fn=None)
 
-        pyplot.text((xlim[0] + xd * 0.7), (ylim[0] + yd * 0.05), '$R^2$ = {0:.2f}'.format(np.round(scores['R2_stacked'], 2)),
+        pyplot.text((xlim[0] + xd * 0.7), (ylim[0] + yd * 0.05), '$R^2$ = {0:.2f}'.format(r ** 2),
                    fontdict={'size': 12})
         yr = np.array(xlim)*slope + intercept
         pyplot.plot(xlim, yr, 'k--', lw=2, zorder=-1)

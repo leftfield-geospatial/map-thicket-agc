@@ -61,6 +61,9 @@ for key in ['AbcHa2', 'AgcHa2']:    # append to im_plot_data_gdf
 im_plot_agc_gdf.loc[im_plot_agc_gdf['data']['Stratum'] == 'Degraded', ('data', 'Stratum')] = 'Severe'
 im_plot_agc_gdf.loc[im_plot_agc_gdf['data']['Stratum'] == 'Intact', ('data', 'Stratum')] = 'Pristine'
 
+# drop the problematic INT* plots with old SOP
+im_plot_agc_gdf = im_plot_agc_gdf.drop(['INT7', 'INT1', 'INT3'])
+
 # make an example scatter plot of feature vs AGC/ABC
 pyplot.rcParams["font.family"] = "arial"
 pyplot.rcParams["font.size"] = "12"
@@ -197,29 +200,78 @@ logger.info(np.array(best_univariate_model.intercept_))
 joblib.dump([best_univariate_model, selected_feats_df.columns[:1].to_numpy(), scores_uv], root_path.joinpath(r'data/outputs/Models/best_univariate_model_py38_cv5v2.joblib'))
 pickle.dump([best_univariate_model, selected_feats_df.columns[:1].to_numpy(), scores_uv], open(root_path.joinpath(r'data/outputs/Models/best_univariate_model_py38_cv5v2.pickle'), 'wb'))
 
-## Analyse outliers
-if True:
-    err_mv = np.abs(predicted_mv - y/1000)
+## Analyse outliers for JARS paper
+if False:
+    from sklearn.neighbors import KernelDensity
+    # add error and max tree height rank to dataframe
+    err_mv = predicted_mv - y/1000
     im_plot_agc_gdf.loc[:, ('data','predicted_mv')] = predicted_mv
-    im_plot_agc_gdf.loc[:, ('data','err_mv')] = err_mv
+    im_plot_agc_gdf.loc[:, ('data','err_mv')] = np.abs(err_mv)
 
+    arg_max_height_sort = np.argsort(-im_plot_agc_gdf[('data', 'MaxHeight')])
+    max_height_rank = np.empty_like(arg_max_height_sort)
+    max_height_rank[arg_max_height_sort] = np.arange(len(arg_max_height_sort))
+    im_plot_agc_gdf.loc[:, ('data', 'max_height_rank')] = max_height_rank
+
+    # predicted vs actual AGC with plot labels and thumbnails
     pyplot.figure()
     vis.scatter_ds(im_plot_agc_gdf, x_col=('data', 'AgcHa'), y_col=('data', 'predicted_mv'),
-                   xfn=lambda x: x/1000, do_regress=False, label_col=('data', 'ID'), thumbnail_col=('data', 'thumbnail'),
-                   x_label='AGC GT', y_label='AGC MV')
+                   xfn=lambda x: x/1000, do_regress=True, label_col=('data', 'ID'), thumbnail_col=('data', 'thumbnail'),
+                   x_label='Measured AGC', y_label='Predicted AGC (mv model)')
+    pyplot.title('Actual vs predicted AGC')
 
+    # investigate correlation between signed error and maximum height in plot
     pyplot.figure()
     vis.scatter_ds(im_plot_agc_gdf, x_col=('data', 'err_mv'), y_col=('data', 'MaxHeight'),
                    xfn=lambda x: x, do_regress=True, label_col=('data', 'ID'), thumbnail_col=('data', 'thumbnail'),
-                   x_label='Err MV', y_label='Max Height')
+                   x_label='Signed mv model error', y_label='Max. height')
+    pyplot.title('Correlation between signed error and max height')
 
-    print(err_mv.sort_values(ascending=True))
-    print((im_plot_agc_gdf[('data', 'MaxHeight')]).sort_values(ascending=False)[:20])
-    print((im_plot_agc_gdf[('data', 'MaxArea')]).sort_values(ascending=False)[:20])
-    print((im_plot_agc_gdf[('data', 'MaxVol')]).sort_values(ascending=False)[:20])
-    print(im_plot_agc_gdf[('data', 'MaxHeight')].loc['INT7'])
-    print(im_plot_agc_gdf[('data', 'MaxArea')].loc['INT7'])
-    print(im_plot_agc_gdf[('data', 'MaxVol')].loc['INT7'])
+    # investigate correlation between abs(error) and maximum height in plot
+    pyplot.figure()
+    vis.scatter_ds(im_plot_agc_gdf, x_col=('data', 'err_mv'), y_col=('data', 'MaxHeight'),
+                   xfn=lambda x: np.abs(x), do_regress=True, label_col=('data', 'ID'), thumbnail_col=('data', 'thumbnail'),
+                   x_label='Abs(mv model error)', y_label='Max. height')
+    pyplot.title('Correlation between abs error and max height')
+
+    # investigate correlation between abs(error) and actual AGC
+    pyplot.figure()
+    vis.scatter_ds(im_plot_agc_gdf, x_col=('data', 'err_mv'), y_col=('data', 'AgcHa'), xfn=lambda x: np.abs(x),
+                   yfn=lambda x: x/1000, do_regress=True, label_col=('data', 'ID'), thumbnail_col=('data', 'thumbnail'),
+                   x_label='Abs(mv model error)', y_label='Measured AGC')
+    pyplot.title('Correlation between abs error and AGC')
+
+    # investigate correlation between abs(error) and actual AGC for Intact stratum
+    im_plot_agc_gdf_intact = im_plot_agc_gdf.loc[im_plot_agc_gdf[('data','Stratum')]=='Pristine']
+    pyplot.figure()
+    vis.scatter_ds(im_plot_agc_gdf_intact, x_col=('data', 'err_mv'), y_col=('data', 'AgcHa'), xfn=lambda x: np.abs(x),
+                   yfn=lambda x: x/1000, do_regress=True, label_col=('data', 'ID'), thumbnail_col=('data', 'thumbnail'),
+                   x_label='Abs(mv model error)', y_label='Actual AGC')
+    pyplot.title('Correlation between abs error and AGC for intact stratum')
+
+    # investigate the distribution of errors
+    kde = KernelDensity(kernel='gaussian', bandwidth=1.5).fit(err_mv.to_numpy().reshape(-1,1))
+    err_plot = np.linspace(-25, 25, 1000)[:, np.newaxis]
+    err_mv_kd = kde.score_samples(err_plot)
+    pyplot.figure()
+    pyplot.plot(err_plot, np.exp(err_mv_kd))
+    pyplot.plot(err_mv, np.zeros_like(err_mv), 'kx')
+    pyplot.title('Signed error distribution')
+
+    # error stats per stratum
+    for stratum, stratum_df in im_plot_agc_gdf.groupby(by=('data', 'Stratum')):
+        mean_err = np.abs(stratum_df.loc[:, ('data', 'err_mv')]).mean()
+        std_err = np.abs(stratum_df.loc[:, ('data', 'err_mv')]).std()/np.sqrt(len(stratum_df))
+        print(f'{stratum} mean(se) error: {mean_err:.4f}({std_err:.4f})')
+
+
+    # which plots were the worst underperformers, and is there a connection with max tree height?
+    print('First 10 lowest underestimated plots:')
+    err_mv_sort = err_mv.sort_values(ascending=False)[:10]
+    print(err_mv_sort)
+
+    print('MaxHeights and corresp ranks of 10 lowest underestimated plots:')
+    print(im_plot_agc_gdf.loc[err_mv_sort.index, ('data', ['MaxHeight','max_height_rank'])])
 
 
 logger.info('Done\n')
