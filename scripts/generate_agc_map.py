@@ -30,15 +30,17 @@ logger.info('Starting...')
 image_root_path = root_path.joinpath(r'data/inputs/imagery')
 image_filename = image_root_path.joinpath('WorldView3_Oct2017_OrthoNgiDem_AtcorSrtmAdjCorr_PanAndPandSharpMs.tif')
 
-if True:
-    map_filename = root_path.joinpath(r'data/outputs/geospatial/gef5_slm_wv3_oct_2017_univariate_agc_10m_w33s33.tif')
+if False:
     model_filename = root_path.joinpath(r'data/outputs/Models/best_univariate_model_py38_cv5v2.joblib')
+    map_filename = root_path.joinpath(f'data/outputs/geospatial/gef5_slm_wv3_oct_2017_univariate_agc_10m_w33s33.{model_filename.stem}.tif')
 else:
-    map_filename = root_path.joinpath(r'data/outputs/geospatial/gef5_slm_wv3_oct_2017_multivariate_agc_10m_w33s33.tif')
-    model_filename = root_path.joinpath(r'data/outputs/Models/best_multivariate_model_py38_cv5v2.joblib')
+    model_filename = root_path.joinpath(f'data/outputs/Models/best_multivariate_model_py38_cv5v2.joblib')
+    map_filename = root_path.joinpath(f'data/outputs/geospatial/gef5_slm_wv3_oct_2017_multivariate_agc_10m_w33s33.{model_filename.stem}.tif')
 
 ## load model and apply to image
 model, model_feat_keys, model_scores = joblib.load(model_filename)
+logger.info(f'Applying {model_filename.stem} ({len(model_feat_keys)} feature(s)) to {image_filename.stem}')
+
 mapper = img.MsImageMapper(image_file_name=image_filename, map_file_name=map_filename, model=model, model_feat_keys=model_feat_keys,
                          save_feats=False)
 start = time.time()

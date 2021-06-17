@@ -61,9 +61,6 @@ for key in ['AbcHa2', 'AgcHa2']:    # append to im_plot_data_gdf
 im_plot_agc_gdf.loc[im_plot_agc_gdf['data']['Stratum'] == 'Degraded', ('data', 'Stratum')] = 'Severe'
 im_plot_agc_gdf.loc[im_plot_agc_gdf['data']['Stratum'] == 'Intact', ('data', 'Stratum')] = 'Pristine'
 
-# drop the problematic INT* plots with old SOP
-im_plot_agc_gdf = im_plot_agc_gdf.drop(['INT7', 'INT1', 'INT3'])
-
 # make an example scatter plot of feature vs AGC/ABC
 pyplot.rcParams["font.family"] = "arial"
 pyplot.rcParams["font.size"] = "12"
@@ -80,8 +77,8 @@ vis.scatter_ds(im_plot_agc_gdf, x_col=('feats', 'log(mean(pan/R))'), y_col=('dat
 #       eg, cv=10, selects ~45 features and gets R2~.93, cv=5 selects ~10 features with R2~.88
 y = im_plot_agc_gdf['data']['AgcHa']
 # selected_feats_df, selected_scores = fs.fcr(im_plot_agc_gdf['feats'], y, max_num_feats=None, dist_fn=None, score_fn=None)
-
-selected_feats_df, selected_scores = fs.forward_selection(im_plot_agc_gdf['feats'], y, max_num_feats=25, cv=5,
+cv = 5
+selected_feats_df, selected_scores = fs.forward_selection(im_plot_agc_gdf['feats'], y, max_num_feats=25, cv=cv,
                                                           score_fn=None)
 
 # calculate scores of selected features with LOOCV
@@ -89,7 +86,7 @@ selected_loocv_scores = []
 num_feats = range(1, len(selected_scores)+1)
 for i in num_feats:
     scores, predicted = fs.score_model(selected_feats_df.to_numpy()[:, :i], y, model=linear_model.LinearRegression(),
-                                       find_predicted=True, cv=len(selected_feats_df))
+                                       find_predicted=True, cv=len(selected_feats_df))  #cv=len(selected_feats_df)
     loocv_scores = {'R2': scores['R2_stacked'], 'RMSE': np.abs(scores['test_-RMSE']).mean()/1000., 'RMSE CI':
         np.percentile(np.abs(scores['test_-RMSE']), [5, 95])}
     selected_loocv_scores.append(loocv_scores)
@@ -112,7 +109,7 @@ pyplot.xlabel('Number of features')
 pyplot.ylabel('RMSE (t C ha$^{-1}$)')
 pyplot.tight_layout()
 pyplot.pause(.2)
-pyplot.savefig(root_path.joinpath(r'data/outputs/plots/agc_acc_vs_num_feats1b_py38_cv5.png'), dpi=300)
+pyplot.savefig(root_path.joinpath(f'data/outputs/plots/agc_acc_vs_num_feats1b_py38_cv{cv}.png'), dpi=300)
 
 fig, ax1 = pyplot.subplots()
 fig.set_size_inches(10, 4, forward=True)
@@ -134,16 +131,16 @@ ax2_lim = ax2.axis()
 ax2.plot([best_model_idx + 1, best_model_idx + 1], [ax2_lim[2], ax2_lim[3]], 'k--', label='Selected multivariate model')
 # pyplot.text(best_model_idx + 1.5, ax2_lim[2] + (ax2_lim[3]-ax2_lim[2])/3, 'Selected multivariate model',
 #             fontdict={'size': 9, 'weight': 'normal'})
-pyplot.legend()
+pyplot.legend(loc='upper left')
 ax2.axis(ax2_lim)
 pyplot.pause(.2)
-fig.savefig(root_path.joinpath(r'data/outputs/plots/agc_acc_vs_num_feats2b_py38_cv5.png'), dpi=300)
+fig.savefig(root_path.joinpath(f'data/outputs/plots/agc_acc_vs_num_feats2b_py38_cv{cv}.png'), dpi=300)
 
 ## fit best multivariate model based on selected features
 logger.info('Multivariate scores:')
 best_model_idx = np.argmin(selected_loocv_scores_df['RMSE'])
 scores_mv, predicted_mv = fs.score_model(selected_feats_df.iloc[:, :best_model_idx + 1], y/1000, model=linear_model.LinearRegression(),
-                                                    find_predicted=True, cv=selected_feats_df.shape[0], print_scores=True)
+                                                    find_predicted=True, cv=selected_feats_df.shape[0], print_scores=True)    #
 logger.info('Multivariate features:')
 logger.info(selected_feats_df.columns[:best_model_idx+1].to_numpy())
 
@@ -162,8 +159,15 @@ logger.info('Multivariate intercept:')
 logger.info(np.array(best_multivariate_model.intercept_))
 
 # save model
-joblib.dump([best_multivariate_model, selected_feats_df.columns[:best_model_idx+1].to_numpy(), scores_mv], root_path.joinpath(r'data/outputs/Models/best_multivariate_model_py38_cv5v2.joblib'))
-pickle.dump([best_multivariate_model, selected_feats_df.columns[:best_model_idx+1].to_numpy(), scores_mv], open(root_path.joinpath(r'data/outputs/Models/best_multivariate_model_py38_cv5v2.pickle'), 'wb'))
+joblib.dump([best_multivariate_model, selected_feats_df.columns[:best_model_idx+1].to_numpy(), scores_mv], root_path.joinpath(f'data/outputs/Models/best_multivariate_model_py38_cv{cv}v2.joblib'))
+pickle.dump([best_multivariate_model, selected_feats_df.columns[:best_model_idx+1].to_numpy(), scores_mv], open(root_path.joinpath(f'data/outputs/Models/best_multivariate_model_py38_cv{cv}v2.pickle'), 'wb'))
+
+# make feature table for JARS paper
+mv_model_feat_dict = dict(Features=selected_feats_df.columns[:best_model_idx+1].to_numpy(),
+                          Coefficients=best_multivariate_model.coef_)
+mv_model_feat_df = pd.DataFrame.from_dict(mv_model_feat_dict).round(decimals=4)
+mv_model_feat_df.index += 1
+# mv_model_feat_df.to_clipboard()
 
 ## fit best univariate model based on selected feature
 logger.info('Univariate model scores:')
@@ -197,16 +201,29 @@ logger.info('Univariate model intercept:')
 logger.info(np.array(best_univariate_model.intercept_))
 
 # save model
-joblib.dump([best_univariate_model, selected_feats_df.columns[:1].to_numpy(), scores_uv], root_path.joinpath(r'data/outputs/Models/best_univariate_model_py38_cv5v2.joblib'))
-pickle.dump([best_univariate_model, selected_feats_df.columns[:1].to_numpy(), scores_uv], open(root_path.joinpath(r'data/outputs/Models/best_univariate_model_py38_cv5v2.pickle'), 'wb'))
+joblib.dump([best_univariate_model, selected_feats_df.columns[:1].to_numpy(), scores_uv], root_path.joinpath(f'data/outputs/Models/best_univariate_model_py38_cv{cv}v2.joblib'))
+pickle.dump([best_univariate_model, selected_feats_df.columns[:1].to_numpy(), scores_uv], open(root_path.joinpath(f'data/outputs/Models/best_univariate_model_py38_cv{cv}v2.pickle'), 'wb'))
+
+# make accuracy table for JARS paper
+acc_dict = dict()
+for key, N, scores in zip(['Multivariate', 'Univariate'], [best_model_idx+1, 1], [scores_mv, scores_uv]):
+    rmse_ptile = np.percentile(np.abs(scores['test_-RMSE']), [5, 95])
+    rmse_ptile_str = f'{rmse_ptile[0]:.4f} - {rmse_ptile[1]:.4f}'
+    rrmse = 100*np.abs(scores['test_-RMSE']).mean() / np.mean(y / 1000)
+    acc_dict[key] = {'N': int(N), 'R2': float(scores['R2_stacked']), 'RMSE': float(np.abs(scores['test_-RMSE']).mean()),
+                            'RMSE 5-95%': rmse_ptile_str, 'RRMSE': float(rrmse)}
+
+acc_df = pd.DataFrame.from_dict(acc_dict).T
+acc_df[['R2','RMSE','RRMSE']] = np.around(acc_df[['R2','RMSE','RRMSE']].to_numpy(dtype=float), decimals=4)
+# acc_df.to_clipboard()
 
 ## Analyse outliers for JARS paper
-if False:
+if True:
     from sklearn.neighbors import KernelDensity
     # add error and max tree height rank to dataframe
     err_mv = predicted_mv - y/1000
     im_plot_agc_gdf.loc[:, ('data','predicted_mv')] = predicted_mv
-    im_plot_agc_gdf.loc[:, ('data','err_mv')] = np.abs(err_mv)
+    im_plot_agc_gdf.loc[:, ('data','err_mv')] = err_mv
 
     arg_max_height_sort = np.argsort(-im_plot_agc_gdf[('data', 'MaxHeight')])
     max_height_rank = np.empty_like(arg_max_height_sort)
@@ -265,9 +282,9 @@ if False:
         print(f'{stratum} mean(se) error: {mean_err:.4f}({std_err:.4f})')
 
 
-    # which plots were the worst underperformers, and is there a connection with max tree height?
-    print('First 10 lowest underestimated plots:')
-    err_mv_sort = err_mv.sort_values(ascending=False)[:10]
+    # which plots were the worst performers, and is there a connection with max tree height?
+    print('First 10 lowest performing plots:')
+    err_mv_sort = err_mv.abs().sort_values(ascending=False)[:10]
     print(err_mv_sort)
 
     print('MaxHeights and corresp ranks of 10 lowest underestimated plots:')

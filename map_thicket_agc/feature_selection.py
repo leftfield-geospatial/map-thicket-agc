@@ -238,7 +238,7 @@ def score_model(feat_df, y, model=linear_model.LinearRegression(), score_fn=None
     find_predicted : bool
         return the predicted outputs (default = True)
     print_scores : bool
-        log scores to consolde (default = False)
+        log scores to console (default = False)
 
     Returns
     -------

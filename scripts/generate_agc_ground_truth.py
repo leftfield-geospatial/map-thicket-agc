@@ -46,6 +46,13 @@ logger.info('Starting...')
 agc_plot_est = allom.AgcPlotEstimator(model_file_name=model_file_name, correction_method=allom.BiomassCorrectionMethod.NicklessZou)
 agc_plot_est.estimate(woody_file_name=woody_file_name, litter_file_name=litter_file_name)
 
+# drop the plots without DGPS data
+agc_plot_est.plot_summary_agc_df = agc_plot_est.plot_summary_agc_df.drop(['MV27', 'MV31', 'MV32', 'PV27'])
+
+# drop the plots from the preliminary trip with old SOP
+agc_plot_est.plot_summary_agc_df = agc_plot_est.plot_summary_agc_df.drop(['INT7', 'INT1', 'INT3', 'TCH1', 'TCH3'])
+
+
 ## write per-plant and per-plot ABC/AGC etc files
 agc_plot_est.write_abc_plant_file(out_file_name=plant_abc_file_name)
 agc_plot_est.write_agc_plot_file(out_file_name=plot_agc_file_name)
@@ -200,29 +207,41 @@ pyplot.pause(0.1)
 f.savefig(root_path.joinpath('data/outputs/plots/plant_height_contribution_to_abc_by_stratum.png'), dpi=300)
 
 ## Show the AGC etc stats per stratum
-
-# drop the plots without DGPS data so it is comparable to fit_agc_model results
-plot_summary_agc_df_drop = agc_plot_est.plot_summary_agc_df.drop(['MV27', 'MV31', 'MV32', 'PV27'])
+plot_summary_agc_df = agc_plot_est.plot_summary_agc_df
 
 per_stratum_dict = {}
-for stratum_label, stratum_df in plot_summary_agc_df_drop.groupby('Stratum'):
-    per_stratum_dict[stratum_label] = {'Mean(ABC)': stratum_df["AbcHa"].mean() / 1000.,
+for stratum_label, stratum_df in plot_summary_agc_df.groupby('Stratum'):
+    per_stratum_dict[stratum_label] = {'N': len(stratum_df),
+                                       'Mean(ABC)': stratum_df["AbcHa"].mean() / 1000.,
                                        'Std(ABC)': stratum_df["AbcHa"].std() / 1000.,
                                        'Mean(LitterC)': stratum_df["LitterCHa"].mean() / 1000.,
                                        'Std(LitterC)': stratum_df["LitterCHa"].std() / 1000.,
                                        'Mean(AGC)': stratum_df["AgcHa"].mean() / 1000.,
                                        'Std(AGC)': stratum_df["AgcHa"].std() / 1000.}
 
-per_stratum_dict['Total'] = {'Mean(ABC)': plot_summary_agc_df_drop["AbcHa"].mean() / 1000.,
-                             'Std(ABC)': plot_summary_agc_df_drop["AbcHa"].std() / 1000.,
-                             'Mean(LitterC)': plot_summary_agc_df_drop["LitterCHa"].mean() / 1000.,
-                             'Std(LitterC)': plot_summary_agc_df_drop["LitterCHa"].std() / 1000.,
-                             'Mean(AGC)': plot_summary_agc_df_drop["AgcHa"].mean() / 1000.,
-                             'Std(AGC)': plot_summary_agc_df_drop["AgcHa"].std() / 1000.}
+per_stratum_dict['Total'] = {'N': len(plot_summary_agc_df),
+                             'Mean(ABC)': plot_summary_agc_df["AbcHa"].mean() / 1000.,
+                             'Std(ABC)': plot_summary_agc_df["AbcHa"].std() / 1000.,
+                             'Mean(LitterC)': plot_summary_agc_df["LitterCHa"].mean() / 1000.,
+                             'Std(LitterC)': plot_summary_agc_df["LitterCHa"].std() / 1000.,
+                             'Mean(AGC)': plot_summary_agc_df["AgcHa"].mean() / 1000.,
+                             'Std(AGC)': plot_summary_agc_df["AgcHa"].std() / 1000.}
 
 per_stratum_df = pd.DataFrame.from_dict(per_stratum_dict).T.round(decimals=4)
-logger.info('Per stratum stats:\n' + per_stratum_df.to_string())
-# per_stratum_df.to_clipboard()
+per_stratum_dict = per_stratum_df.to_dict(orient='index')
+
+# make table for JARS paper
+per_stratum_word_dict = {}
+for stratum, row in per_stratum_dict.items():
+    per_stratum_word_dict[stratum] = dict(N=int(row['N']))
+    for meas in ['ABC', 'LitterC', 'AGC']:
+        mean_key = f'Mean({meas})'
+        std_key = f'Std({meas})'
+        per_stratum_word_dict[stratum][meas] = f'{row[mean_key]} ({row[std_key]})'
+
+per_stratum_word_df = pd.DataFrame.from_dict(per_stratum_word_dict).T
+logger.info('Per stratum stats:\n' + per_stratum_word_df.to_string())
+# per_stratum_word_df.to_clipboard()
 
 logger.info('Done\n')
 if __name__ =='__main__':
