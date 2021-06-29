@@ -262,15 +262,15 @@ def score_model(feat_df, y, model=linear_model.LinearRegression(), score_fn=None
 
     if print_scores:
         rmse_ci = np.percentile(-scores['test_-RMSE'], [5, 95])
-        logger.info('RMSE mean: {0:.4f}, std: {1:.4f}, 5-95%: {2:.4f} - {3:.4f}'.format(-scores['test_-RMSE'].mean(),
+        logger.info('RMSE mean: {0:.3f}, std: {1:.3f}, 5-95%: {2:.3f} - {3:.3f}'.format(-scores['test_-RMSE'].mean(),
                                                                                         scores['test_-RMSE'].std(),
                                                                                         rmse_ci[0], rmse_ci[1]))
-        logger.info(f'Relative RMSE (%): {100*(-scores["test_-RMSE"].mean()/np.mean(y)):.4f}')
+        logger.info(f'Relative RMSE (%): {100*(-scores["test_-RMSE"].mean()/np.mean(y)):.3f}')
 
     if find_predicted:
         predicted = cross_val_predict(model, feat_df, y, cv=cv)  # )
         # Also suspect for validation, but better than cross validated R2
         scores['R2_stacked'] = metrics.r2_score(y, predicted)
         if print_scores:
-            logger.info('R2 (stacked): {0:.4f}'.format(scores['R2_stacked']))
+            logger.info('R2 (stacked): {0:.3f}'.format(scores['R2_stacked']))
     return scores, predicted

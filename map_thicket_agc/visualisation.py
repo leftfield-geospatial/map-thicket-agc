@@ -123,7 +123,7 @@ def scatter_ds(data, x_col=None, y_col=None, class_col=None, label_col=None, thu
         scores, predicted = feature_selection.score_model(x.to_numpy().reshape(-1,1), y.to_numpy().reshape(-1,1), model=linear_model.LinearRegression(),
                                                         find_predicted=True, cv=len(x), print_scores=False, score_fn=None)
 
-        pyplot.text((xlim[0] + xd * 0.7), (ylim[0] + yd * 0.05), '$R^2$ = {0:.2f}'.format(scores['R2_stacked']),
+        pyplot.text((xlim[0] + xd * 0.7), (ylim[0] + yd * 0.05), '$R^2$ = {0:.3f}'.format(scores['R2_stacked']),
                    fontdict={'size': 12})
         yr = np.array(xlim)*slope + intercept
         pyplot.plot(xlim, yr, 'k--', lw=2, zorder=-1)
@@ -131,13 +131,13 @@ def scatter_ds(data, x_col=None, y_col=None, class_col=None, label_col=None, thu
         yhat = x * slope + intercept
         rmse = np.sqrt(np.mean((y - yhat) ** 2))
         logger.info('Regression scores')
-        logger.info('RMSE: {0:.4f}'.format(rmse))
-        logger.info('RMSE LOOCV: {0:.4f}'.format(-scores['test_-RMSE'].mean()))
-        logger.info('R^2:  {0:.4f}'.format(r ** 2))
-        logger.info('R^2 stacked: {0:.4f}'.format(scores['R2_stacked']))
-        logger.info('P (slope=0): {0:.4f}'.format(p))
-        logger.info('Slope: {0:.4f}'.format(slope))
-        logger.info('Std error of slope: {0:.4f}'.format(stde))
+        logger.info('RMSE: {0:.3f}'.format(rmse))
+        logger.info('RMSE LOOCV: {0:.3f}'.format(-scores['test_-RMSE'].mean()))
+        logger.info('R^2:  {0:.3f}'.format(r ** 2))
+        logger.info('R^2 stacked: {0:.3f}'.format(scores['R2_stacked']))
+        logger.info('P (slope=0): {0:.3f}'.format(p))
+        logger.info('Slope: {0:.3f}'.format(slope))
+        logger.info('Std error of slope: {0:.3f}'.format(stde))
     else:
         r = np.nan
         rmse = np.nan
@@ -187,9 +187,9 @@ def scatter_y_actual_vs_pred(y, pred, scores, xlabel='Measured AGC (t C ha$^{-1}
     h, = pyplot.plot([mn, mx], [mn, mx], 'k--', lw=2, zorder=-1, label='1:1')
     pyplot.xlim(0, mx)
     pyplot.ylim(0, mx)
-    pyplot.text(26, 5, str.format('$R^2$ = {0:.2f}', scores['R2_stacked']),
+    pyplot.text(26, 5, str.format('$R^2$ = {0:.3f}', scores['R2_stacked']),
                fontdict={'size': 11})
-    pyplot.text(26, 2, str.format('RMSE = {0:.2f} t C ha{1}',np.abs(scores['test_-RMSE']).mean(),'$^{-1}$'),
+    pyplot.text(26, 2, str.format('RMSE = {0:.3f} t C ha{1}',np.abs(scores['test_-RMSE']).mean(),'$^{-1}$'),
                fontdict={'size': 11})
     pyplot.tight_layout()
     pyplot.legend([h], ['1:1'], frameon=False)

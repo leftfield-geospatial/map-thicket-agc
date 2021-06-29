@@ -178,7 +178,7 @@ class EvaluateCalibration(object):
 
     def print_scores(self):
         logger.info('print_scores')
-        with pd.option_context('display.float_format', '{:0.4f}'.format):
+        with pd.option_context('display.float_format', '{:0.3f}'.format):
             for scores_label, scores_df in zip(['Model', 'Calib'], [self.model_scores_df, self.calib_scores_df]):
                 for scores_key in ['r2', 'std(r2)', 'rmse', 'std(rmse)']:
                     logger.info(' ')

@@ -153,7 +153,7 @@ pyplot.savefig(root_path.joinpath(r'data/outputs/Plots/meas_vs_pred_agc_multivar
 best_multivariate_model = linear_model.LinearRegression()
 best_multivariate_model.fit(selected_feats_df.iloc[:, :best_model_idx+1], y/1000)
 logger.info('Multivariate coefficients:')
-np.set_printoptions(precision=4, suppress=True)
+np.set_printoptions(precision=3, suppress=True)
 logger.info(np.array(best_multivariate_model.coef_))
 logger.info('Multivariate intercept:')
 logger.info(np.array(best_multivariate_model.intercept_))
@@ -165,7 +165,7 @@ pickle.dump([best_multivariate_model, selected_feats_df.columns[:best_model_idx+
 # make feature table for JARS paper
 mv_model_feat_dict = dict(Features=selected_feats_df.columns[:best_model_idx+1].to_numpy(),
                           Coefficients=best_multivariate_model.coef_)
-mv_model_feat_df = pd.DataFrame.from_dict(mv_model_feat_dict).round(decimals=4)
+mv_model_feat_df = pd.DataFrame.from_dict(mv_model_feat_dict).round(decimals=3)
 mv_model_feat_df.index += 1
 # mv_model_feat_df.to_clipboard()
 
@@ -208,7 +208,7 @@ pickle.dump([best_univariate_model, selected_feats_df.columns[:1].to_numpy(), sc
 acc_dict = dict()
 for key, N, scores in zip(['Multivariate', 'Univariate'], [best_model_idx+1, 1], [scores_mv, scores_uv]):
     rmse_ptile = np.percentile(np.abs(scores['test_-RMSE']), [5, 95])
-    rmse_ptile_str = f'{rmse_ptile[0]:.4f} - {rmse_ptile[1]:.4f}'
+    rmse_ptile_str = f'{rmse_ptile[0]:.3f} - {rmse_ptile[1]:.3f}'
     rrmse = 100*np.abs(scores['test_-RMSE']).mean() / np.mean(y / 1000)
     acc_dict[key] = {'N': int(N), 'R2': float(scores['R2_stacked']), 'RMSE': float(np.abs(scores['test_-RMSE']).mean()),
                             'RMSE 5-95%': rmse_ptile_str, 'RRMSE': float(rrmse)}
@@ -279,7 +279,7 @@ if True:
     for stratum, stratum_df in im_plot_agc_gdf.groupby(by=('data', 'Stratum')):
         mean_err = np.abs(stratum_df.loc[:, ('data', 'err_mv')]).mean()
         std_err = np.abs(stratum_df.loc[:, ('data', 'err_mv')]).std()/np.sqrt(len(stratum_df))
-        print(f'{stratum} mean(se) error: {mean_err:.4f}({std_err:.4f})')
+        print(f'{stratum} mean(se) error: {mean_err:.3f}({std_err:.3f})')
 
 
     # which plots were the worst performers, and is there a connection with max tree height?

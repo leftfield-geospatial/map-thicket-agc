@@ -227,7 +227,7 @@ per_stratum_dict['Total'] = {'N': len(plot_summary_agc_df),
                              'Mean(AGC)': plot_summary_agc_df["AgcHa"].mean() / 1000.,
                              'Std(AGC)': plot_summary_agc_df["AgcHa"].std() / 1000.}
 
-per_stratum_df = pd.DataFrame.from_dict(per_stratum_dict).T.round(decimals=4)
+per_stratum_df = pd.DataFrame.from_dict(per_stratum_dict).T.round(decimals=3)
 per_stratum_dict = per_stratum_df.to_dict(orient='index')
 
 # make table for JARS paper
