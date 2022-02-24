@@ -338,17 +338,20 @@ class ImageFeatureExtractor(object):
                                                                           all_touched=False)
             plot_cnrs_pixel =  np.array(plot_window.toranges())
             plot_mask = ~plot_mask  # TODO: can we lose this?
+            if plot_mask.sum() == 0:
+                logger.warning(f'Excluding plot {plot_id} - no valid pixels')
+                continue
 
             # check plot window lies inside image
             if not (np.all(plot_cnrs_pixel[1, :] < self._image_reader.width) and np.all(plot_cnrs_pixel[0, :] < self._image_reader.height)
                     and np.all(plot_cnrs_pixel >= 0)):  # and plot.has_key('Yc') and plot['Yc'] > 0.:
-                logger.warning(f'Excluding plot {plot["ID"]} - outside image extent')
+                logger.warning(f'Excluding plot {plot_id} - outside image extent')
                 continue
 
             im_buf = self._image_reader.read(window=plot_window)     # read plot ROI from image
 
             if np.all(im_buf == 0):
-                logger.warning(f'Excluding plot {plot["ID"]} - all pixels are zero')
+                logger.warning(f'Excluding plot {plot_id} - all pixels are zero')
                 continue
 
             plot_mask = plot_mask & np.all(im_buf > 0, axis=0) & np.all(~np.isnan(im_buf), axis=0)  # exclude any nan or -ve pixels
