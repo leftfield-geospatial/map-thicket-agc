@@ -47,7 +47,7 @@ homo_filename = pathlib.Path(r"V:\Data\HomonimEgs\NGI_3323D_2015_GefSite\Homogen
 # homo_filename = pathlib.Path(r"V:\Data\HomonimEgs\NGI_3323D_2015_GefSite\Homogenised\NGI_3323D_2015_GefSite_RGBN_HOMO_cREF_mGAIN_k5_5.vrt")
 # homo_filename = pathlib.Path(r"V:\Data\HomonimEgs\NGI_3323D_2015_GefSite\Homogenised\COPERNICUS-S2-20151023T081112_20151023T081949_T34HGH_B4328_HOMO_cREF_mGAIN-BLK-OFFSET_k1_1.tif")
 # homo_filename = pathlib.Path(r"V:\Data\HomonimEgs\NGI_3323D_2015_GefSite\Homogenised\NGI_3323D_2015_GefSite_RGBN_HOMO_cREF_mGAIN-OFFSET_k15_15.vrt")
-homo_filename = pathlib.Path(r"V:\Data\HomonimEgs\NGI_3323D_2015_GefSite\Homogenised\NGI_3323D_2015_GefSite_RGBN_HOMO_cREF_mGAIN_k15_15.vrt")
+# homo_filename = pathlib.Path(r"V:\Data\HomonimEgs\NGI_3323D_2015_GefSite\Homogenised\NGI_3323D_2015_GefSite_RGBN_HOMO_cREF_mGAIN_k15_15.vrt")
 
 logger = get_logger(__name__)
 logger.info('Starting...')
@@ -109,4 +109,5 @@ for i, gdf in enumerate([source_gdf, homo_gdf]):
     plot_agc_corr(gdf[('feats', '(mean(NDVI))')], gdf[('data', 'AgcHa')]/1000)
     pyplot.title(labels[i])
 
+pyplot.savefig(root_path.joinpath(f'data/outputs/plots/homonim_ngi_case_study.png'), dpi=300)
 
