@@ -16,69 +16,73 @@
     You should have received a copy of the GNU Affero General Public License
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
-##
-
 from map_thicket_agc import root_path
-import numpy as np
-import geopandas as gpd, pandas as pd
-from sklearn import linear_model
+from glob import glob
 from matplotlib import pyplot
-from scipy import stats as stats
+from pathlib import Path
+import numpy as np
+import geopandas as gpd
+from map_thicket_agc.imaging import MsImageFeatureExtractor
+from map_thicket_agc.visualisation import scatter_ds
+from pprint import pprint
+from scipy import stats
 
-import joblib, pickle
+# -----------------------------------------------------------------------------
+# compare performance of different references and different homonim fuse params
 
-from map_thicket_agc import imaging as img
-from map_thicket_agc import visualisation as vis
-from map_thicket_agc import feature_selection as fs
-from map_thicket_agc import get_logger
-import pathlib
-## extract features from multi-spectral satellite image
 plot_agc_shapefile_name = root_path.joinpath(r'data/outputs/geospatial/gef_plot_polygons_with_agc_v2.shp')
-# source_filename = pathlib.Path(r"V:\Data\HomonimEgs\NGI_3323D_2015_GefSite\Reference\COPERNICUS-S2-20151023T081112_20151023T081949_T34HGH_B4328.tif")
-# source_filename = pathlib.Path(r"V:\Data\HomonimEgs\NGI_3323D_2015_GefSite\Reference\LANDSAT-LC08-C02-T1_L2-LC08_172083_20150525_B4325.tif")
-source_filename = pathlib.Path(r"V:\Data\HomonimEgs\NGI_3323D_2015_GefSite\Source\NGI_3323DA_2015_GefSite_Source.vrt")
+src_file = Path(r"V:\Data\HomonimEgs\NGI_3323D_2015_GefSite\Source\NGI_3323DA_2015_GefSite_Source.vrt")
 
-# homo_filename = pathlib.Path(r"V:\Data\HomonimEgs\NGI_3323D_2015_GefSite\Reference\COPERNICUS-S2-20151023T081112_20151023T081949_T34HGH_B4328.tif")
-homo_filename = pathlib.Path(r"V:\Data\HomonimEgs\NGI_3323D_2015_GefSite\Homogenised\NGI_3323D_2015_GefSite_RGBN_HOMO_cREF_mGAIN-BLK-OFFSET_k5_5.vrt")
-# homo_filename = pathlib.Path(r"V:\Data\HomonimEgs\NGI_3323D_2015_GefSite\Homogenised\Landsat\NGI_3323D_2015_GefSite_RGBN_HOMO_cREF_mGAIN-BLK-OFFSET_k5_5.vrt")
-# homo_filename = pathlib.Path(r"V:\Data\HomonimEgs\NGI_3323D_2015_GefSite\Homogenised\NGI_3323D_2015_GefSite_RGBN_HOMO_cREF_mGAIN-BLK-OFFSET_k7_7.vrt")
-# homo_filename = pathlib.Path(r"V:\Data\HomonimEgs\NGI_3323D_2015_GefSite\Homogenised\NGI_3323D_2015_GefSite_RGBN_HOMO_cREF_mGAIN-BLK-OFFSET_k11_11.vrt")
-# homo_filename = pathlib.Path(r"V:\Data\HomonimEgs\NGI_3323D_2015_GefSite\Homogenised\NGI_3323D_2015_GefSite_RGBN_HOMO_cREF_mGAIN-BLK-OFFSET_k1_1.vrt")
-# homo_filename = pathlib.Path(r"V:\Data\HomonimEgs\NGI_3323D_2015_GefSite\Homogenised\NGI_3323D_2015_GefSite_RGBN_HOMO_cREF_mGAIN_k5_5.vrt")
-# homo_filename = pathlib.Path(r"V:\Data\HomonimEgs\NGI_3323D_2015_GefSite\Homogenised\COPERNICUS-S2-20151023T081112_20151023T081949_T34HGH_B4328_HOMO_cREF_mGAIN-BLK-OFFSET_k1_1.tif")
-# homo_filename = pathlib.Path(r"V:\Data\HomonimEgs\NGI_3323D_2015_GefSite\Homogenised\NGI_3323D_2015_GefSite_RGBN_HOMO_cREF_mGAIN-OFFSET_k15_15.vrt")
-# homo_filename = pathlib.Path(r"V:\Data\HomonimEgs\NGI_3323D_2015_GefSite\Homogenised\NGI_3323D_2015_GefSite_RGBN_HOMO_cREF_mGAIN_k15_15.vrt")
+# create a list of all the available corrected VRT mosaic files
+corrected_wildcards = [
+    r'V:\Data\HomonimEgs\NGI_3323D_2015_GefSite\Corrected\Landsat-8\*.vrt',
+    r'V:\Data\HomonimEgs\NGI_3323D_2015_GefSite\Corrected\Sentinel-2\*.vrt',
+    r'V:\Data\HomonimEgs\NGI_3323D_2015_GefSite\Corrected\Sentinel-2-Harm\*.vrt',
+    r'V:\Data\HomonimEgs\NGI_3323D_2015_GefSite\Corrected\Modis-nbar\*.vrt',
+]
 
-logger = get_logger(__name__)
-logger.info('Starting...')
+corrected_files = []
+for corrected_wildcard in corrected_wildcards:
+    corrected_files += [*glob(corrected_wildcard)]
 
-# load ground truth
+pprint(corrected_files)
+
+def correct_stratum(gdf):
+    # fix stratum labels
+    gdf.loc[gdf['data']['Stratum'] == 'Degraded', ('data', 'Stratum')] = 'Severe'
+    return gdf
+
+# load AGC ground truth shapefile
 plot_agc_gdf = gpd.GeoDataFrame.from_file(plot_agc_shapefile_name)
 plot_agc_gdf = plot_agc_gdf.set_index('ID').sort_index()
 
-source_fex = img.MsImageFeatureExtractor(image_filename=source_filename, plot_data_gdf=plot_agc_gdf)
+# Extract features from the source (uncorrected) images
+source_fex = MsImageFeatureExtractor(image_filename=src_file, plot_data_gdf=plot_agc_gdf)
 source_gdf = source_fex.extract_image_features()
-homo_fex = img.MsImageFeatureExtractor(image_filename=homo_filename, plot_data_gdf=plot_agc_gdf)
-homo_gdf = homo_fex.extract_image_features()
+source_gdf = correct_stratum(source_gdf)
 
-# fix stratum labels
-for gdf in [source_gdf, homo_gdf]:
-    gdf.loc[gdf['data']['Stratum'] == 'Degraded', ('data', 'Stratum')] = 'Severe'
-    gdf.loc[gdf['data']['Stratum'] == 'Intact', ('data', 'Stratum')] = 'Pristine'
+# Extract features from the corrected VRT mosaics
+corrected_dict = {}
+for corrected_file in corrected_files:
+    print(f'Extracting features for {corrected_file}')
+    corrected_fex = MsImageFeatureExtractor(image_filename=corrected_file, plot_data_gdf=plot_agc_gdf)
+    corrected_gdf = corrected_fex.extract_image_features()
+    corrected_gdf = correct_stratum(corrected_gdf)
+    corrected_dict[str(corrected_file)] = corrected_gdf
 
-# make an example scatter plot of feature vs AGC/ABC
-pyplot.rcParams["font.family"] = "arial"
-pyplot.rcParams["font.size"] = "12"
-pyplot.rcParams["font.style"] = "normal"
-pyplot.rcParams['legend.fontsize'] = 'medium'
-pyplot.rcParams['figure.titlesize'] = 'medium'
+# Find R2 correlation coefficient for each of the corrected VRT mosaics
+feat = '(mean(NDVI))'  # this is one of the better performing features and commonly understood
+corrected_r2 = {}
+for corrected_gdf, corrected_file in zip(corrected_dict.values(), corrected_files):
+    cc = np.corrcoef(corrected_gdf[('feats', feat)], corrected_gdf[('data', 'AgcHa')]/1000)
+    corrected_r2[str(corrected_file)] = cc[0, 1] ** 2
 
-pyplot.figure()
-vis.scatter_ds(homo_gdf, x_col=('feats', 'log(mean(NDVI))'), y_col=('data', 'AgcHa'), class_col=('data', 'Stratum'),
-               xfn=lambda x: x, do_regress=True, label_col=('data', 'ID'))
-
+pprint(corrected_r2)
+# features corresponding to the best R2
+corrected_gdf = corrected_dict[max(corrected_r2, key=corrected_r2.get)]
 
 def plot_agc_corr(x, y, x_label='NDVI', y_label='AGC (t C ha$^{-1}$)'):
+    """ Plot ground truth vs feature vals with R2 text. """
     xlim = [np.nanmin(x), np.nanmax(x)]
     ylim = [np.nanmin(y), np.nanmax(y)]
     xd = np.diff(xlim)[0]
@@ -86,11 +90,11 @@ def plot_agc_corr(x, y, x_label='NDVI', y_label='AGC (t C ha$^{-1}$)'):
 
     pyplot.axis('tight')
     pyplot.axis(xlim + ylim)
-    pyplot.plot(x, y, marker='.', linestyle='None', markersize=5)
+    pyplot.plot(x, y, marker='.', linestyle='None', markersize=7)
 
     if True:
         (slope, intercept, r, p, stde) = stats.linregress(x, y)
-        pyplot.text((xlim[0] + xd * 0.7), (ylim[0] + yd * 0.05), '$R^2$ = {0:.3f}'.format(r ** 2),
+        pyplot.text((xlim[0] + xd * 0.7), (ylim[0] + yd * 0.05), '$R^2$ = {0:.2f}'.format(r ** 2),
                     fontdict={'size': 12})
         yr = np.array(xlim) * slope + intercept
         pyplot.plot(xlim, yr, 'k--', lw=2, zorder=-1)
@@ -99,15 +103,111 @@ def plot_agc_corr(x, y, x_label='NDVI', y_label='AGC (t C ha$^{-1}$)'):
     pyplot.ylabel(y_label, fontdict={'size': 12})
     # pyplot.axis('tight')
 
-
-labels = ['Source', 'Homogenised']
+# create before and after correction scatter plots
+labels = ['Source', 'Corrected']
 fig = pyplot.figure()
 fig.set_size_inches(10, 4.5, forward=True)
 
-for i, gdf in enumerate([source_gdf, homo_gdf]):
+for i, gdf in enumerate([source_gdf, corrected_gdf]):
     pyplot.subplot(1, 2, i+1)
-    plot_agc_corr(gdf[('feats', '(mean(NDVI))')], gdf[('data', 'AgcHa')]/1000)
+    plot_agc_corr(gdf[('feats', feat)], gdf[('data', 'AgcHa')]/1000)
     pyplot.title(labels[i])
 
-pyplot.savefig(root_path.joinpath(f'data/outputs/plots/homonim_ngi_case_study.png'), dpi=300)
+# pyplot.savefig(root_path.joinpath(f'data/outputs/plots/homonim_ngi_case_study.png'), dpi=300)
+
+#---------------------------------------------------------------------------------------------------------------
+# show image mosaics before and after correction
+%matplotlib
+import rasterio as rio
+from rasterio.plot import show
+from rasterio.enums import Resampling
+from matplotlib import pyplot
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+import numpy as np
+
+# corr_file = max(corrected_r2, key=corrected_r2.get)
+src_file = r'V:\Data\HomonimEgs\NGI_3323D_2015_GefSite\Source\NGI_3323DA_2015_GefSite_Source.vrt'
+corr_file = r'V:\Data\HomonimEgs\NGI_3323D_2015_GefSite\Corrected\Sentinel-2\o3323d_2015_RGBN_FUSE_cREF_mGAIN-BLK-OFFSET_15_15.vrt'
+ref_file = r'V:\Data\HomonimEgs\NGI_3323D_2015_GefSite\Reference\COPERNICUS-S2-20151023T081112_20151023T081949_T34HGH_B4328.tif'
+
+indexes = [4, 1, 2]
+ds_fact = 4  # downsample factor
+
+
+fig, ax = pyplot.subplots(1, 1)
+divider = make_axes_locatable(ax)
+cax = divider.append_axes('right', size='3%', pad=0.1)
+
+with rio.Env(GDAL_NUM_THREADS='ALL_CPUs', GTIFF_FORCE_RGBA=False), rio.open(corr_file, 'r') as ds:
+    ds_shape = tuple(np.round(np.array(ds.shape) / ds_fact).astype(int).tolist())
+    array = ds.read(indexes=indexes, out_dtype='float32', out_shape=ds_shape)  # , resampling=Resampling.average)
+    for bi in range(len(indexes)):
+        array[bi] -= np.nanpercentile(array[bi], .5)
+        array[bi] /= np.nanpercentile(array[bi], 98)
+        array[bi] = np.clip(array[bi], 0, 1)
+
+    transform = ds.transform * rio.Affine.scale(ds_fact)
+    ax = show(array, transform=transform, interpolation='bilinear', ax=ax)
+    _plot_agc_gdf = plot_agc_gdf.to_crs(ds.crs)
+    _plot_agc_gdf.geometry = _plot_agc_gdf.geometry.centroid
+    _plot_agc_gdf.AgcHa /= 1000
+    ax = _plot_agc_gdf.plot(
+        'AgcHa', kind='geo', legend=True, ax=ax, cmap='RdYlGn', cax=cax, edgecolor='white', linewidth=0.5,
+        legend_kwds=dict(label='Aboveground Carbon (t C ha$^{-1}$)', orientation='vertical')
+    )
+    ax.axis((86494.06047619047, 94313.07562770562, -3717680.7510822513, -3711286.8766233767))
+    ax.axis('off')
+
+
+
+# fig, axes = pyplot.subplots(1, 3, sharex=True, sharey=True, figsize=(15, 10))
+#
+# indexes = [1, 2, 3]
+# ds_fact = 8  # downsample factor
+# for im_file, scale, axis, label in zip(
+#         [src_file, ref_file, corr_file],
+#         [255, 150, 150],
+#         axes,
+#         ['Source', 'Reference', 'Corrected'],
+# ):
+#     # read, scale and display the image
+#     with rio.open(im_file, 'r') as ds:
+#         array = ds.read(out_dtype='float32') / scale
+#
+#         show(array, transform=ds.transform, ax=axis, interpolation='nearest')
+#         axis.set_title(label, fontweight='bold')
+#         # axis.set_xlim(-5.75e4, -5.50e4)  # zoom in
+#         # axis.set_ylim(-3.733e6, -3.730e6)
+#         axis.axis('off')
+
+fig, axes = pyplot.subplots(1, 2, sharex=True, sharey=True, figsize=(15, 10))
+
+for im_file, scale, axis, label in zip(
+        [src_file, corr_file],
+        [3500, 4000],
+        axes,
+        ['Source', 'Corrected'],
+):
+    # read, scale and display the image
+    with rio.Env(GDAL_NUM_THREADS='ALL_CPUs', GTIFF_FORCE_RGBA=False), rio.open(im_file, 'r') as ds:
+        ds_shape = tuple(np.round(np.array(ds.shape) / ds_fact).astype(int).tolist())
+        print(ds.shape)
+        print(ds_shape)
+        print(ds.overviews(1))
+        # continue
+        array = ds.read(indexes=indexes, out_dtype='float32', out_shape=ds_shape) #, resampling=Resampling.average)
+        mask = np.any(array == ds.nodata, axis=(0)) | np.any(np.isnan(array), axis=(0))
+        array[:, mask] = np.nan
+        print(np.nanmin(array, axis=(1, 2)))
+        for bi in range(len(indexes)):
+            array[bi] -= np.nanpercentile(array[bi], 2)
+            array[bi] /= np.nanpercentile(array[bi], 98)
+            array[bi] = np.clip(array[bi], 0, 1)
+
+        transform = ds.transform * rio.Affine.scale(ds_fact)
+        show(array, transform=transform, ax=axis, interpolation='nearest')
+        axis.set_title(label, fontweight='bold')
+        # axis.set_xlim(-5.75e4, -5.50e4)  # zoom in
+        # axis.set_ylim(-3.733e6, -3.730e6)
+        # axis.axis('off')
 
