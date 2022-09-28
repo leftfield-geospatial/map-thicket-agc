@@ -225,9 +225,9 @@ class MsPatchFeatureExtractor(PatchFeatureExtractor):
         nir_keys = [key for key in list(self._band_dict.keys()) if ('NIR' in key) or ('RE' in key)]
         for _nir_key in nir_keys:
             post_fix = '' if _nir_key == 'NIR' else '_{0}'.format(_nir_key)
-            self.inner_dict['NDVI' + post_fix] = lambda pan, bands, nir_key=_nir_key: (bands[self._band_dict[nir_key], :] - bands[self._band_dict['R'], :]) / \
+            self.inner_dict['NDVI' + post_fix] = lambda pan, bands, nir_key=_nir_key: 1 + (bands[self._band_dict[nir_key], :] - bands[self._band_dict['R'], :]) / \
                                                                                      (bands[self._band_dict[nir_key], :] + bands[self._band_dict['R'], :])
-            self.inner_dict['SAVI' + post_fix] = lambda pan, bands, nir_key=_nir_key: (1 + SAVI_L) * (bands[self._band_dict[nir_key], :] - bands[self._band_dict['R'], :]) / \
+            self.inner_dict['SAVI' + post_fix] = lambda pan, bands, nir_key=_nir_key: 1 + (1 + SAVI_L) * (bands[self._band_dict[nir_key], :] - bands[self._band_dict['R'], :]) / \
                                                                                      (SAVI_L + bands[self._band_dict[nir_key], :] + bands[self._band_dict['R'], :])
 
         # window functions
@@ -334,8 +334,8 @@ class ImageFeatureExtractor(object):
 
         for plot_id, plot in plot_data_gdf.iterrows():     # loop through plot polygons
             # convert polygon to raster mask
-            plot_mask, plot_transform, plot_window = raster_geometry_mask(self._image_reader, [plot['geometry']],
-                                                                          crop=True, all_touched=True)
+            plot_mask, plot_transform, plot_window = raster_geometry_mask(self._image_reader, [plot['geometry']], crop=True,
+                                                                          all_touched=False)
             plot_cnrs_pixel =  np.array(plot_window.toranges())
             plot_mask = ~plot_mask  # TODO: can we lose this?
             if plot_mask.sum() == 0:
