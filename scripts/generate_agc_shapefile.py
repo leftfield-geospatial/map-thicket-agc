@@ -34,6 +34,7 @@ uncorr_shapefile_names = [pathlib.Path(p) for p in glob.glob(str(uncorr_plot_loc
 gcp_shapefile_name = uncorr_plot_loc_root_path.joinpath('geomax_field_reference_pts.shp')
 plot_agc_allom_filename = root_path.joinpath(r'data/outputs/allometry/plot_agc_v3.csv')
 plot_agc_shapefile_name = root_path.joinpath(r'data/outputs/geospatial/gef_plot_polygons_with_agc_v2.shp')
+plot_agc_geopackage_name = root_path.joinpath(r'data/outputs/geospatial/gef_plot_polygons_with_agc_v2.gpckg')
 
 ## manually correct DGPS plot locations that could not be post-processed
 logger.info('Starting...')
@@ -94,6 +95,7 @@ for plot_name, plot_group in corr_plot_loc_gdf.groupby('PlotName'):
 # drop null geometry rows
 plot_agc_gdf = plot_agc_gdf.drop(np.where(plot_agc_gdf['geometry'].isnull())[0], axis=0)
 plot_agc_gdf.to_file(plot_agc_shapefile_name)   # write shapefile
+plot_agc_gdf.to_file(plot_agc_geopackage_name)   # write geopackage
 
 logger.info('Done\n')
 if __name__ =='__main__':
