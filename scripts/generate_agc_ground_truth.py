@@ -128,7 +128,8 @@ for (degr_class, degr_group), plotIdx in zip(plot_species_abc_df.groupby('degr_c
 
     degr_row = dict(list(zip(species_keys, species_abc_ha)))
     degr_row['degr_class'] = degr_class
-    degr_species_abc_df = degr_species_abc_df.append(degr_row, ignore_index=True)
+    degr_df = pd.DataFrame([degr_row.values()], columns=degr_row.keys())
+    degr_species_abc_df = pd.concat((degr_species_abc_df, degr_df), ignore_index=True)
 
     logger.info('Average ABC in {0} stratum: {1:.3f} tC/ha'.format(degr_class, species_abc_ha.sum()))
     idx = np.argsort(-species_abc_ha)

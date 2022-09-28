@@ -19,7 +19,8 @@ conda install -c conda-forge matplotlib numpy scipy scikit-learn openpyxl raster
 git clone https://github.com/dugalh/map_thicket_agc.git
 pip install -e map_thicket_agc
 ```        
-3) Create the `data/inputs/imagery` directory and download the [satellite and aerial imagery](https://1drv.ms/u/s!Aq0bZ0KcAqFZgRawIwhndMUdXFEs?e=q9HaPC) into it
+3) Create the `data/inputs/imagery/worldview3` directory and download the [satellite imagery](https://zenodo.org/record/7114242) into it.
+4) Create the `data/inputs/imagery/ngi` directory; download and extract the [corrected aerial imagery](https://zenodo.org/record/7114702) into it.
 
 ### Requirements  
 The following dependencies are installed in the process above.  The `geopandas` and `rasterio` packages have binary dependencies that are not directly available through `pip`, hence the recommendation for using `conda`.  
@@ -42,7 +43,8 @@ Path | Description
 [data/inputs/allometry](data/inputs/allometry) | Woody and litter allometric measurements from 85 sampling plots in the Baviaanskloof, South Africa, and [allometric models](https://www.researchgate.net/publication/335531470_Aboveground_biomass_and_carbon_pool_estimates_of_Portulacaria_afra_spekboom-rich_subtropical_thicket_with_species-specific_allometric_models) for common thicket species.  
 [data/inputs/geospatial/sampling_plot_locations/corrected](data/inputs/geospatial/sampling_plot_locations/corrected) | Polygons of sampling plot boundaries with differential correction to < 30cm accuracy.      
 [data/inputs/geospatial/sampling_plot_locations/uncorrected](data/inputs/geospatial/sampling_plot_locations/uncorrected) | Reference and sampling plot corner points with no differential correction.      
-data/inputs/imagery | Satellite and aerial imagery (see [Installation](#installation)). 
+data/inputs/imagery/worldview3 | Satellite imagery (see [Installation](#installation)). 
+data/inputs/imagery/ngi | Aerial imagery (see [Installation](#installation)). 
 
 ### Generating Results
 The [scripts](scripts) directory contains python scripts for generating results.  To run the scripts in the required order, execute:
@@ -85,14 +87,14 @@ A method for calibrating AGC models to new images gave encouraging results.  Tes
 
 *R*<sup>2</sup> | WV3 Oct 2017 | WV3 Nov 2018 | WV3 Aug 2017 | NGI April 2015
 ---|--------------|--------------|--------------|---------------
-**WV3 Oct 2017** | - | 0.8309 | 0.7994 | 0.7241
-**WV3 Nov 2018** | 0.8413 | - | 0.7915 | 0.7195
-**WV3 Aug 2017** | 0.8392 | 0.8215 | - | 0.7027
-**NGI April 2015** | 0.8099 | 0.7951 | 0.7443 | -
+**WV3 Oct 2017** | - | 0.826 | 0.803 | 0.802
+**WV3 Nov 2018** | 0.847 | - | 0.798 | 0.813
+**WV3 Aug 2017** | 0.845 | 0.818 | - | 0.801
+**NGI April 2015** | 0.835 | 0.830 | 0.798 | -
 
 ## Licenses
 - Code is licensed under the [AGPLv3](https://www.gnu.org/licenses/agpl-3.0.en.html)
-- Data, excluding imagery, is licensed under the [CC-BY-SA](https://creativecommons.org/licenses/by-sa/4.0)
+- Data, excluding WorldView-3 imagery, is licensed under the [CC-BY-SA](https://creativecommons.org/licenses/by-sa/4.0)
 - WorldView-3 imagery is licensed under the [DigitalGlobe Foundation's terms](data/WV3_attribution)
 
 ## Citation
