@@ -38,10 +38,10 @@ calib_plot_file = sampling_plot_gt_file     # sampling plots were used as calib 
 # calib_plot_file = root_path.joinpath(r'data/inputs/geospatial/gef_calib_plots.shp')   # a set of calib plots separate from sampling plots
 
 image_files_dict = {
-    'WV3 Oct 2017': image_root_path.joinpath(r'WorldView3/WorldView3_Oct2017_OrthoNgiDem_AtcorSrtmAdjCorr_PanAndPandSharpMs.tif'),
-    'WV3 Nov 2018': image_root_path.joinpath(r'WorldView3/WorldView3_Nov2018_OrthoThinSpline_NoAtcor_PanSharpMs.tif'),
-    'WV3 Aug 2017': image_root_path.joinpath(r'WorldView3/WorldView3_Aug2017_OrthoThinSpline_NoAtcor_PanSharpMs.tif'),
-    'NGI April 2015': image_root_path.joinpath(r'NGI/Ngi_May2015_OrthoNgiDem_Corrected_Mosaic.vrt'),
+    'WV3 Oct 2017': image_root_path.joinpath(r'worldview3/WorldView3_Oct2017_OrthoNgiDem_AtcorSrtmAdjCorr_PanAndPandSharpMs.tif'),
+    'WV3 Nov 2018': image_root_path.joinpath(r'worldview3/WorldView3_Nov2018_OrthoThinSpline_NoAtcor_PanSharpMs.tif'),
+    'WV3 Aug 2017': image_root_path.joinpath(r'worldview3/WorldView3_Aug2017_OrthoThinSpline_NoAtcor_PanSharpMs.tif'),
+    'NGI April 2015': image_root_path.joinpath(r'ngi/Ngi_May2015_OrthoNgiDem_Corrected_Mosaic.vrt'),
 }
 
 feats_of_interest = ['log(mean(R/pan))', 'log(mean(G/R))', 'log(mean(R/NIR))', '(mean(NDVI))', '(mean(SAVI))', 'log(mean(B/R))']

@@ -31,7 +31,7 @@ from scipy import stats
 # compare performance of different references and different homonim fuse params
 image_root_path = root_path.joinpath(r'data/inputs/imagery')
 plot_agc_shapefile_name = root_path.joinpath(r'data/outputs/geospatial/gef_plot_polygons_with_agc_v2.shp')
-src_file = image_root_path.joinpath(r'NGI/Ngi_May2015_OrthoNgiDem_Source_Mosaic.vrt')
+src_file = image_root_path.joinpath(r'ngi/Ngi_May2015_OrthoNgiDem_Source_Mosaic.vrt')
 
 # create a list of all the available corrected VRT mosaic files
 corrected_wildcards = [
@@ -127,8 +127,8 @@ import numpy as np
 from map_thicket_agc import root_path
 
 image_root_path = root_path.joinpath(r'data/inputs/imagery')
-src_file = image_root_path.joinpath(r'NGI/Ngi_May2015_OrthoNgiDem_Source_Mosaic.vrt')
-corr_file = image_root_path.joinpath(r'NGI/Ngi_May2015_OrthoNgiDem_Corrected_Mosaic.vrt')
+src_file = image_root_path.joinpath(r'ngi/Ngi_May2015_OrthoNgiDem_Source_Mosaic.vrt')
+corr_file = image_root_path.joinpath(r'ngi/Ngi_May2015_OrthoNgiDem_Corrected_Mosaic.vrt')
 plot_agc_shapefile_name = root_path.joinpath(r'data/outputs/geospatial/gef_plot_polygons_with_agc_v2.shp')
 
 plot_agc_gdf = gpd.GeoDataFrame.from_file(plot_agc_shapefile_name)

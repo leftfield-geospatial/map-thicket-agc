@@ -30,7 +30,7 @@ calib_plot_in_file = root_path.joinpath(r'data/inputs/geospatial/gef_calib_plots
 calib_plot_out_file = root_path.joinpath(r'data/outputs/geospatial/gef_calib_plots_with_agc.geojson')
 calib_plot_out_file_translated = root_path.joinpath(r'data/outputs/geospatial/gef_calib_plots_with_agc_translated.geojson')
 
-image_file = image_root_path.joinpath(r'WorldView3/WorldView3_Oct2017_OrthoNgiDem_AtcorSrtmAdjCorr_PanAndPandSharpMs.tif')
+image_file = image_root_path.joinpath(r'worldview3/WorldView3_Oct2017_OrthoNgiDem_AtcorSrtmAdjCorr_PanAndPandSharpMs.tif')
 model_file = root_path.joinpath(r'data/outputs/Models/best_univariate_model_py38_cv5v2.joblib')
 
 feats_of_interest = ['log(mean(R/pan))', 'log(mean(G/R))', 'log(mean(R/NIR))', '(mean(NDVI))', '(mean(SAVI))', 'log(mean(B/R))']

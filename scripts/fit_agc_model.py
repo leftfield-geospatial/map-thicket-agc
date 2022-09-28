@@ -32,7 +32,7 @@ from map_thicket_agc import get_logger
 
 ## extract features from multi-spectral satellite image
 plot_agc_shapefile_name = root_path.joinpath(r'data/outputs/geospatial/gef_plot_polygons_with_agc_v2.shp')
-image_filename = root_path.joinpath(r'data/inputs/imagery/WorldView3/WorldView3_Oct2017_OrthoNgiDem_AtcorSrtmAdjCorr_PanAndPandSharpMs.tif')
+image_filename = root_path.joinpath(r'data/inputs/imagery/worldview3/WorldView3_Oct2017_OrthoNgiDem_AtcorSrtmAdjCorr_PanAndPandSharpMs.tif')
 
 logger = get_logger(__name__)
 logger.info('Starting...')
