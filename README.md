@@ -43,8 +43,8 @@ Path | Description
 [data/inputs/allometry](data/inputs/allometry) | Woody and litter allometric measurements from 85 sampling plots in the Baviaanskloof, South Africa, and [allometric models](https://www.researchgate.net/publication/335531470_Aboveground_biomass_and_carbon_pool_estimates_of_Portulacaria_afra_spekboom-rich_subtropical_thicket_with_species-specific_allometric_models) for common thicket species.  
 [data/inputs/geospatial/sampling_plot_locations/corrected](data/inputs/geospatial/sampling_plot_locations/corrected) | Polygons of sampling plot boundaries with differential correction to < 30cm accuracy.      
 [data/inputs/geospatial/sampling_plot_locations/uncorrected](data/inputs/geospatial/sampling_plot_locations/uncorrected) | Reference and sampling plot corner points with no differential correction.      
-data/inputs/imagery/WorldView3 | Satellite imagery (see [Installation](#installation)). 
-data/inputs/imagery/NGI | Aerial imagery (see [Installation](#installation)). 
+data/inputs/imagery/worldview3 | Satellite imagery (see [Installation](#installation)). 
+data/inputs/imagery/ngi | Aerial imagery (see [Installation](#installation)). 
 
 ### Generating Results
 The [scripts](scripts) directory contains python scripts for generating results.  To run the scripts in the required order, execute:
