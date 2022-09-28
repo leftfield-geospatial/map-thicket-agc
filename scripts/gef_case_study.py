@@ -29,9 +29,9 @@ from scipy import stats
 
 # -----------------------------------------------------------------------------
 # compare performance of different references and different homonim fuse params
-
+image_root_path = root_path.joinpath(r'data/inputs/imagery')
 plot_agc_shapefile_name = root_path.joinpath(r'data/outputs/geospatial/gef_plot_polygons_with_agc_v2.shp')
-src_file = Path(r"V:\Data\HomonimEgs\NGI_3323D_2015_GefSite\Source\NGI_3323DA_2015_GefSite_Source.vrt")
+src_file = image_root_path.joinpath(r'NGI/Ngi_May2015_OrthoNgiDem_Source_Mosaic.vrt')
 
 # create a list of all the available corrected VRT mosaic files
 corrected_wildcards = [
@@ -44,7 +44,6 @@ corrected_wildcards = [
 corrected_files = []
 for corrected_wildcard in corrected_wildcards:
     corrected_files += [*glob(corrected_wildcard)]
-
 pprint(corrected_files)
 
 def correct_stratum(gdf):
@@ -122,15 +121,19 @@ import rasterio as rio
 from rasterio.plot import show
 from rasterio.enums import Resampling
 from matplotlib import pyplot
+import geopandas as gpd
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 import numpy as np
+from map_thicket_agc import root_path
 
-# corr_file = max(corrected_r2, key=corrected_r2.get)
-src_file = r'V:\Data\HomonimEgs\NGI_3323D_2015_GefSite\Source\NGI_3323DA_2015_GefSite_Source.vrt'
-corr_file = r'V:\Data\HomonimEgs\NGI_3323D_2015_GefSite\Corrected\Sentinel-2\o3323d_2015_RGBN_FUSE_cREF_mGAIN-BLK-OFFSET_15_15.vrt'
-ref_file = r'V:\Data\HomonimEgs\NGI_3323D_2015_GefSite\Reference\COPERNICUS-S2-20151023T081112_20151023T081949_T34HGH_B4328.tif'
+image_root_path = root_path.joinpath(r'data/inputs/imagery')
+src_file = image_root_path.joinpath(r'NGI/Ngi_May2015_OrthoNgiDem_Source_Mosaic.vrt')
+corr_file = image_root_path.joinpath(r'NGI/Ngi_May2015_OrthoNgiDem_Corrected_Mosaic.vrt')
+plot_agc_shapefile_name = root_path.joinpath(r'data/outputs/geospatial/gef_plot_polygons_with_agc_v2.shp')
 
-indexes = [4, 1, 2]
+plot_agc_gdf = gpd.GeoDataFrame.from_file(plot_agc_shapefile_name)
+
+indexes = [1, 2, 3]
 ds_fact = 4  # downsample factor
 
 
@@ -141,8 +144,10 @@ cax = divider.append_axes('right', size='3%', pad=0.1)
 with rio.Env(GDAL_NUM_THREADS='ALL_CPUs', GTIFF_FORCE_RGBA=False), rio.open(corr_file, 'r') as ds:
     ds_shape = tuple(np.round(np.array(ds.shape) / ds_fact).astype(int).tolist())
     array = ds.read(indexes=indexes, out_dtype='float32', out_shape=ds_shape)  # , resampling=Resampling.average)
+    mask = np.any(array == ds.nodata, axis=(0)) | np.any(np.isnan(array), axis=(0))
+    array[:, mask] = np.nan
     for bi in range(len(indexes)):
-        array[bi] -= np.nanpercentile(array[bi], .5)
+        array[bi] -= np.nanpercentile(array[bi], 2)
         array[bi] /= np.nanpercentile(array[bi], 98)
         array[bi] = np.clip(array[bi], 0, 1)
 
@@ -157,57 +162,4 @@ with rio.Env(GDAL_NUM_THREADS='ALL_CPUs', GTIFF_FORCE_RGBA=False), rio.open(corr
     )
     ax.axis((86494.06047619047, 94313.07562770562, -3717680.7510822513, -3711286.8766233767))
     ax.axis('off')
-
-
-
-# fig, axes = pyplot.subplots(1, 3, sharex=True, sharey=True, figsize=(15, 10))
-#
-# indexes = [1, 2, 3]
-# ds_fact = 8  # downsample factor
-# for im_file, scale, axis, label in zip(
-#         [src_file, ref_file, corr_file],
-#         [255, 150, 150],
-#         axes,
-#         ['Source', 'Reference', 'Corrected'],
-# ):
-#     # read, scale and display the image
-#     with rio.open(im_file, 'r') as ds:
-#         array = ds.read(out_dtype='float32') / scale
-#
-#         show(array, transform=ds.transform, ax=axis, interpolation='nearest')
-#         axis.set_title(label, fontweight='bold')
-#         # axis.set_xlim(-5.75e4, -5.50e4)  # zoom in
-#         # axis.set_ylim(-3.733e6, -3.730e6)
-#         axis.axis('off')
-
-fig, axes = pyplot.subplots(1, 2, sharex=True, sharey=True, figsize=(15, 10))
-
-for im_file, scale, axis, label in zip(
-        [src_file, corr_file],
-        [3500, 4000],
-        axes,
-        ['Source', 'Corrected'],
-):
-    # read, scale and display the image
-    with rio.Env(GDAL_NUM_THREADS='ALL_CPUs', GTIFF_FORCE_RGBA=False), rio.open(im_file, 'r') as ds:
-        ds_shape = tuple(np.round(np.array(ds.shape) / ds_fact).astype(int).tolist())
-        print(ds.shape)
-        print(ds_shape)
-        print(ds.overviews(1))
-        # continue
-        array = ds.read(indexes=indexes, out_dtype='float32', out_shape=ds_shape) #, resampling=Resampling.average)
-        mask = np.any(array == ds.nodata, axis=(0)) | np.any(np.isnan(array), axis=(0))
-        array[:, mask] = np.nan
-        print(np.nanmin(array, axis=(1, 2)))
-        for bi in range(len(indexes)):
-            array[bi] -= np.nanpercentile(array[bi], 2)
-            array[bi] /= np.nanpercentile(array[bi], 98)
-            array[bi] = np.clip(array[bi], 0, 1)
-
-        transform = ds.transform * rio.Affine.scale(ds_fact)
-        show(array, transform=transform, ax=axis, interpolation='nearest')
-        axis.set_title(label, fontweight='bold')
-        # axis.set_xlim(-5.75e4, -5.50e4)  # zoom in
-        # axis.set_ylim(-3.733e6, -3.730e6)
-        # axis.axis('off')
 
