@@ -65,8 +65,10 @@ for uncorr_shapefile_name in uncorr_shapefile_names:
     gcp_ids, uncorr_idx, gcp_idx = np.intersect1d(uncorr_plot_loc_gdf['NAME'], gcp_gdf['ID'], return_indices=True)
 
     # Calculate correction offset - No high level way of converting GeoSeries to numpy arrays, and or doing array type arithmetic on GeoSeries, so ...
-    offsets = np.array([(np.array(uncorr_gcp_pt)[:2] - np.array(gcp_pt)[:2]).tolist()
-                        for gcp_pt, uncorr_gcp_pt in zip(uncorr_plot_loc_gdf.iloc[uncorr_idx]['geometry'], gcp_gdf.iloc[gcp_idx]['geometry'])])
+    offsets = np.array([
+        (np.array(*uncorr_gcp_pt.coords)[:2] - np.array(*gcp_pt.coords)[:2]).tolist()
+        for gcp_pt, uncorr_gcp_pt in zip(uncorr_plot_loc_gdf.iloc[uncorr_idx]['geometry'], gcp_gdf.iloc[gcp_idx]['geometry'])
+    ])
     offset = np.mean(offsets, axis=0)
 
     # apply correction to new dataframe
@@ -74,7 +76,7 @@ for uncorr_shapefile_name in uncorr_shapefile_names:
     tmp_gdf['geometry'] = uncorr_plot_loc_gdf[pt_idx]['geometry'].translate(xoff=offset[0], yoff=offset[1])
 
     tmp_gdf = tmp_gdf.to_crs(corr_plot_loc_gdf.crs) # convert to corr_plot_loc_gdf CRS (does not work with geopandas from https://www.lfd.uci.edu/~gohlke/pythonlibs/ - use conda)
-    corr_plot_loc_gdf = corr_plot_loc_gdf.append(tmp_gdf, ignore_index=True)
+    corr_plot_loc_gdf = pd.concat((corr_plot_loc_gdf, tmp_gdf), ignore_index=True)
 
 # read in AGC ground truth
 plot_agc_gdf = gpd.GeoDataFrame(pd.read_csv(plot_agc_allom_filename))
