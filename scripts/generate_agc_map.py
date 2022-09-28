@@ -28,7 +28,7 @@ logger = get_logger(__name__)
 logger.info('Starting...')
 
 image_root_path = root_path.joinpath(r'data/inputs/imagery')
-image_filename = image_root_path.joinpath('WorldView3_Oct2017_OrthoNgiDem_AtcorSrtmAdjCorr_PanAndPandSharpMs.tif')
+image_filename = image_root_path.joinpath('WorldView3/WorldView3_Oct2017_OrthoNgiDem_AtcorSrtmAdjCorr_PanAndPandSharpMs.tif')
 
 if False:
     model_filename = root_path.joinpath(r'data/outputs/Models/best_univariate_model_py38_cv5v2.joblib')
