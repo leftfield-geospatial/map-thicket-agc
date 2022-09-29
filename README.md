@@ -20,7 +20,7 @@ git clone https://github.com/dugalh/map_thicket_agc.git
 pip install -e map_thicket_agc
 ```        
 3) Create the `data/inputs/imagery/worldview3` directory and download the [satellite imagery](https://zenodo.org/record/7114242) into it.
-4) Create the `data/inputs/imagery/ngi` directory; download and extract the [corrected aerial imagery](https://zenodo.org/record/7114702) into it.
+4) Create the `data/inputs/imagery/ngi` directory; download and extract the [corrected aerial imagery](https://zenodo.org/record/7114702/files/Ngi_May2015_Corrected.zip) into it.
 
 ### Requirements  
 The following dependencies are installed in the process above.  The `geopandas` and `rasterio` packages have binary dependencies that are not directly available through `pip`, hence the recommendation for using `conda`.  
