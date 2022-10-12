@@ -104,14 +104,11 @@ For use of the code or output data, please cite:
 For use of the input allometric or plot location data, please cite: 
 - Bolus,  C., Harris, D., Reeler,  J., Powell, M.,  Powell, R., Ngwenya, M. 2020. *Above Ground Carbon (AGC) baseline assessment, using species specific allometric models, across  three  degradation  classes  in  Baviaanskloof Spekboom Thicket*, GEF-5  SLM,  Rhodes University. Internal report.
 
-## Author
-* **Dugal Harris** - *Method design and development* - [dugalh@gmail.com](mailto:dugalh@gmail.com)
-
 ## Credits
-* **Cosman Bolus** - *Field work and allometry* - [cosbolus@gmail.com](mailto:cosbolus@gmail.com)
-* **James Reeler** - *Policy advice and oversight* - [jreeler@wwf.org.za](mailto:jreeler@wwf.org.za)
-* **Marius van der Vyver** - *Allometric models* - [mariusvdv@gmail.com](mailto:mariusvdv@gmail.com)
-* **Rebecca Powell** - *GEF-5 SLM project coordination, E. Cape* - [rebeccajoub@gmail.com](mailto:rebeccajoub@gmail.com)
+* **Cosman Bolus** - *Field work and allometry* 
+* **James Reeler** - *Policy advice and oversight* 
+* **Marius van der Vyver** - *Allometric models* 
+* **Rebecca Powell** - *GEF-5 SLM project coordination, E. Cape*
 * **Center for Geographical Analysis** - *Assistance with imagery and DGPS device* - [www.sun.ac.za/cga](http://www0.sun.ac.za/cga/)
 * **National Geo-spatial Information** - *Aerial imagery* - [www.ngi.gov.za](http://www.ngi.gov.za)
 * Satellite images courtesy of the [DigitalGlobe Foundation](http://www.maxar.com)
