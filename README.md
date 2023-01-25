@@ -36,7 +36,7 @@ The following dependencies are installed in the process above.  The `geopandas` 
   - dcor >= 0.5
 
 ### Data
-Allometric and plot location data for generating AGC ground truth are included in the repository (refer to the [carbon baselines report](docs/gef5_slm_final_report_c_baselines_may2020.pdf) for detail on how this data was gathered).  Satellite and aerial imagery is too large for `git` and can be downloaded separately.  See the data licensing [here](#licensing).
+Allometric and plot location data for generating AGC ground truth are included in the repository (refer to the [carbon baselines report](docs/gef5_slm_final_report_c_baselines_may2020.pdf) for detail on how this data was gathered).  Satellite and aerial imagery is too large for `git` and can be downloaded separately.  See the data licensing [here](#licenses).
 
 Path | Description
 ---|---
