@@ -93,9 +93,9 @@ A method for calibrating AGC models to new images gave encouraging results.  Tes
 **NGI April 2015** | 0.835 | 0.830 | 0.798 | -
 
 ## Licenses
-- Code is licensed under the [AGPLv3](https://www.gnu.org/licenses/agpl-3.0.en.html)
-- Data, excluding WorldView-3 imagery, is licensed under the [CC-BY-SA](https://creativecommons.org/licenses/by-sa/4.0)
-- WorldView-3 imagery is licensed under the [DigitalGlobe Foundation's terms](data/WV3_attribution)
+- Code is licensed under the [AGPLv3](https://www.gnu.org/licenses/agpl-3.0.en.html).
+- All data, used and produced by the software (excluding WorldView-3 imagery), is licensed under the [CC BY-NC-SA](https://creativecommons.org/licenses/by-nc-sa/4.0/).
+- WorldView-3 imagery is licensed under the [DigitalGlobe Foundation's terms](data/WV3_attribution).
 
 ## Citation
 For use of the code or output data, please cite: 
