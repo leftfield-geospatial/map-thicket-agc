@@ -1,5 +1,5 @@
 # Above ground carbon estimation in thicket using multi-spectral images
-Aboveground carbon (AGC) maps are needed for monitoring of thicket restoration in  South Africa.  This project developed a method for mapping AGC using multi-spectral satellite imagery.  The work was undertaken as part of the [GEF5-SLM](https://www.thegef.org/project/securing-multiple-ecosystems-benefit-through-slm-productive-degraded-landscapes-south-africa) (sustainable land management project) project.  
+Aboveground carbon (AGC) maps are needed for monitoring of thicket restoration in  South Africa.  This project developed a method for mapping AGC using multi-spectral satellite imagery.  The work was undertaken as part of the [GEF5-SLM](https://www.thegef.org/project/securing-multiple-ecosystems-benefit-through-slm-productive-degraded-landscapes-south-africa) (sustainable land management) project.  
 
 Generic modules for allometry, image feature extraction, feature selection and applying models to large rasters may be useful for other projects.
 
