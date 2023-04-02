@@ -39,6 +39,7 @@ corrected_wildcards = [
     r'V:\Data\HomonimEgs\NGI_3323D_2015_GefSite\Corrected\Sentinel-2\*.vrt',
     r'V:\Data\HomonimEgs\NGI_3323D_2015_GefSite\Corrected\Sentinel-2-Harm\*.vrt',
     r'V:\Data\HomonimEgs\NGI_3323D_2015_GefSite\Corrected\Modis-nbar\*.vrt',
+    r"D:\Data\Development\Projects\PhD GeoInformatics\Data\NGI\Rectified\3322D_2015_1001\RGBN\XCALIB\AutoGcpWv3\*.vrt"
 ]
 
 corrected_files = []

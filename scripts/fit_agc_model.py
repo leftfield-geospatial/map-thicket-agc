@@ -34,6 +34,9 @@ from map_thicket_agc import get_logger
 plot_agc_shapefile_name = root_path.joinpath(r'data/outputs/geospatial/gef_plot_polygons_with_agc_v2.shp')
 image_filename = root_path.joinpath(r'data/inputs/imagery/worldview3/WorldView3_Oct2017_OrthoNgiDem_AtcorSrtmAdjCorr_PanAndPandSharpMs.tif')
 
+# temp change for reporting NGI scores in Leftfield portfolio section, based on best imagery from gef_case_study.py
+# image_filename = r'V:\\Data\\HomonimEgs\\NGI_3323D_2015_GefSite\\Corrected\\Sentinel-2\\3323d_2015_RGBN_CMP_FUSE_cREF_mGAIN-BLK-OFFSET_15_15.vrt'
+
 logger = get_logger(__name__)
 logger.info('Starting...')
 
