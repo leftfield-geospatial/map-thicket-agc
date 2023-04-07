@@ -16,7 +16,7 @@
     You should have received a copy of the GNU Affero General Public License
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
-## Generate model calibration and AGC data for https://github.com/dugalh/extend_thicket_agc
+## Generate model calibration and AGC data for https://github.com/leftfield-geospatial/extend-thicket-agc
 
 import geopandas as gpd, pandas as pd
 import numpy as np

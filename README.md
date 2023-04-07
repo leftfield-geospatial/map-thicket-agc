@@ -16,8 +16,8 @@ conda install -c conda-forge matplotlib numpy scipy scikit-learn openpyxl raster
 ```
 2) Clone the git repository and link into the conda environment:
 ```shell
-git clone https://github.com/dugalh/map_thicket_agc.git
-pip install -e map_thicket_agc
+git clone https://github.com/leftfield-geospatial/map-thicket-agc.git
+pip install -e map-thicket-agc
 ```        
 3) Create the `data/inputs/imagery/worldview3` directory and download the [satellite imagery](https://zenodo.org/record/7114242) into it.
 4) Create the `data/inputs/imagery/ngi` directory; download and extract the [corrected aerial imagery](https://zenodo.org/record/7130228/files/Ngi_May2015_Corrected.zip) into it.
@@ -49,7 +49,7 @@ data/inputs/imagery/ngi | Aerial imagery (see [Installation](#installation)).
 ### Generating Results
 The [scripts](scripts) directory contains python scripts for generating results.  To run the scripts in the required order, execute:
 ```shell
-python map_thicket_agc/scripts/run_all.py
+python map-thicket-agc/scripts/run_all.py
 ```
 
 Script | Description
@@ -60,7 +60,7 @@ Script | Description
 [scripts/fit_agc_model.py](scripts/fit_agc_model.py) | Extracts features from the satellite image, selects a set of informative features, and fits and evaluates models for predicting AGC from these features  
 [scripts/generate_agc_map.py](scripts/generate_agc_map.py) | Applies fitted model(s) to the satellite image to generate a coarse resolution AGC map
 [scripts/evaluate_calibration.py](scripts/evaluate_calibration.py) | Evaluates a method for calibrating AGC models to new images (using an additional two satellite images and a mosaic of aerial imagery)
-[scripts/generate_extend_ground_truth.py](scripts/generate_extend_ground_truth.py) | Generates AGC and feature ground truth for [extending the model spatially](https://github.com/dugalh/extend_thicket_agc)  
+[scripts/generate_extend_ground_truth.py](scripts/generate_extend_ground_truth.py) | Generates AGC and feature ground truth for [extending the model spatially](https://github.com/leftfield-geospatial/extend-thicket-agc)  
 
 ## Summary of Results
 See the [paper](docs/vhr_agc_mapping_in_subtropical_thicket_preprint_jul2021.pdf), and [full report](docs/gef5_slm_remote_sensing_of_agc_in_thicket_nov2019.pdf) for more detail.

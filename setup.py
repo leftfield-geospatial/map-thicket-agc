@@ -27,7 +27,7 @@ setup(
     description='Mapping AGC in thicket with multi-spectral imagery',
     author='Dugal Harris',
     author_email='dugalh@gmail.com',
-    url='https://github.com/dugalh/map_thicket_agc/blob/master/setup-py',
+    url='https://github.com/leftfield-geospatial/map-thicket-agc',
     license='AGPLv3',
     packages=find_packages(),
     python_requires='>=3.6',
